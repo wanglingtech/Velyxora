@@ -74,22 +74,22 @@ conversionQueue.process(async (jobId: string, data: any) => {
       }
     }
 
+    const storedOutput = storageService.registerOutput(result.outputPath, result.outputFilename, result.mimeType);
+
     jobManager.updateJob(jobId, {
       metadata: probe ? { probe } : undefined,
       output: {
-        fileId: path.parse(result.outputFilename).name,
+        fileId: storedOutput.fileId,
         filename: result.outputFilename,
         mimeType: result.mimeType,
         size: result.size,
         path: result.outputPath,
-        downloadUrl: `/api/download/${path.parse(result.outputFilename).name}`,
+        downloadUrl: `/api/download/${storedOutput.fileId}`,
         duration: probe?.duration,
         width: probe?.streams.find((stream) => stream.codecType === 'video')?.width,
         height: probe?.streams.find((stream) => stream.codecType === 'video')?.height,
       },
     });
-
-    storageService.registerOutput(result.outputPath, result.outputFilename, result.mimeType);
 
     jobManager.setStatus(jobId, 'COMPLETED');
   } catch (err: any) {
@@ -101,6 +101,6 @@ conversionQueue.process(async (jobId: string, data: any) => {
       jobManager.setStatus(jobId, 'FAILED', err.message);
     }
   } finally {
-    storageService.deleteFile(path.parse(job.input.filename).name);
+    if (job.input.fileId) storageService.deleteFile(job.input.fileId);
   }
 });

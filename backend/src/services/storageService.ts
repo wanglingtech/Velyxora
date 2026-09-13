@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
 import { assertSafePath } from '../utils/pathUtils';
@@ -32,7 +33,10 @@ class StorageService {
   }
 
   public registerFile(file: Express.Multer.File): StoredFileInfo {
-    const fileId = path.parse(file.filename).name;
+    // IDs are API identifiers, not filenames. Keeping them independent avoids
+    // otherwise-safe characters in user filenames (dots, spaces, Unicode)
+    // being rejected by the conversion request schema.
+    const fileId = `file-${randomUUID()}`;
     const record: StoredFileInfo = {
       fileId,
       originalName: file.originalname,
@@ -52,7 +56,7 @@ class StorageService {
     const stat = fs.statSync(outputPath);
     const filename = path.basename(outputPath);
     const record: StoredFileInfo = {
-      fileId: path.parse(filename).name,
+      fileId: `file-${randomUUID()}`,
       originalName,
       filename,
       path: outputPath,

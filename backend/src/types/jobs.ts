@@ -17,6 +17,7 @@ export interface JobRecord {
   progress: number; // -1 for indeterminate, 0..100 for exact
   progressMessage?: string;
   input: {
+    fileId?: string;
     filename: string;
     originalName: string;
     mimeType: string;

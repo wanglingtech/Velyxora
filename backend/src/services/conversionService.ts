@@ -49,6 +49,7 @@ class ConversionService {
       id: jobId,
       toolId: dto.toolId,
       input: {
+        fileId: dto.fileId,
         filename: path.basename(sourcePath),
         originalName,
         mimeType,

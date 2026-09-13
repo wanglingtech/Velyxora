@@ -2,9 +2,9 @@ import { Request, Response } from 'express';
 import { jobService } from '../services/jobService';
 import { HTTP_STATUS } from '../config/constants';
 import fs from 'fs';
-import path from 'path';
-import { ENV } from '../config/env';
 import { assertSafePath } from '../utils/pathUtils';
+import { storageService } from '../services/storageService';
+import { ENV } from '../config/env';
 
 export async function getJobById(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
@@ -55,14 +55,10 @@ export async function deleteJobById(req: Request, res: Response): Promise<void> 
 export async function streamDownload(req: Request, res: Response): Promise<void> {
   const { fileId } = req.params;
 
-  // Search for matching file in storage directory
   try {
-    const files = fs.readdirSync(ENV.STORAGE_DIR);
-    // fileId is the complete basename emitted by the conversion job. Avoid
-    // substring matches, which could return a different user's similarly named file.
-    const target = files.find((f) => path.parse(f).name === fileId);
+    const stored = storageService.getFile(fileId);
 
-    if (!target) {
+    if (!stored) {
       res.status(HTTP_STATUS.NOT_FOUND).json({
         success: false,
         error: {
@@ -74,13 +70,13 @@ export async function streamDownload(req: Request, res: Response): Promise<void>
       return;
     }
 
-    const fullPath = path.join(ENV.STORAGE_DIR, target);
+    const fullPath = stored.path;
     assertSafePath(ENV.STORAGE_DIR, fullPath);
 
     const stat = fs.statSync(fullPath);
-    res.setHeader('Content-Type', getDownloadMime(path.extname(target)));
+    res.setHeader('Content-Type', stored.mimeType);
     res.setHeader('Content-Length', String(stat.size));
-    res.download(fullPath, target, (err) => {
+    res.download(fullPath, stored.filename, (err) => {
       if (err) {
         // stream was closed or aborted
       }
@@ -95,14 +91,4 @@ export async function streamDownload(req: Request, res: Response): Promise<void>
       timestamp: new Date().toISOString(),
     });
   }
-}
-
-function getDownloadMime(extension: string): string {
-  const types: Record<string, string> = {
-    '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
-    '.mp4': 'video/mp4', '.webm': 'video/webm', '.gif': 'image/gif',
-    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-    '.webp': 'image/webp', '.pdf': 'application/pdf', '.zip': 'application/zip',
-  };
-  return types[extension.toLowerCase()] || 'application/octet-stream';
 }

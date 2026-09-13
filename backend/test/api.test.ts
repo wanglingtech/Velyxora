@@ -69,20 +69,34 @@ test("upload stores a real fixture and rejects a conversion with an unsupported 
   }
 });
 
+test("upload returns a schema-safe opaque fileId for complex filenames", async () => {
+  const upload = await request(backendApp)
+    .post("/api/uploads")
+    .attach("file", Buffer.from("video bytes"), {
+      filename: "recording final.v2.mp4",
+      contentType: "video/mp4",
+    });
+
+  assert.strictEqual(upload.status, 201);
+  assert.match(upload.body.data.fileId, /^[a-zA-Z0-9_-]+$/);
+  assert.strictEqual(upload.body.data.originalName, "recording final.v2.mp4");
+  storageService.deleteFile(upload.body.data.fileId);
+});
+
 test("backend download returns exact bytes and attachment headers", async () => {
-  const fileId = `download-test-${Date.now()}`;
-  const filename = `${fileId}.png`;
+  const filename = `download-test-${Date.now()}.png`;
   const fullPath = path.join(ENV.STORAGE_DIR, filename);
   const fixture = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
   fs.writeFileSync(fullPath, fixture);
+  const stored = storageService.registerOutput(fullPath, filename, "image/png");
   try {
-    const res = await request(backendApp).get(`/api/download/${fileId}`);
+    const res = await request(backendApp).get(`/api/download/${stored.fileId}`);
     assert.strictEqual(res.status, 200);
     assert.match(res.headers["content-type"], /image\/png/);
     assert.match(res.headers["content-disposition"], /attachment/);
     assert.strictEqual(Number(res.headers["content-length"]), fixture.length);
   } finally {
-    fs.unlinkSync(fullPath);
+    storageService.deleteFile(stored.fileId);
   }
 });
 

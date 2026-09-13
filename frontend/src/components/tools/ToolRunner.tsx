@@ -29,6 +29,7 @@ import { JobProgressView } from "../common/JobProgressView";
 import { CapabilityBadge } from "../common/Badge";
 import { toast } from "../common/ToastContainer";
 import { apiClient } from "../../services/apiClient";
+import { uploadAndStartConversion } from "../../services/backendConversionService";
 import {
   formatFileSize,
   formatDuration,
@@ -247,9 +248,6 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
           throw new Error("FFMPEG_NOT_AVAILABLE: FFmpeg no está disponible en el backend.");
         }
         jobService.updateStatus(job.id, "UPLOADING", "Subiendo archivo al backend...", 0);
-        const upload = await apiClient.uploadFile(selectedFile, (progress) =>
-          jobService.updateStatus(job.id, "UPLOADING", "Subiendo archivo al backend...", progress),
-        );
         const mime = tool.id === "video-to-mp3"
           ? "audio/mpeg"
           : tool.id === "audio-format-converter" && selectedFile.type === "audio/mpeg"
@@ -264,7 +262,11 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
         if (tool.id === "video-to-gif") { options.gifWidth = gifWidth; options.fps = gifFps; }
         if (tool.id === "audio-normalize") options.normalizeAudio = true;
         if (tool.id === "video-resize") options.resolution = videoResolution;
-        const remote = await apiClient.startConversion({ fileId: upload.fileId, toolId: tool.id, targetFormat, options });
+        const remote = await uploadAndStartConversion(
+          selectedFile,
+          { toolId: tool.id, targetFormat, options },
+          (progress) => jobService.updateStatus(job.id, "UPLOADING", "Subiendo archivo al backend...", progress),
+        );
         backendJobIdRef.current = remote.id;
         pollingCancelledRef.current = false;
         for (let attempt = 0; attempt < 300 && !pollingCancelledRef.current; attempt += 1) {

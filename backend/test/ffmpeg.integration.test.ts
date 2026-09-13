@@ -119,7 +119,7 @@ test("real FFmpeg/FFprobe conversions, cancellation, timeout and HTTP download",
     assert.ok((await e2eConvert(video, "video.mp4", "video/mp4", "video-trimmer", "mp4", { trimStart: 1, trimEnd: 3 }, /video\/mp4/)).duration! < 2.3);
     assert.equal((await e2eConvert(video, "video.mp4", "video/mp4", "video-mute", "mp4", { muteAudio: true }, /video\/mp4/)).streams.some((s) => s.codecType === "audio"), false);
     assert.ok((await e2eConvert(video, "video.mp4", "video/mp4", "video-speed", "mp4", { speedMultiplier: 2 }, /video\/mp4/)).duration! < 2.8);
-    assert.match((await e2eConvert(video, "video.mp4", "video/mp4", "video-to-gif", "gif", { gifWidth: 320, fps: 15 }, /image\/gif/)).format, /gif/);
+    assert.match((await e2eConvert(video, "recording final.v2.mp4", "video/mp4", "video-to-gif", "gif", { gifWidth: 320, fps: 15 }, /image\/gif/)).format, /gif/);
     assert.equal((await e2eConvert(wav, "tone.wav", "audio/wav", "audio-bitrate", "mp3", { bitrate: "96k" }, /audio\/mpeg/)).streams.some((s) => s.codecName === "mp3"), true);
     assert.equal((await e2eConvert(wav, "tone.wav", "audio/wav", "audio-normalize", "mp3", { bitrate: "192k", normalizeAudio: true }, /audio\/mpeg/)).streams.some((s) => s.codecName === "mp3"), true);
     const resizedProbe = await e2eConvert(video, "video.mp4", "video/mp4", "video-resize", "mp4", { resolution: "854x480" }, /video\/mp4/);

@@ -1,5 +1,4 @@
 import multer from 'multer';
-import path from 'path';
 import fs from 'fs';
 import { ENV } from '../config/env';
 import { sanitizeFilename } from '../utils/sanitize';
