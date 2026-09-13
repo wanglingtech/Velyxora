@@ -11,6 +11,8 @@ import {
 import { ProcessingJob } from "../../types";
 import { formatFileSize } from "../../services/detectionService";
 import { CapabilityBadge } from "./Badge";
+import { downloadService } from "../../services/downloadService";
+import { toast } from "./ToastContainer";
 
 interface JobProgressViewProps {
   job: ProcessingJob;
@@ -28,15 +30,17 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
   );
   const [copied, setCopied] = useState(false);
 
-  const handleDownload = () => {
-    if (!job.output?.downloadUrl) return;
-
-    const a = document.createElement("a");
-    a.href = job.output.downloadUrl;
-    a.download = customFilename || job.output.filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const handleDownload = async () => {
+    if (!job.output) return;
+    try {
+      const filename = customFilename || job.output.filename;
+      if (job.output.blob) downloadService.downloadBlob(job.output.blob, filename);
+      else if (typeof job.output.fileId === "string") await downloadService.downloadBackendFile(job.output.fileId, filename);
+      else if (job.output.downloadUrl) await downloadService.downloadFromUrl(job.output.downloadUrl, filename);
+      else throw new Error("DOWNLOAD_FAILED: no existe un archivo de salida.");
+    } catch (error) {
+      toast.error("No se pudo descargar", error instanceof Error ? error.message : "DOWNLOAD_FAILED");
+    }
   };
 
   const handleCopyText = () => {
@@ -222,7 +226,7 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
 
         {/* Download and Action Row */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-white/[0.06]">
-          {job.output.downloadUrl ? (
+          {job.output.blob || job.output.fileId || job.output.downloadUrl ? (
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <input
                 type="text"

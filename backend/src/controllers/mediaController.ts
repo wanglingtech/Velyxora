@@ -17,6 +17,18 @@ export async function analyzeMedia(req: Request, res: Response): Promise<void> {
   }
 
   try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('protocol');
+  } catch {
+    res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      error: { code: 'INVALID_URL', message: 'La URL debe ser una dirección HTTP o HTTPS válida.' },
+      timestamp: new Date().toISOString(),
+    });
+    return;
+  }
+
+  try {
     const analysis = await mediaService.analyzeUrl(url);
     res.status(HTTP_STATUS.OK).json({
       success: true,

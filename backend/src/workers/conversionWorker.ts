@@ -48,6 +48,7 @@ conversionQueue.process(async (jobId: string, data: any) => {
 
     jobManager.updateJob(jobId, {
       output: {
+        fileId: path.parse(result.outputFilename).name,
         filename: result.outputFilename,
         mimeType: result.mimeType,
         size: result.size,

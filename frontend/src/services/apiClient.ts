@@ -34,10 +34,11 @@ export interface ConversionJobResponse {
   progress: number;
   progressMessage?: string;
   output?: {
+    fileId: string;
     filename: string;
     mimeType: string;
     size: number;
-    downloadUrl: string;
+    downloadUrl?: string;
   };
   error?: string;
 }
@@ -73,9 +74,8 @@ class ApiClient {
   };
 
   constructor() {
-    // In browser, relative path '/api' works with Vite proxy/Express middleware.
-    // Falls back to import.meta.env.VITE_API_URL or ''
-    const envUrl = (import.meta as any).env?.VITE_API_URL || "";
+    // One strategy: an absolute backend origin. Paths below always include /api.
+    const envUrl = (import.meta as any).env?.VITE_API_URL || "http://localhost:3000";
     this.baseUrl = envUrl ? envUrl.replace(/\/+$/, "") : "";
   }
 
@@ -268,6 +268,34 @@ class ApiClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
     });
+  }
+
+  async downloadFile(fileId: string): Promise<{ blob: Blob; filename: string; contentType: string }> {
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}/api/download/${encodeURIComponent(fileId)}`);
+    } catch {
+      throw new Error("Backend no disponible: no se pudo establecer conexión.");
+    }
+    const contentType = response.headers.get("content-type") || "application/octet-stream";
+    if (!response.ok) {
+      let message = `DOWNLOAD_FAILED: HTTP ${response.status}.`;
+      if (contentType.includes("application/json")) {
+        const payload = await response.json().catch(() => null);
+        message = payload?.error?.message || message;
+      }
+      throw new Error(message);
+    }
+    if (contentType.includes("application/json")) {
+      throw new Error("DOWNLOAD_FAILED: el backend devolvió JSON en lugar de un archivo.");
+    }
+    const disposition = response.headers.get("content-disposition") || "";
+    const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    const quoted = disposition.match(/filename="([^"]+)"/i)?.[1];
+    const filename = encoded ? decodeURIComponent(encoded) : quoted || `download-${fileId}`;
+    const blob = await response.blob();
+    if (!blob.size) throw new Error("DOWNLOAD_FAILED: el archivo descargado está vacío.");
+    return { blob, filename, contentType };
   }
 }
 

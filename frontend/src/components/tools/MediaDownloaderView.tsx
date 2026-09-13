@@ -300,16 +300,19 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
               </div>
 
               <div className="flex justify-end pt-1">
-                <button
-                  onClick={handleDownloadAction}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all"
-                >
-                  <DownloadCloud className="w-4 h-4" />
-                  <span>
-                    Descargar{" "}
-                    {selectedFormat ? selectedFormat.formatNote : "archivo"}
+                {metadata.requiresServerEngine || !selectedFormat?.directDownloadUrl ? (
+                  <span className="px-4 py-2 rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-300 text-xs font-medium">
+                    Análisis disponible · Descarga directa pendiente de motor externo
                   </span>
-                </button>
+                ) : (
+                  <button
+                    onClick={handleDownloadAction}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all"
+                  >
+                    <DownloadCloud className="w-4 h-4" />
+                    <span>Descargar {selectedFormat.formatNote}</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

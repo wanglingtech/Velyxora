@@ -24,6 +24,22 @@ This file details concrete, granular engineering steps required to continue deve
 - [x] Add explicit FFmpeg integration prerequisite reporting; conversion fixtures remain skipped when host binaries are absent.
 - [x] Fix the `qs` audit finding with a compatible npm override.
 
+## Completed in Phase 2B — real result delivery
+
+- [x] Use one absolute frontend API origin (`VITE_API_URL=http://localhost:3000`); API paths are centralized in `apiClient` and no Vite proxy is used.
+- [x] Route media analysis to the backend and distinguish validation, provider and offline failures.
+- [x] Add central Blob, URL and backend-file download handling with Object URL cleanup.
+- [x] Add `fileId` to completed backend job output and exact-id download resolution with MIME, length and attachment headers.
+- [x] Connect server tools to upload → conversion → bounded polling → download, with cancellation request support.
+- [x] Stop advertising a browser-produced WAV as MP3; real MP3 now requires the FFmpeg backend.
+- [x] Hide media stream download actions when no real provider/extractor URL exists.
+
+### Remaining after Phase 2B
+
+- [ ] Wire AbortSignal through the conversion worker so cancellation terminates an already-running FFmpeg child process.
+- [ ] Add per-file batch retry/remove controls; current implemented image batch produces one real ZIP.
+- [ ] Install no external engines automatically. LibreOffice and yt-dlp features remain external-engine-required.
+
 ### Phase 2A findings
 
 - React Router is not installed or used by the current source, so the reported v7 future-flag warnings do not originate in VELYXORA.

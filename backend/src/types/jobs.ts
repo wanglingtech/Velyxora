@@ -24,6 +24,7 @@ export interface JobRecord {
     path: string;
   };
   output?: {
+    fileId: string;
     filename: string;
     mimeType: string;
     size: number;

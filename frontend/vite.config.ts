@@ -9,4 +9,5 @@ export default defineConfig({
       "@": "/src",
     },
   },
+  // API calls use the absolute VITE_API_URL; no development proxy is mixed in.
 });

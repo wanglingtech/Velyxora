@@ -21,7 +21,6 @@ import {
   cropImage,
   extractVideoFrame,
   trimAndExportWav,
-  extractFullAudioTrack,
   generateFaviconPackage,
   generateBatchZip,
   generateQrCode,
@@ -29,6 +28,7 @@ import {
 import { JobProgressView } from "../common/JobProgressView";
 import { CapabilityBadge } from "../common/Badge";
 import { toast } from "../common/ToastContainer";
+import { apiClient } from "../../services/apiClient";
 import {
   formatFileSize,
   formatDuration,
@@ -54,6 +54,8 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
     initialFile || null,
   );
   const [activeJob, setActiveJob] = useState<ProcessingJob | null>(null);
+  const backendJobIdRef = useRef<string | null>(null);
+  const pollingCancelledRef = useRef(false);
 
   // Common Options
   const [quality, setQuality] = useState<number>(90);
@@ -213,16 +215,6 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
 
   // ==================== REAL PROCESSING EXECUTION ====================
   const handleExecute = async () => {
-    // If tool requires backend server
-    if (tool.requiresServer && !tool.isClientReady) {
-      toast.warning(
-        "Motor de backend requerido",
-        tool.serverEngineNotice ||
-          "Esta operación requiere el servicio backend de VELYXORA con FFmpeg/LibreOffice.",
-      );
-      return;
-    }
-
     const job = jobService.createJob(
       tool.id,
       tool.name,
@@ -237,6 +229,35 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
     setActiveJob(job);
 
     try {
+      if ((tool.requiresServer || tool.id === "video-to-mp3") && selectedFile) {
+        const health = await apiClient.checkHealth(true);
+        if (!health) throw new Error("Backend no disponible");
+        if (tool.engine === "server-ffmpeg" && !health.services.ffmpeg) {
+          throw new Error("FFMPEG_NOT_AVAILABLE: FFmpeg no está disponible en el backend.");
+        }
+        jobService.updateStatus(job.id, "UPLOADING", "Subiendo archivo al backend...", 0);
+        const upload = await apiClient.uploadFile(selectedFile, (progress) =>
+          jobService.updateStatus(job.id, "UPLOADING", "Subiendo archivo al backend...", progress),
+        );
+        const mime = tool.id === "video-to-mp3" ? "audio/mpeg" : String(tool.outputTypes[0] || "");
+        const targetFormat = mime.split("/").pop()!.replace("mpeg", "mp3").replace("jpeg", "jpg");
+        const remote = await apiClient.startConversion({ fileId: upload.fileId, toolId: tool.id, targetFormat, options: { quality, bitrate: "192k" } });
+        backendJobIdRef.current = remote.id;
+        pollingCancelledRef.current = false;
+        for (let attempt = 0; attempt < 300 && !pollingCancelledRef.current; attempt += 1) {
+          const state = await apiClient.getJobStatus(remote.id);
+          jobService.updateStatus(job.id, state.status, state.progressMessage || "Procesando en backend...", state.progress);
+          if (state.status === "COMPLETED" && state.output) {
+            jobService.completeJob(job.id, { ...state.output });
+            return;
+          }
+          if (state.status === "FAILED" || state.status === "CANCELLED") throw new Error(state.error || `Trabajo ${state.status}.`);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        if (pollingCancelledRef.current) return;
+        throw new Error("PROCESSING_FAILED: se agotó el tiempo de espera del trabajo.");
+      }
+
       jobService.updateStatus(
         job.id,
         "PROCESSING",
@@ -395,24 +416,6 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
           audioEnd,
           forceMono,
         );
-        jobService.completeJob(job.id, {
-          blob: res.blob,
-          filename: res.filename,
-          mimeType: "audio/wav",
-          size: res.blob.size,
-        });
-        return;
-      }
-
-      // --- Video to Audio Extractor ---
-      if (tool.id === "video-to-mp3" && selectedFile) {
-        jobService.updateStatus(
-          job.id,
-          "PROCESSING",
-          "Decodificando flujo audiovisual y extrayendo pista de audio WAV PCM...",
-          -1,
-        );
-        const res = await extractFullAudioTrack(selectedFile, forceMono);
         jobService.completeJob(job.id, {
           blob: res.blob,
           filename: res.filename,
@@ -658,7 +661,11 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
       {activeJob && (
         <JobProgressView
           job={activeJob}
-          onCancel={() => activeJob && jobService.cancelJob(activeJob.id)}
+          onCancel={() => {
+            pollingCancelledRef.current = true;
+            if (backendJobIdRef.current) void apiClient.cancelJob(backendJobIdRef.current);
+            if (activeJob) jobService.cancelJob(activeJob.id);
+          }}
           onReset={() => setActiveJob(null)}
         />
       )}

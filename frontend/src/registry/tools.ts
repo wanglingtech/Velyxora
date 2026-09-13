@@ -302,13 +302,15 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     icon: 'Music',
     inputTypes: ['video/mp4', 'video/webm'],
     outputTypes: ['audio/wav', 'audio/mpeg'],
-    processingMode: 'HYBRID',
-    engine: 'browser-webaudio',
+    processingMode: 'SERVER_SIDE',
+    engine: 'server-ffmpeg',
     supportsBatch: false,
     supportsPreview: true,
     keywords: ['mp4', 'mp3', 'wav', 'extraer audio', 'musica', 'sonido'],
     popular: true,
-    isClientReady: true
+    requiresServer: true,
+    serverEngineNotice: 'Requiere FFmpeg para codificar bytes MP3 reales.',
+    isClientReady: false
   },
   {
     id: 'video-compressor',

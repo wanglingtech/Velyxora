@@ -21,7 +21,7 @@ const resolveBackendPath = (
 export const ENV = {
   NODE_ENV: process.env.NODE_ENV || "development",
   PORT: Number(process.env.PORT) || 3000,
-  CORS_ORIGIN: process.env.CORS_ORIGIN || "*",
+  CORS_ORIGIN: process.env.CORS_ORIGIN || "http://localhost:5173",
   MAX_UPLOAD_SIZE_BYTES:
     Number(process.env.MAX_UPLOAD_SIZE_MB || 100) * 1024 * 1024, // 100MB default
   STORAGE_DIR: resolveBackendPath(process.env.STORAGE_DIR, "storage"),

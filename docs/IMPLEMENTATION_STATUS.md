@@ -1,6 +1,8 @@
 # VELYXORA — Tool Implementation Status Matrix
 
-This document tracks the implementation status of the tools represented by the current registry. Statuses are based on checked-in code, not on former AI Studio claims. PDF, API and SSRF tests are automated; native FFmpeg/LibreOffice conversions remain unverified because this host has no FFmpeg/FFprobe binaries.
+This document tracks the implementation status of the tools represented by the current registry. Statuses are based on checked-in code, not on former AI Studio claims. The former per-row “Tested: Yes” values describe implementation review/manual coverage from earlier phases, not a dedicated automated test per tool. Current automated coverage is limited to PDF generation, API/media validation, upload/download contracts, SSRF and engine prerequisites; rows without a dedicated automated download test must not be interpreted as satisfying the strict Phase 2B `COMPLETE` gate.
+
+Phase 2B fixed the shared result-delivery defect: client jobs now download their real Blob through `downloadService`, while backend jobs return `output.fileId` and download through `GET /api/download/:fileId`. Tools still requiring unavailable host binaries remain `BACKEND_READY`/`REQUIRES_EXTERNAL_ENGINE`, not complete.
 
 ### Status Definitions
 
@@ -35,7 +37,7 @@ This document tracks the implementation status of the tools represented by the c
 | **Merge PDF**                    | pdf              | SERVER_SIDE     | server-libreoffice      | `NOT_IMPLEMENTED`          | Registry only    | No verified flow | No             | No complete runner/engine flow in the current frontend                                          |
 | **Split PDF**                    | pdf              | SERVER_SIDE     | server-libreoffice      | `NOT_IMPLEMENTED`          | No verified flow | No verified flow | No             | No complete runner/engine flow in the current frontend                                          |
 | **PDF to Images**                | pdf              | SERVER_SIDE     | server-ffmpeg           | `REQUIRES_EXTERNAL_ENGINE` | No verified flow | Engine only      | No             | Requires a real PDF rasterization pipeline and host validation                                  |
-| **Video to MP3**                 | video            | HYBRID          | server-ffmpeg           | `BACKEND_READY`            | Yes              | Yes              | No fixture     | Native FFmpeg integration exists; no reproducible media fixture in baseline                     |
+| **Video to MP3**                 | video            | SERVER_SIDE     | server-ffmpeg           | `BACKEND_READY`            | Yes              | Yes              | Skipped        | Real upload/job/download flow; FFmpeg fixture is explicitly skipped when host binaries are absent |
 | **Video to WAV**                 | video            | CLIENT_SIDE     | browser-webaudio        | `COMPLETE`                 | Yes              | Yes              | Yes            | Client Web Audio API PCM decoder + backend fallback                                             |
 | **Video Trimmer**                | video            | HYBRID          | server-ffmpeg           | `BACKEND_READY`            | Yes              | Yes              | Yes            | Backend `-ss` and `-t` sub-second trimming                                                      |
 | **Video Compressor**             | video            | SERVER_SIDE     | server-ffmpeg           | `BACKEND_READY`            | Yes              | Yes              | No fixture     | Engine integration exists; host codec verification pending                                      |

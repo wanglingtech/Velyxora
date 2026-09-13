@@ -58,7 +58,9 @@ export async function streamDownload(req: Request, res: Response): Promise<void>
   // Search for matching file in storage directory
   try {
     const files = fs.readdirSync(ENV.STORAGE_DIR);
-    const target = files.find((f) => f.includes(fileId));
+    // fileId is the complete basename emitted by the conversion job. Avoid
+    // substring matches, which could return a different user's similarly named file.
+    const target = files.find((f) => path.parse(f).name === fileId);
 
     if (!target) {
       res.status(HTTP_STATUS.NOT_FOUND).json({
@@ -75,6 +77,9 @@ export async function streamDownload(req: Request, res: Response): Promise<void>
     const fullPath = path.join(ENV.STORAGE_DIR, target);
     assertSafePath(ENV.STORAGE_DIR, fullPath);
 
+    const stat = fs.statSync(fullPath);
+    res.setHeader('Content-Type', getDownloadMime(path.extname(target)));
+    res.setHeader('Content-Length', String(stat.size));
     res.download(fullPath, target, (err) => {
       if (err) {
         // stream was closed or aborted
@@ -90,4 +95,14 @@ export async function streamDownload(req: Request, res: Response): Promise<void>
       timestamp: new Date().toISOString(),
     });
   }
+}
+
+function getDownloadMime(extension: string): string {
+  const types: Record<string, string> = {
+    '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
+    '.mp4': 'video/mp4', '.webm': 'video/webm', '.gif': 'image/gif',
+    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp', '.pdf': 'application/pdf', '.zip': 'application/zip',
+  };
+  return types[extension.toLowerCase()] || 'application/octet-stream';
 }
