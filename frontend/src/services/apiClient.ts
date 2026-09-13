@@ -40,6 +40,9 @@ export interface ConversionJobResponse {
     mimeType: string;
     size: number;
     downloadUrl?: string;
+    duration?: number;
+    width?: number;
+    height?: number;
   };
   error?: string;
 }

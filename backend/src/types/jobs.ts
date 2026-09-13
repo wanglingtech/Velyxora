@@ -30,6 +30,9 @@ export interface JobRecord {
     size: number;
     path: string;
     downloadUrl: string;
+    duration?: number;
+    width?: number;
+    height?: number;
   };
   options?: Record<string, any>;
   createdAt: string;

@@ -194,6 +194,11 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
             <span className="text-xs text-emerald-400/90 font-mono">
               {formatFileSize(newSize)}
             </span>
+            <p className="text-[11px] text-slate-400 mt-1">
+              {job.output.mimeType || "Formato detectado"}
+              {typeof job.output.duration === "number" && ` · ${job.output.duration.toFixed(2)} s`}
+              {typeof job.output.width === "number" && typeof job.output.height === "number" && ` · ${job.output.width}×${job.output.height}`}
+            </p>
           </div>
         </div>
 

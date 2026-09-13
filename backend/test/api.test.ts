@@ -85,3 +85,10 @@ test("backend download returns exact bytes and attachment headers", async () => 
     fs.unlinkSync(fullPath);
   }
 });
+
+test("conversion API rejects arbitrary paths and non-allowlisted FFmpeg options", async () => {
+  const pathAttempt = await request(backendApp).post("/api/conversions").send({ sourceFilePath: "C:\\Windows\\system.ini", toolId: "video-to-mp3", targetFormat: "mp3" });
+  assert.strictEqual(pathAttempt.status, 400);
+  const optionAttempt = await request(backendApp).post("/api/conversions").send({ fileId: "safe-id", toolId: "video-speed", targetFormat: "mp4", options: { ffmpegArgs: ["-anything"] } });
+  assert.strictEqual(optionAttempt.status, 400);
+});

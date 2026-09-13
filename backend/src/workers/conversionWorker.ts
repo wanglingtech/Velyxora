@@ -41,10 +41,20 @@ conversionQueue.process(async (jobId: string, data: any) => {
 
     logger.info(`Processing job [${jobId}] with engine: ${engine.name}`);
 
+    let inputProbe;
+    const engineOptions = { ...(data.options || {}) };
+    if (engine === serverFFmpegEngine) {
+      inputProbe = await probeMedia(job.input.path);
+      engineOptions.inputHasAudio = inputProbe.streams.some((stream) => stream.codecType === 'audio');
+      if (engineOptions.trimEnd !== undefined && inputProbe.duration !== undefined && engineOptions.trimEnd > inputProbe.duration + 0.05) {
+        throw new Error(`INVALID_TRIM_RANGE: trimEnd exceeds input duration (${inputProbe.duration.toFixed(3)}s).`);
+      }
+    }
+
     const result = await engine.convert(
       job.input.path,
       outputPath,
-      data.options || {},
+      engineOptions,
       (progress, message) => {
         jobManager.updateProgress(jobId, progress, message);
       },
@@ -73,6 +83,9 @@ conversionQueue.process(async (jobId: string, data: any) => {
         size: result.size,
         path: result.outputPath,
         downloadUrl: `/api/download/${path.parse(result.outputFilename).name}`,
+        duration: probe?.duration,
+        width: probe?.streams.find((stream) => stream.codecType === 'video')?.width,
+        height: probe?.streams.find((stream) => stream.codecType === 'video')?.height,
       },
     });
 

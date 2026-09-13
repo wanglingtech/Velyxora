@@ -1,5 +1,14 @@
 # VELYXORA — Actionable Roadmap & Engineering Next Steps
 
+## FFmpeg closure
+
+- [x] Expose existing FFmpeg capabilities as public video/audio tools with typed controls.
+- [x] Add per-tool real HTTP integration coverage with FFprobe and attachment validation.
+- [x] Validate option allowlists and reject arbitrary source paths/FFmpeg arguments.
+- [x] Show real output MIME, size, duration and dimensions when available.
+- [ ] Complete the human UI checklist in `IMPLEMENTATION_STATUS.md` using a controllable browser.
+- [ ] Audio merge remains intentionally unimplemented pending an ordered multi-input job contract.
+
 This file details concrete, granular engineering steps required to continue development outside Google AI Studio (e.g. in VS Code or production cloud environments).
 
 ---

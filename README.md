@@ -1,5 +1,11 @@
 # VELYXORA | Universal Conversion & Media Toolkit
 
+## Herramientas FFmpeg
+
+El catálogo expone conversiones reales de video y audio mediante el backend: MP4/WebM, MP3/WAV, GIF, recorte, silencio, velocidad, compresión, resolución, bitrate y normalización. El frontend sólo envía opciones tipadas; el servidor usa `spawn` con argumentos separados, valida cada resultado con FFprobe y publica la descarga únicamente después de `COMPLETED`.
+
+Puede configurar `FFMPEG_PATH`, `FFPROBE_PATH` y `FFMPEG_TIMEOUT_MS`; por defecto se resuelven `ffmpeg` y `ffprobe` desde PATH.
+
 VELYXORA is an enterprise-grade, privacy-first universal file transformation and media processing toolkit designed for modern desktop and mobile web environments.
 
 ```text

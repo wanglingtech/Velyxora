@@ -75,6 +75,13 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   const [audioEnd, setAudioEnd] = useState<number>(10);
   const [audioDuration, setAudioDuration] = useState<number>(10);
   const [forceMono, setForceMono] = useState<boolean>(false);
+  const [serverBitrate, setServerBitrate] = useState("192k");
+  const [serverTrimStart, setServerTrimStart] = useState(0);
+  const [serverTrimEnd, setServerTrimEnd] = useState(3);
+  const [serverSpeed, setServerSpeed] = useState(1.5);
+  const [gifWidth, setGifWidth] = useState(320);
+  const [gifFps, setGifFps] = useState(15);
+  const [videoResolution, setVideoResolution] = useState("1280x720");
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string>("");
 
@@ -215,6 +222,10 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
 
   // ==================== REAL PROCESSING EXECUTION ====================
   const handleExecute = async () => {
+    if (tool.id === "video-trimmer" && (serverTrimStart < 0 || serverTrimEnd <= serverTrimStart || (videoDuration > 0 && serverTrimEnd > videoDuration))) {
+      toast.error("Intervalo inválido", "El final debe ser posterior al inicio y no superar la duración del video.");
+      return;
+    }
     const job = jobService.createJob(
       tool.id,
       tool.name,
@@ -245,7 +256,15 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
             ? "audio/wav"
             : String(tool.outputTypes[0] || "");
         const targetFormat = mime.split("/").pop()!.replace("mpeg", "mp3").replace("jpeg", "jpg");
-        const remote = await apiClient.startConversion({ fileId: upload.fileId, toolId: tool.id, targetFormat, options: { quality, bitrate: "192k" } });
+        const options: Record<string, unknown> = { quality };
+        if (["video-to-mp3", "wav-to-mp3", "audio-bitrate", "audio-normalize"].includes(tool.id)) options.bitrate = serverBitrate;
+        if (tool.id === "video-trimmer") { options.trimStart = serverTrimStart; options.trimEnd = serverTrimEnd; }
+        if (tool.id === "video-mute") options.muteAudio = true;
+        if (tool.id === "video-speed") options.speedMultiplier = serverSpeed;
+        if (tool.id === "video-to-gif") { options.gifWidth = gifWidth; options.fps = gifFps; }
+        if (tool.id === "audio-normalize") options.normalizeAudio = true;
+        if (tool.id === "video-resize") options.resolution = videoResolution;
+        const remote = await apiClient.startConversion({ fileId: upload.fileId, toolId: tool.id, targetFormat, options });
         backendJobIdRef.current = remote.id;
         pollingCancelledRef.current = false;
         for (let attempt = 0; attempt < 300 && !pollingCancelledRef.current; attempt += 1) {
@@ -1009,6 +1028,45 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
                     />
                     <span>Convertir a pista monofónica balanceada</span>
                   </label>
+                </div>
+              )}
+
+              {tool.engine === "server-ffmpeg" && selectedFile && (
+                <div className="p-5 rounded-xl bg-[#101218] border border-white/[0.08] space-y-4">
+                  {selectedFile.type.startsWith("video/") && videoPreviewUrl && (
+                    <video src={videoPreviewUrl} controls className="w-full max-h-56 rounded-lg bg-black" onLoadedMetadata={(e) => setVideoDuration(e.currentTarget.duration)} />
+                  )}
+                  {videoDuration > 0 && <p className="text-xs text-slate-400">Duración original: <span className="font-mono text-slate-200">{formatDuration(videoDuration)}</span></p>}
+
+                  {["video-to-mp3", "wav-to-mp3", "audio-bitrate", "audio-normalize"].includes(tool.id) && (
+                    <label className="block text-xs text-slate-300">Bitrate de salida
+                      <select value={serverBitrate} onChange={(e) => setServerBitrate(e.target.value)} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]">
+                        {[96,128,192,256,320].map((rate) => <option key={rate} value={`${rate}k`}>{rate} kbps</option>)}
+                      </select>
+                    </label>
+                  )}
+
+                  {tool.id === "video-trimmer" && <div className="grid grid-cols-2 gap-3">
+                    <label className="text-xs text-slate-300">Inicio (segundos)<input type="number" min={0} step={0.1} value={serverTrimStart} onChange={(e) => setServerTrimStart(Number(e.target.value))} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]" /></label>
+                    <label className="text-xs text-slate-300">Fin (segundos)<input type="number" min={0.1} step={0.1} value={serverTrimEnd} onChange={(e) => setServerTrimEnd(Number(e.target.value))} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]" /></label>
+                  </div>}
+
+                  {tool.id === "video-speed" && <label className="block text-xs text-slate-300">Velocidad
+                    <select value={serverSpeed} onChange={(e) => setServerSpeed(Number(e.target.value))} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]">
+                      {[0.5,0.75,1.25,1.5,2].map((speed) => <option key={speed} value={speed}>{speed}× — {speed < 1 ? "más lento" : "más rápido"}</option>)}
+                    </select>
+                  </label>}
+
+                  {tool.id === "video-to-gif" && <div className="grid grid-cols-2 gap-3">
+                    <label className="text-xs text-slate-300">Ancho<select value={gifWidth} onChange={(e) => setGifWidth(Number(e.target.value))} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]">{[240,320,480,640].map((width) => <option key={width} value={width}>{width} px</option>)}</select></label>
+                    <label className="text-xs text-slate-300">Fotogramas/segundo<select value={gifFps} onChange={(e) => setGifFps(Number(e.target.value))} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]">{[10,15,20,24].map((fps) => <option key={fps} value={fps}>{fps} FPS</option>)}</select></label>
+                  </div>}
+
+                  {tool.id === "video-compressor" && <div><p className="text-xs text-slate-300 mb-2">Nivel de compresión</p><div className="grid grid-cols-3 gap-2">{[[90,"Alta calidad"],[70,"Equilibrada"],[35,"Compresión alta"]].map(([value,label]) => <button type="button" key={value} onClick={() => setQuality(Number(value))} className={`p-2 rounded-lg text-xs border ${quality === value ? "bg-indigo-600 border-indigo-500 text-white" : "bg-[#08090D] border-white/[0.08] text-slate-300"}`}>{label}</button>)}</div><p className="mt-2 text-[11px] text-slate-500">El tamaño final depende del contenido y del archivo original.</p></div>}
+                  {tool.id === "video-resize" && <label className="block text-xs text-slate-300">Resolución de salida<select value={videoResolution} onChange={(e) => setVideoResolution(e.target.value)} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]"><option value="854x480">480p</option><option value="1280x720">720p</option><option value="1920x1080">1080p</option></select></label>}
+
+                  {tool.id === "video-mute" && <p className="text-xs text-amber-200">El video conservará la imagen, pero se eliminará completamente el audio.</p>}
+                  {tool.id === "audio-bitrate" && <p className="text-[11px] text-slate-500">Un bitrate más alto suele conservar más calidad, pero genera archivos mayores. No recupera calidad ya perdida.</p>}
                 </div>
               )}
 

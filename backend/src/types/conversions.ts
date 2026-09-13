@@ -12,6 +12,8 @@ export interface ConversionOptions {
   watermarkText?: string;
   speedMultiplier?: number;
   normalizeAudio?: boolean;
+  gifWidth?: number;
+  inputHasAudio?: boolean; // Internal worker hint; never accepted from the API.
   scale?: number;
 }
 

@@ -142,7 +142,11 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
         while (remaining > 2) { audioFilters.push("atempo=2"); remaining /= 2; }
         while (remaining < 0.5) { audioFilters.push("atempo=0.5"); remaining /= 0.5; }
         audioFilters.push(`atempo=${remaining}`);
-        args.push("-filter_complex", `[0:v]setpts=${1 / speed}*PTS[v];[0:a]${audioFilters.join(",")}[a]`, "-map", "[v]", "-map", "[a]");
+        if (options.inputHasAudio === false) {
+          args.push("-vf", `setpts=${1 / speed}*PTS`);
+        } else {
+          args.push("-filter_complex", `[0:v]setpts=${1 / speed}*PTS[v];[0:a]${audioFilters.join(",")}[a]`, "-map", "[v]", "-map", "[a]");
+        }
       }
       if (targetExt === "mp4") {
         const crf = options.quality === undefined
@@ -170,7 +174,9 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
           "libopus",
         );
       } else if (targetExt === "gif") {
-        args.push("-filter_complex", "[0:v]split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse");
+        const scale = options.gifWidth ? `scale=${options.gifWidth}:-2:flags=lanczos,` : "";
+        const fps = options.fps ? `fps=${options.fps},` : "";
+        args.push("-filter_complex", `[0:v]${fps}${scale}split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`);
       }
     }
 

@@ -1,5 +1,47 @@
 # VELYXORA — Tool Implementation Status Matrix
 
+## FFmpeg closure status
+
+This section supersedes older FFmpeg rows below. Every `COMPLETE` row is visible in the registry and has a real HTTP integration path covering upload, job, FFmpeg, FFprobe, completed output, attachment download and cleanup.
+
+| Tool | UI | API/engine | FFprobe/download test | Status |
+| :-- | :--: | :--: | :--: | :-- |
+| Video → MP3 | Yes | Yes | Yes | `COMPLETE` |
+| Video → WAV | Yes | Yes | Yes | `COMPLETE` |
+| Video → GIF | Yes | Yes | Yes | `COMPLETE` |
+| Recortar video | Yes | Yes | Yes | `COMPLETE` |
+| Silenciar video | Yes | Yes | Yes | `COMPLETE` |
+| Cambiar velocidad de video | Yes | Yes | Yes | `COMPLETE` |
+| Comprimir video | Yes | Yes | Yes | `COMPLETE` |
+| Cambiar resolución de video | Yes | Yes | Yes | `COMPLETE` |
+| MP4 → WebM | Yes | Yes | Yes | `COMPLETE` |
+| WebM → MP4 | Yes | Yes | Yes | `COMPLETE` |
+| WAV → MP3 | Yes | Yes | Yes | `COMPLETE` |
+| MP3 → WAV | Yes | Yes | Yes | `COMPLETE` |
+| Cambiar bitrate de audio | Yes | Yes | Yes | `COMPLETE` |
+| Normalizar volumen | Yes | Yes | Yes | `COMPLETE` |
+| Unir audios | No | No multi-input DTO | No | `NOT_IMPLEMENTED` |
+
+Audio merge remains unimplemented because the current job contract owns one uploaded input. A correct implementation requires ordered multi-upload ownership, normalization/concat and atomic cleanup; byte concatenation is explicitly not acceptable.
+
+### Human UI checklist
+
+No manual UI pass is claimed until a human or controllable browser completes this checklist.
+
+| Tool | Upload | Processing | Result | Download | File opens | Final state |
+| :-- | :--: | :--: | :--: | :--: | :--: | :--: |
+| Video → MP3 | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Video → WAV | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Video → GIF | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Recortar video | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Silenciar video | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Cambiar velocidad | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Comprimir video | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| WAV → MP3 | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| MP3 → WAV | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Cambiar bitrate | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Normalizar volumen | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+
 This document tracks the implementation status of the tools represented by the current registry. Statuses are based on checked-in code, not on former AI Studio claims. FFmpeg 9.0.1 integration is now exercised with generated media fixtures and FFprobe validation. Capabilities mentioned below that are not present in `frontend/src/registry/tools.ts` are engine capabilities, not visible tools.
 
 Phase 2B fixed the shared result-delivery defect: client jobs now download their real Blob through `downloadService`, while backend jobs return `output.fileId` and download through `GET /api/download/:fileId`. Tools still requiring unavailable host binaries remain `BACKEND_READY`/`REQUIRES_EXTERNAL_ENGINE`, not complete.
