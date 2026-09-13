@@ -11,6 +11,7 @@ export interface ConversionOptions {
   muteAudio?: boolean;
   watermarkText?: string;
   speedMultiplier?: number;
+  normalizeAudio?: boolean;
   scale?: number;
 }
 

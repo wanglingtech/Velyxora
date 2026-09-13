@@ -10,7 +10,8 @@ export interface IConversionEngine {
     inputPath: string,
     outputPath: string,
     options: ConversionOptions,
-    onProgress?: (progress: number, message?: string) => void
+    onProgress?: (progress: number, message?: string) => void,
+    signal?: AbortSignal,
   ): Promise<ConversionResult>;
 }
 
@@ -31,6 +32,7 @@ export abstract class BaseConversionEngine implements IConversionEngine {
     inputPath: string,
     outputPath: string,
     options: ConversionOptions,
-    onProgress?: (progress: number, message?: string) => void
+    onProgress?: (progress: number, message?: string) => void,
+    signal?: AbortSignal,
   ): Promise<ConversionResult>;
 }

@@ -13,6 +13,8 @@ export interface ConversionRequestDto {
     trimEnd?: number;
     muteAudio?: boolean;
     watermarkText?: string;
+    speedMultiplier?: number;
+    normalizeAudio?: boolean;
   };
 }
 

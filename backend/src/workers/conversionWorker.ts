@@ -6,6 +6,9 @@ import { libreOfficeEngine } from '../engines/LibreOfficeEngine';
 import { serverImageEngine } from '../engines/ServerImageEngine';
 import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
+import fs from 'fs';
+import { probeMedia } from '../utils/mediaProbe';
+import { storageService } from '../services/storageService';
 
 export const conversionQueue = new InMemoryQueue('conversions', 2);
 
@@ -15,11 +18,12 @@ conversionQueue.process(async (jobId: string, data: any) => {
 
   jobManager.setStatus(jobId, 'PROCESSING');
 
+  let outputPath: string | undefined;
   try {
     const inputExt = path.extname(job.input.path).replace(/^\./, '').toLowerCase();
     const targetFormat = (data.targetFormat || 'mp3').toLowerCase();
     const outputFilename = `converted-${jobId}-${path.parse(job.input.originalName).name}.${targetFormat}`;
-    const outputPath = path.join(ENV.STORAGE_DIR, outputFilename);
+    outputPath = path.join(ENV.STORAGE_DIR, outputFilename);
 
     let engine = null;
 
@@ -43,10 +47,25 @@ conversionQueue.process(async (jobId: string, data: any) => {
       data.options || {},
       (progress, message) => {
         jobManager.updateProgress(jobId, progress, message);
-      }
+      },
+      jobManager.getSignal(jobId),
     );
 
+    if (jobManager.getJob(jobId)?.status === 'CANCELLED') {
+      if (fs.existsSync(result.outputPath)) fs.unlinkSync(result.outputPath);
+      return;
+    }
+
+    let probe;
+    if (engine === serverFFmpegEngine) {
+      probe = await probeMedia(result.outputPath);
+      if (result.size <= 0 || probe.streams.length === 0) {
+        throw new Error('FFPROBE_VALIDATION_FAILED: output has no valid media streams.');
+      }
+    }
+
     jobManager.updateJob(jobId, {
+      metadata: probe ? { probe } : undefined,
       output: {
         fileId: path.parse(result.outputFilename).name,
         filename: result.outputFilename,
@@ -57,9 +76,18 @@ conversionQueue.process(async (jobId: string, data: any) => {
       },
     });
 
+    storageService.registerOutput(result.outputPath, result.outputFilename, result.mimeType);
+
     jobManager.setStatus(jobId, 'COMPLETED');
   } catch (err: any) {
-    logger.error(`Job [${jobId}] failed during execution: ${err.message}`);
-    jobManager.setStatus(jobId, 'FAILED', err.message);
+    if (outputPath && fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    if (jobManager.getJob(jobId)?.status === 'CANCELLED') {
+      logger.info(`Job [${jobId}] FFmpeg process cancelled and cleaned up.`);
+    } else {
+      logger.error(`Job [${jobId}] failed during execution: ${err.message}`);
+      jobManager.setStatus(jobId, 'FAILED', err.message);
+    }
+  } finally {
+    storageService.deleteFile(path.parse(job.input.filename).name);
   }
 });

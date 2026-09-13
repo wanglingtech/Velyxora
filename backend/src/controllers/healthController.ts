@@ -4,10 +4,12 @@ import { libreOfficeEngine } from '../engines/LibreOfficeEngine';
 import { HTTP_STATUS } from '../config/constants';
 import fs from 'fs';
 import { ENV } from '../config/env';
+import { isFfprobeAvailable } from '../utils/mediaProbe';
 
 export async function getHealth(req: Request, res: Response): Promise<void> {
-  const [ffmpegReady, libreofficeReady] = await Promise.all([
+  const [ffmpegReady, ffprobeReady, libreofficeReady] = await Promise.all([
     serverFFmpegEngine.isAvailable(),
+    isFfprobeAvailable(),
     libreOfficeEngine.isAvailable(),
   ]);
 
@@ -27,6 +29,7 @@ export async function getHealth(req: Request, res: Response): Promise<void> {
     },
     services: {
       ffmpeg: ffmpegReady,
+      ffprobe: ffprobeReady,
       libreoffice: libreofficeReady,
       storage: storageReady,
     },

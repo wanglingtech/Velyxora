@@ -68,11 +68,11 @@ This file details concrete, granular engineering steps required to continue deve
 
 - [x] **Spawn `/usr/bin/ffmpeg` with isolated child_process** (Completed).
 - [x] **Parse timestamp progress from stderr** (Completed).
-- [ ] **Add AbortController / child_process.kill(SIGTERM) signal to cancel running jobs**:
+- [x] **Add AbortController / child_process.kill(SIGTERM) signal to cancel running jobs**:
       Update `ServerFFmpegEngine.convert()` to accept an `AbortSignal`, invoking `proc.kill('SIGTERM')` on cancellation.
 - [ ] **Add Video Watermark Filter Graph**:
       Append `-filter_complex "drawtext=text='VELYXORA':x=10:y=H-th-10:fontsize=24:fontcolor=white@0.8"` when `options.watermarkText` is supplied.
-- [ ] **Add Video Speed Filter**:
+- [x] **Add Video Speed Filter**:
       When `options.speedMultiplier` is supplied, append `-filter_complex "[0:v]setpts=0.5*PTS[v];[0:a]atempo=2.0[a]" -map "[v]" -map "[a]"`.
 
 ---

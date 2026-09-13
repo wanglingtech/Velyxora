@@ -4,6 +4,7 @@ export interface BackendHealth {
   uptimeSeconds: number;
   services: {
     ffmpeg: boolean;
+    ffprobe: boolean;
     libreoffice: boolean;
     storage: boolean;
   };
@@ -254,7 +255,7 @@ class ApiClient {
    * Cancels a job
    */
   async cancelJob(jobId: string): Promise<void> {
-    await this.request<unknown>(`/api/jobs/${encodeURIComponent(jobId)}`, {
+    await this.request<unknown>(`/api/conversions/${encodeURIComponent(jobId)}`, {
       method: "DELETE",
     });
   }

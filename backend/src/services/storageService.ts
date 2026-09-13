@@ -47,6 +47,23 @@ class StorageService {
     return record;
   }
 
+  public registerOutput(outputPath: string, originalName: string, mimeType: string): StoredFileInfo {
+    assertSafePath(ENV.STORAGE_DIR, outputPath);
+    const stat = fs.statSync(outputPath);
+    const filename = path.basename(outputPath);
+    const record: StoredFileInfo = {
+      fileId: path.parse(filename).name,
+      originalName,
+      filename,
+      path: outputPath,
+      size: stat.size,
+      mimeType,
+      createdAt: Date.now(),
+    };
+    this.files.set(record.fileId, record);
+    return record;
+  }
+
   public getFile(fileId: string): StoredFileInfo | undefined {
     const record = this.files.get(fileId);
     if (!record) return undefined;
@@ -62,7 +79,9 @@ class StorageService {
     if (!record) return false;
 
     try {
-      assertSafePath(ENV.TEMP_DIR, record.path);
+      const root = path.dirname(record.path) === path.resolve(ENV.STORAGE_DIR)
+        ? ENV.STORAGE_DIR : ENV.TEMP_DIR;
+      assertSafePath(root, record.path);
       if (fs.existsSync(record.path)) {
         fs.unlinkSync(record.path);
       }

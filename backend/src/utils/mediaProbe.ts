@@ -79,6 +79,8 @@ export async function probeMedia(inputPath: string): Promise<MediaProbeResult> {
     bitRate: data.format?.bit_rate ? Number(data.format.bit_rate) : undefined,
     streams: (data.streams || []).map((stream) => ({
       ...stream,
+      codecType: typeof stream.codec_type === "string" ? stream.codec_type : undefined,
+      codecName: typeof stream.codec_name === "string" ? stream.codec_name : undefined,
       width: typeof stream.width === "number" ? stream.width : undefined,
       height: typeof stream.height === "number" ? stream.height : undefined,
       sampleRate: stream.sample_rate ? Number(stream.sample_rate) : undefined,

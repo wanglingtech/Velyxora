@@ -63,6 +63,7 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
     outputPath: string,
     options: ConversionOptions,
     onProgress?: (progress: number, message?: string) => void,
+    signal?: AbortSignal,
   ): Promise<ConversionResult> {
     const isReady = await this.isAvailable();
     if (!isReady) {
@@ -121,6 +122,7 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
         if (options.channels) {
           args.push("-ac", options.channels.toString());
         }
+        if (options.normalizeAudio) args.push("-af", "loudnorm");
       }
     } else {
       // Video options
@@ -133,14 +135,26 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
       if (options.resolution) {
         args.push("-s", options.resolution);
       }
+      if (options.speedMultiplier && options.speedMultiplier > 0) {
+        const speed = options.speedMultiplier;
+        const audioFilters: string[] = [];
+        let remaining = speed;
+        while (remaining > 2) { audioFilters.push("atempo=2"); remaining /= 2; }
+        while (remaining < 0.5) { audioFilters.push("atempo=0.5"); remaining /= 0.5; }
+        audioFilters.push(`atempo=${remaining}`);
+        args.push("-filter_complex", `[0:v]setpts=${1 / speed}*PTS[v];[0:a]${audioFilters.join(",")}[a]`, "-map", "[v]", "-map", "[a]");
+      }
       if (targetExt === "mp4") {
+        const crf = options.quality === undefined
+          ? 23
+          : Math.max(18, Math.min(40, 51 - Math.round(options.quality * 0.4)));
         args.push(
           "-c:v",
           "libx264",
           "-preset",
           "fast",
           "-crf",
-          "23",
+          crf.toString(),
           "-c:a",
           "aac",
         );
@@ -155,6 +169,8 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
           "-c:a",
           "libopus",
         );
+      } else if (targetExt === "gif") {
+        args.push("-filter_complex", "[0:v]split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse");
       }
     }
 
@@ -163,7 +179,21 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
     logger.info(`Spawning FFmpeg: ${ENV.FFMPEG_PATH} ${args.join(" ")}`);
 
     return new Promise<ConversionResult>((resolve, reject) => {
-      const proc = spawn(ENV.FFMPEG_PATH, args);
+      const proc = spawn(ENV.FFMPEG_PATH, args, { windowsHide: true });
+      let settled = false;
+      let terminationReason: "cancelled" | "timeout" | null = null;
+      const removePartial = () => {
+        try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch { /* best effort */ }
+      };
+      const terminate = (reason: "cancelled" | "timeout") => {
+        if (settled) return;
+        terminationReason = reason;
+        proc.kill("SIGTERM");
+      };
+      const abortHandler = () => terminate("cancelled");
+      signal?.addEventListener("abort", abortHandler, { once: true });
+      if (signal?.aborted) abortHandler();
+      const timeout = setTimeout(() => terminate("timeout"), ENV.FFMPEG_TIMEOUT_MS);
 
       let stderrLog = "";
 
@@ -183,11 +213,24 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
       });
 
       proc.on("error", (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        signal?.removeEventListener("abort", abortHandler);
+        removePartial();
         logger.error(`FFmpeg process error: ${err.message}`);
         reject(err);
       });
 
       proc.on("close", (code) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        signal?.removeEventListener("abort", abortHandler);
+        if (terminationReason) {
+          removePartial();
+          return reject(new Error(terminationReason === "timeout" ? "FFMPEG_TIMEOUT" : "FFMPEG_CANCELLED"));
+        }
         if (code !== 0) {
           const errMsg = `FFmpeg exited with code ${code}. Error log: ${stderrLog.slice(-500)}`;
           logger.error(errMsg);
@@ -203,9 +246,8 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
         }
 
         const stat = fs.statSync(outputPath);
-        const mimeType = isAudioOutput
-          ? `audio/${targetExt}`
-          : `video/${targetExt}`;
+        const mimeType = targetExt === "mp3" ? "audio/mpeg" : targetExt === "gif" ? "image/gif" : isAudioOutput
+          ? `audio/${targetExt}` : `video/${targetExt}`;
 
         resolve({
           outputPath,

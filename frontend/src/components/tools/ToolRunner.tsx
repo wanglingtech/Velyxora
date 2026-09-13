@@ -239,7 +239,11 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
         const upload = await apiClient.uploadFile(selectedFile, (progress) =>
           jobService.updateStatus(job.id, "UPLOADING", "Subiendo archivo al backend...", progress),
         );
-        const mime = tool.id === "video-to-mp3" ? "audio/mpeg" : String(tool.outputTypes[0] || "");
+        const mime = tool.id === "video-to-mp3"
+          ? "audio/mpeg"
+          : tool.id === "audio-format-converter" && selectedFile.type === "audio/mpeg"
+            ? "audio/wav"
+            : String(tool.outputTypes[0] || "");
         const targetFormat = mime.split("/").pop()!.replace("mpeg", "mp3").replace("jpeg", "jpg");
         const remote = await apiClient.startConversion({ fileId: upload.fileId, toolId: tool.id, targetFormat, options: { quality, bitrate: "192k" } });
         backendJobIdRef.current = remote.id;

@@ -3,6 +3,7 @@ import { logger } from '../utils/logger';
 
 class JobManager {
   private jobs = new Map<string, JobRecord>();
+  private cancellation = new Map<string, AbortController>();
 
   createJob(params: {
     id: string;
@@ -23,12 +24,25 @@ class JobManager {
     };
 
     this.jobs.set(job.id, job);
+    this.cancellation.set(job.id, new AbortController());
     logger.info(`Job created: [${job.id}] for tool ${job.toolId}`);
     return job;
   }
 
   getJob(id: string): JobRecord | undefined {
     return this.jobs.get(id);
+  }
+
+  getSignal(id: string): AbortSignal | undefined {
+    return this.cancellation.get(id)?.signal;
+  }
+
+  requestCancellation(id: string): boolean {
+    const job = this.jobs.get(id);
+    if (!job || ['COMPLETED', 'FAILED', 'CANCELLED'].includes(job.status)) return false;
+    this.cancellation.get(id)?.abort();
+    this.setStatus(id, 'CANCELLED');
+    return true;
   }
 
   updateJob(id: string, updates: Partial<JobRecord>): JobRecord | undefined {
@@ -64,6 +78,7 @@ class JobManager {
   }
 
   deleteJob(id: string): boolean {
+    this.cancellation.delete(id);
     return this.jobs.delete(id);
   }
 
