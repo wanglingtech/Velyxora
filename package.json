@@ -1,0 +1,58 @@
+{
+  "name": "react-example",
+  "private": true,
+  "overrides": {
+    "qs": "^6.16.0"
+  },
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.mjs",
+    "start": "cross-env NODE_ENV=production node dist/server.mjs",
+    "preview": "vite preview",
+    "clean": "rm -rf dist server.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint frontend/src backend/src server.ts",
+    "test": "tsx --test backend/test/security.test.ts backend/test/api.test.ts backend/test/ffmpeg.integration.test.ts frontend/test/pdfEngine.test.ts"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.35.0",
+    "@google/genai": "^2.4.0",
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/cors": "^2.8.19",
+    "@types/multer": "^2.2.0",
+    "@types/qrcode": "^1.5.6",
+    "@vitejs/plugin-react": "^5.0.4",
+    "cors": "^2.8.6",
+    "cross-env": "^10.0.0",
+    "dotenv": "^17.2.3",
+    "eslint": "^9.35.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "express": "^4.21.2",
+    "jszip": "^3.10.2",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "multer": "^2.3.0",
+    "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "vite": "^6.2.3"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "autoprefixer": "^10.4.21",
+    "esbuild": "^0.25.0",
+    "supertest": "^7.2.2",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "typescript-eslint": "^8.43.0",
+    "vite": "^6.2.3"
+  }
+}

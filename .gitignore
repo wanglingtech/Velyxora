@@ -1,0 +1,17 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+backend/temp/*
+backend/storage/*
+!backend/temp/.gitkeep
+!backend/storage/.gitkeep
+temp/*
+storage/*
+*.tmp
+artifacts/*
+

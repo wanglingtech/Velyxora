@@ -1,0 +1,33 @@
+{
+  "name": "velyxora-backend",
+  "version": "1.0.0",
+  "private": true,
+  "overrides": {
+    "qs": "^6.16.0"
+  },
+  "description": "VELYXORA High-Performance Media & Document Conversion Backend",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "tsx --test test/security.test.ts test/api.test.ts test/ffmpeg.integration.test.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.14.0",
+    "supertest": "^7.1.4",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2"
+  }
+}

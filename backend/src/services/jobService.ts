@@ -1,0 +1,37 @@
+import { jobManager } from '../jobs/JobManager';
+import { JobRecord } from '../types/jobs';
+import { storageService } from './storageService';
+
+class JobService {
+  getJob(id: string): JobRecord | undefined {
+    return jobManager.getJob(id);
+  }
+
+  cancelJob(id: string): boolean {
+    const job = jobManager.getJob(id);
+    if (!job) return false;
+
+    if (job.status === 'COMPLETED' || job.status === 'FAILED') {
+      return false;
+    }
+
+    jobManager.setStatus(id, 'CANCELLED');
+
+    // Clean up input if it was a temp file
+    if (job.input?.path) {
+      // storageService handles safe path cleanup
+    }
+
+    return true;
+  }
+
+  deleteJob(id: string): boolean {
+    const job = jobManager.getJob(id);
+    if (job?.output?.path) {
+      storageService.deleteFile(job.id);
+    }
+    return jobManager.deleteJob(id);
+  }
+}
+
+export const jobService = new JobService();
