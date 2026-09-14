@@ -7,6 +7,7 @@ export interface BackendHealth {
     ffprobe: boolean;
     libreoffice: boolean;
     storage: boolean;
+    ytDlp: boolean;
   };
 }
 
@@ -27,6 +28,8 @@ export interface ConversionJobResponse {
     | "QUEUED"
     | "UPLOADING"
     | "ANALYZING"
+    | "READY"
+    | "DOWNLOADING"
     | "PROCESSING"
     | "FINALIZING"
     | "COMPLETED"
@@ -55,14 +58,21 @@ export interface MediaAnalysisResponse {
   authorUrl?: string;
   thumbnailUrl?: string;
   durationSeconds?: number;
+  contentType?: string;
   embedHtml?: string;
   formats: Array<{
     formatId: string;
+    type: "video" | "audio";
+    container: string;
     extension: string;
     resolution?: string;
     qualityLabel?: string;
     hasVideo: boolean;
     hasAudio: boolean;
+    fps?: number;
+    bitrate?: number;
+    estimatedSize?: number;
+    codec?: string;
     url?: string;
   }>;
   isDirectDownloadPossible: boolean;
@@ -271,6 +281,14 @@ class ApiClient {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
+    });
+  }
+
+  async startMediaDownload(params: { url: string; formatId: string; container: string; type: "video" | "audio"; title: string }): Promise<ConversionJobResponse> {
+    return this.request<ConversionJobResponse>("/api/media/process", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
     });
   }
 

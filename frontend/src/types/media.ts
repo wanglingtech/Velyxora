@@ -10,6 +10,11 @@ export interface MediaFormatOption {
   hasVideo?: boolean;
   hasAudio?: boolean;
   directDownloadUrl?: string;
+  type?: "video" | "audio";
+  fps?: number;
+  bitrate?: number;
+  filesize?: number;
+  codec?: string;
 }
 
 export interface MediaMetadata {
@@ -21,6 +26,7 @@ export interface MediaMetadata {
   thumbnailUrl?: string;
   embedUrl?: string;
   formattedDuration?: string;
+  contentType?: string;
   availableFormats: MediaFormatOption[];
   requiresServerEngine: boolean;
   id?: string;

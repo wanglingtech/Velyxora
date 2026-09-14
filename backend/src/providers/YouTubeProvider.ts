@@ -59,7 +59,7 @@ export class YouTubeProvider extends BaseMediaProvider {
         formats: [],
         isDirectDownloadPossible: false,
         requiresExternalExtractor: true,
-        notice: 'Direct media stream extraction requires yt-dlp binary with appropriate cookies and user authorization.',
+        notice: 'Direct media extraction requires yt-dlp and is limited to public, authorized content.',
       };
     } catch (err: any) {
       clearTimeout(timeout);

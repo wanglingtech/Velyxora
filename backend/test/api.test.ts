@@ -13,6 +13,7 @@ test("GET /api/health returns valid health schema and dynamic service status", a
   const body = res.body as any;
   assert.strictEqual(body.status, "ok");
   assert.ok(typeof body.services.ffmpeg === "boolean");
+  assert.ok(typeof body.services.ytDlp === "boolean");
   assert.ok(typeof body.services.libreoffice === "boolean");
   assert.strictEqual(body.services.storage, true);
 });

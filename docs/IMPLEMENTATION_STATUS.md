@@ -118,3 +118,8 @@ Phase 2B fixed the shared result-delivery defect: client jobs now download their
 | **Media Downloader (TikTok)**    | media-downloader | HYBRID          | server-ytdlp            | `PARTIAL`                  | Yes              | Yes              | Yes            | Real oEmbed metadata extraction                                                                 |
 | **Media Downloader (Reddit)**    | media-downloader | HYBRID          | server-ytdlp            | `PARTIAL`                  | Yes              | Yes              | Yes            | Post metadata & embed extraction                                                                |
 | **Media Downloader (Twitter/X)** | media-downloader | HYBRID          | server-ytdlp            | `PARTIAL`                  | Yes              | Yes              | Yes            | Tweet oEmbed metadata extraction                                                                |
+# Fase yt-dlp
+
+- `COMPLETE`: registry desacoplado, nueve providers de primer nivel y GenericProvider; DTO normalizado; validación SSRF; jobs, cancelación, timeout, cleanup, FFmpeg/FFprobe y descarga por ID opaco; UI y términos.
+- `EXTERNAL_DEPENDENCY`: análisis y descarga requieren que `YT_DLP_PATH` resuelva un binario yt-dlp operativo.
+- `PARTIAL`: compatibilidad externa por proveedor; depende de cambios de cada plataforma y debe validarse periódicamente con contenido público autorizado.

@@ -14,7 +14,7 @@
     "clean": "rm -rf dist server.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint frontend/src backend/src server.ts",
-    "test": "tsx --test backend/test/security.test.ts backend/test/api.test.ts backend/test/ffmpeg.integration.test.ts frontend/test/*.test.ts"
+    "test": "tsx --test backend/test/security.test.ts backend/test/api.test.ts backend/test/ytdlp.test.ts backend/test/ffmpeg.integration.test.ts frontend/test/*.test.ts"
   },
   "dependencies": {
     "@eslint/js": "^9.35.0",

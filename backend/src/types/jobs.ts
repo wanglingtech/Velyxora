@@ -3,6 +3,8 @@ export type JobStatus =
   | 'QUEUED'
   | 'UPLOADING'
   | 'ANALYZING'
+  | 'READY'
+  | 'DOWNLOADING'
   | 'PROCESSING'
   | 'FINALIZING'
   | 'COMPLETED'

@@ -48,10 +48,11 @@ const mapAnalysis = (
   author: analysis.author,
   thumbnailUrl: analysis.thumbnailUrl,
   embedUrl: extractEmbedUrl(analysis.embedHtml),
-  formattedDuration:
+    formattedDuration:
     analysis.durationSeconds === undefined
       ? undefined
       : `${Math.floor(analysis.durationSeconds / 60)}:${String(Math.round(analysis.durationSeconds % 60)).padStart(2, "0")}`,
+  contentType: analysis.contentType,
   availableFormats: analysis.formats.map((format) => ({
     id: format.formatId,
     extension: format.extension,
@@ -72,6 +73,11 @@ const mapAnalysis = (
     hasVideo: format.hasVideo,
     hasAudio: format.hasAudio,
     directDownloadUrl: format.url,
+    type: format.type,
+    fps: format.fps,
+    bitrate: format.bitrate,
+    filesize: format.estimatedSize,
+    codec: format.codec,
   })),
   requiresServerEngine: analysis.requiresExternalExtractor,
   engineDetails: {
@@ -91,9 +97,12 @@ export const ALL_MEDIA_ADAPTERS: MediaAdapter[] = [
   createAdapter("x", "X / Twitter", ["x.com", "twitter.com"]),
   createAdapter("facebook", "Facebook", ["facebook.com"]),
   createAdapter("reddit", "Reddit", ["reddit.com"]),
+  createAdapter("twitch", "Twitch", ["twitch.tv"]),
+  createAdapter("soundcloud", "SoundCloud", ["soundcloud.com"]),
+  createAdapter("generic", "Otros sitios compatibles", []),
 ];
 
 export const findMatchingMediaAdapter = (
   url: string,
 ): MediaAdapter | undefined =>
-  ALL_MEDIA_ADAPTERS.find((adapter) => adapter.matches(url));
+  ALL_MEDIA_ADAPTERS.find((adapter) => adapter.id !== "generic" && adapter.matches(url)) || ALL_MEDIA_ADAPTERS.find((adapter) => adapter.id === "generic");

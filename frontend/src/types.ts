@@ -9,6 +9,8 @@ export type ProcessingStatus =
   | "QUEUED"
   | "UPLOADING"
   | "ANALYZING"
+  | "READY"
+  | "DOWNLOADING"
   | "PROCESSING"
   | "FINALIZING"
   | "COMPLETED"

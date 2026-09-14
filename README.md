@@ -6,6 +6,12 @@ El catálogo expone conversiones reales de video y audio mediante el backend: MP
 
 Puede configurar `FFMPEG_PATH`, `FFPROBE_PATH` y `FFMPEG_TIMEOUT_MS`; por defecto se resuelven `ffmpeg` y `ffprobe` desde PATH.
 
+## Descargador multimedia con yt-dlp
+
+`POST /api/media/analyze` obtiene metadata JSON y formatos reales mediante una capa de providers para YouTube, TikTok, Instagram, Facebook, X/Twitter, Vimeo, Reddit, Twitch y SoundCloud, con un provider genérico para otros sitios compatibles. `POST /api/media/process` crea un job cancelable; yt-dlp descarga, FFmpeg combina streams o convierte a MP3 cuando corresponde y FFprobe valida el resultado antes de habilitar la descarga.
+
+Configure `YT_DLP_PATH` con la ruta al ejecutable (o déjelo como `yt-dlp` si está en PATH) y `YT_DLP_TIMEOUT_MS`. La compatibilidad depende de yt-dlp y de cambios externos; solo se admite contenido público o autorizado. VELYXORA no usa cookies, sesiones, credenciales, bypass de DRM, autenticación ni paywalls.
+
 VELYXORA is an enterprise-grade, privacy-first universal file transformation and media processing toolkit designed for modern desktop and mobile web environments.
 
 ```text
@@ -123,6 +129,12 @@ npm run dev
 
 - **Linux (Ubuntu/Debian)**: `sudo apt update && sudo apt install -y libreoffice-writer libreoffice-calc libreoffice-impress` (Path: `soffice`)
 - **Windows**: Install standard MSI from [libreoffice.org](https://www.libreoffice.org/download/download-libreoffice/). Path: `C:\Program Files\LibreOffice\program\soffice.exe`. Configure `LIBREOFFICE_PATH` in `backend/.env`.
+
+### yt-dlp
+
+- Compruebe `yt-dlp --version` desde la misma terminal que ejecutará VELYXORA.
+- En Windows puede definir `YT_DLP_PATH=C:\ruta\a\yt-dlp.exe`.
+- No configure cookies ni credenciales: esta integración está limitada a contenido público/autorizado.
 
 ---
 

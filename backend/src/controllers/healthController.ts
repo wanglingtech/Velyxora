@@ -5,12 +5,14 @@ import { HTTP_STATUS } from '../config/constants';
 import fs from 'fs';
 import { ENV } from '../config/env';
 import { isFfprobeAvailable } from '../utils/mediaProbe';
+import { ytDlpService } from '../services/ytDlpService';
 
 export async function getHealth(req: Request, res: Response): Promise<void> {
-  const [ffmpegReady, ffprobeReady, libreofficeReady] = await Promise.all([
+  const [ffmpegReady, ffprobeReady, libreofficeReady, ytDlpReady] = await Promise.all([
     serverFFmpegEngine.isAvailable(),
     isFfprobeAvailable(),
     libreOfficeEngine.isAvailable(),
+    ytDlpService.isAvailable(),
   ]);
 
   const storageReady = fs.existsSync(ENV.TEMP_DIR) && fs.existsSync(ENV.STORAGE_DIR);
@@ -32,6 +34,7 @@ export async function getHealth(req: Request, res: Response): Promise<void> {
       ffprobe: ffprobeReady,
       libreoffice: libreofficeReady,
       storage: storageReady,
+      ytDlp: ytDlpReady,
     },
     timestamp: new Date().toISOString(),
   });

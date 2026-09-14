@@ -13,7 +13,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "tsx --test test/security.test.ts test/api.test.ts test/ffmpeg.integration.test.ts"
+    "test": "tsx --test test/security.test.ts test/api.test.ts test/ytdlp.test.ts test/ffmpeg.integration.test.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

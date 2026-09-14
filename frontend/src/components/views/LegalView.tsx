@@ -77,8 +77,9 @@ export const LegalView: React.FC<LegalViewProps> = ({ page }) => {
 
           <h3 className="text-sm sm:text-base font-semibold text-white">2. Media Downloader & Restricciones</h3>
           <p>
-            El analizador de URLs de video no evade mecanismos de gestión de derechos digitales (DRM), ni intenta descifrar transmisiones privadas o protegidas por suscripciones de pago. Respeta de forma irrestricta los términos de servicio de los proveedores de contenido.
+            VELYXORA es una herramienta técnica de conversión y procesamiento. El usuario debe tener autorización para descargar o procesar el contenido, respetar los derechos de autor y los términos del proveedor original. No debe utilizarse para acceder a contenido privado, protegido o restringido.
           </p>
+          <p>No se almacenan credenciales, cookies ni sesiones de terceros. No se evade DRM, autenticación ni paywalls. La compatibilidad no es permanente: los proveedores externos pueden cambiar sus sistemas.</p>
 
           <h3 className="text-sm sm:text-base font-semibold text-white">3. Responsabilidad</h3>
           <p>

@@ -1,17 +1,54 @@
+# Dependencies
 node_modules/
+
+# Builds
 build/
 dist/
 coverage/
-.DS_Store
-*.log
-.env*
+frontend/dist/
+backend/dist/
+
+# Environment files
+.env
+.env.*
 !.env.example
+!frontend/.env.example
+!backend/.env.example
+
+# Logs and temporary reports
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lint-*.txt
+*-lint.txt
+
+# Temporary files
+*.tmp
+*.temp
+
+# Runtime temporary/storage folders
 backend/temp/*
 backend/storage/*
-!backend/temp/.gitkeep
-!backend/storage/.gitkeep
 temp/*
 storage/*
-*.tmp
-artifacts/*
 
+# Keep empty runtime directories
+!backend/temp/.gitkeep
+!backend/storage/.gitkeep
+
+# Generated artifacts
+artifacts/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Accidental generated files
+({length
+JSON.stringify({root

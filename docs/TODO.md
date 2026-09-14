@@ -120,3 +120,7 @@ This file details concrete, granular engineering steps required to continue deve
       Add sample 2-second fixture `fixtures/sample.mp4` and verify `ServerFFmpegEngine.convert('sample.mp4', 'output.mp3')` produces valid MP3 file > 1000 bytes.
 - [ ] **Frontend Component Test: UniversalInput**:
       Verify drag-and-drop event emits correct file metadata and MIME detection.
+# Seguimiento yt-dlp
+
+- `EXTERNAL_DEPENDENCY`: configurar `YT_DLP_PATH` en cada entorno y ejecutar pruebas externas voluntarias con contenido público autorizado.
+- `PARTIAL`: mantener fixtures/manual checks por proveedor sin cookies ni login; actualizar providers individualmente ante cambios externos.

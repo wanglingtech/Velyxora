@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { mediaService } from '../services/mediaService';
 import { HTTP_STATUS } from '../config/constants';
+import { mediaDownloadService } from '../services/mediaDownloadService';
 
 export async function analyzeMedia(req: Request, res: Response): Promise<void> {
   const { url } = req.body;
@@ -48,12 +49,15 @@ export async function analyzeMedia(req: Request, res: Response): Promise<void> {
 }
 
 export async function processMedia(req: Request, res: Response): Promise<void> {
-  res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
-    success: false,
-    error: {
-      code: 'EXTERNAL_EXTRACTOR_REQUIRED',
-      message: 'Direct automated downloading of external video streams requires an external stream extractor (yt-dlp) and authorized user credentials.',
-    },
-    timestamp: new Date().toISOString(),
-  });
+  const { url, formatId, container, type, title } = req.body || {};
+  if (typeof url !== 'string' || typeof formatId !== 'string' || typeof container !== 'string' || (type !== 'video' && type !== 'audio')) {
+    res.status(HTTP_STATUS.BAD_REQUEST).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Se requieren url y formatId válidos.' }, timestamp: new Date().toISOString() });
+    return;
+  }
+  try {
+    const job = await mediaDownloadService.start(url, formatId, container, type, typeof title === 'string' ? title : 'Contenido multimedia');
+    res.status(HTTP_STATUS.ACCEPTED).json({ success: true, data: job, timestamp: new Date().toISOString() });
+  } catch (error: any) {
+    res.status(HTTP_STATUS.UNPROCESSABLE_ENTITY).json({ success: false, error: { code: 'DOWNLOAD_REJECTED', message: error.message }, timestamp: new Date().toISOString() });
+  }
 }

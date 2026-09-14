@@ -18,6 +18,8 @@ import {
 } from "../../services/mediaService";
 import { MediaMetadata, MediaFormatOption } from "../../types/media";
 import { toast } from "../common/ToastContainer";
+import { apiClient, type ConversionJobResponse } from "../../services/apiClient";
+import { downloadService } from "../../services/downloadService";
 
 interface MediaDownloaderViewProps {
   initialUrl?: string;
@@ -33,6 +35,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
   const [metadata, setMetadata] = useState<MediaMetadata | null>(null);
   const [selectedFormat, setSelectedFormat] =
     useState<MediaFormatOption | null>(null);
+  const [downloadJob, setDownloadJob] = useState<ConversionJobResponse | null>(null);
 
   const handleAnalyze = async (inputUrl?: string) => {
     const targetUrl = (inputUrl || url).trim();
@@ -74,17 +77,37 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
     }
   };
 
-  const handleDownloadAction = () => {
+  const handleDownloadAction = async () => {
     if (!selectedFormat || !metadata) return;
-
-    if (metadata.requiresServerEngine) {
-      toast.warning(
-        "Backend Microservice Requerido",
-        `${metadata.engineDetails.backendEngine} es necesario en el backend para empaquetar y entregar este flujo de video sin bloqueos CORS del navegador.`,
-      );
-    } else if (selectedFormat.directDownloadUrl) {
-      window.open(selectedFormat.directDownloadUrl, "_blank");
+    try {
+      let job = await apiClient.startMediaDownload({
+        url: metadata.originalUrl,
+        formatId: selectedFormat.id,
+        container: selectedFormat.extension,
+        type: selectedFormat.type || (selectedFormat.hasVideo ? "video" : "audio"),
+        title: metadata.title,
+      });
+      setDownloadJob(job);
+      for (let attempt = 0; attempt < 600; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        job = await apiClient.getJobStatus(job.id);
+        setDownloadJob(job);
+        if (job.status === "COMPLETED" && job.output) {
+          await downloadService.downloadBackendFile(job.output.fileId, job.output.filename);
+          return;
+        }
+        if (job.status === "FAILED" || job.status === "CANCELLED") throw new Error(job.error || `Trabajo ${job.status}.`);
+      }
+      throw new Error("La descarga excedió el tiempo de espera.");
+    } catch (error: any) {
+      toast.error("No fue posible descargar", error.message);
     }
+  };
+
+  const handleCancel = async () => {
+    if (!downloadJob) return;
+    await apiClient.cancelJob(downloadJob.id);
+    setDownloadJob({ ...downloadJob, status: "CANCELLED" });
   };
 
   return (
@@ -99,9 +122,9 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
           Descarga autorizada de medios digitales
         </h2>
         <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
-          Analiza enlaces multimedia y extrae formatos autorizados con
-          previsualización oficial y respeto a términos de servicio.
+          Pega una URL pública compatible para analizar y descargar los formatos disponibles.
         </p>
+        <p className="text-xs text-amber-300">Usa esta herramienta solo con contenido público o que tengas permiso para descargar.</p>
       </div>
 
       {/* Input URL Bar */}
@@ -211,6 +234,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
                   {metadata.formattedDuration &&
                     `• ${metadata.formattedDuration}`}
                 </p>
+                {metadata.contentType && <p className="text-[11px] text-slate-500 mt-1">Tipo: {metadata.contentType}</p>}
               </div>
 
               <a
@@ -235,8 +259,12 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {metadata.availableFormats.map((fmt) => {
+              <div className="space-y-5">
+                {(["video", "audio"] as const).map((group) => (
+                  <div key={group} className="space-y-2">
+                    <h5 className="text-[11px] font-bold tracking-widest text-indigo-300">{group.toUpperCase()}</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {metadata.availableFormats.filter((fmt) => fmt.type === group).map((fmt) => {
                   const isSelected = selectedFormat?.id === fmt.id;
                   return (
                     <div
@@ -265,6 +293,8 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
                           <p className="text-[10px] text-slate-400 font-mono">
                             {fmt.streamType}{" "}
                             {fmt.resolution && `• ${fmt.resolution}`}
+                            {fmt.fps && ` • ${fmt.fps} FPS`}
+                            {fmt.bitrate && ` • ${fmt.bitrate} kbps`}
                           </p>
                         </div>
                       </div>
@@ -277,6 +307,9 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
                     </div>
                   );
                 })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -292,21 +325,21 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
                     {metadata.engineDetails.legalNote}
                   </p>
                   <p className="text-[11px] text-slate-500 mt-1 font-mono">
-                    Contrato de API: POST /api/media/process (body: &#123; url:
-                    "{metadata.id}", format: "{selectedFormat?.id || "default"}"
-                    &#125;)
+                    yt-dlp descarga el formato seleccionado; FFmpeg combina o convierte cuando es necesario y FFprobe valida el resultado.
                   </p>
                 </div>
               </div>
 
               <div className="flex justify-end pt-1">
-                {metadata.requiresServerEngine || !selectedFormat?.directDownloadUrl ? (
-                  <span className="px-4 py-2 rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-300 text-xs font-medium">
-                    Análisis disponible · Descarga directa pendiente de motor externo
-                  </span>
+                {downloadJob && !["COMPLETED", "FAILED", "CANCELLED"].includes(downloadJob.status) ? (
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-300">{downloadJob.progressMessage || downloadJob.status} · {Math.max(0, downloadJob.progress)}%</span>
+                    <button onClick={handleCancel} className="px-4 py-2 rounded-xl border border-red-500/30 text-red-300 text-xs">Cancelar</button>
+                  </div>
                 ) : (
                   <button
                     onClick={handleDownloadAction}
+                    disabled={!selectedFormat}
                     className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all"
                   >
                     <DownloadCloud className="w-4 h-4" />
