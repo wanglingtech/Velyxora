@@ -2,6 +2,9 @@ import { prisma } from '../db/prisma';
 import { BETA_PACKAGES, BetaPackageId } from '../config/betaPayments';
 
 export class PaymentService {
+  async listOrders(userId: string) {
+    return prisma.paymentOrder.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 50, select: { id: true, status: true, credits: true, amountMinor: true, currency: true, reference: true, createdAt: true, updatedAt: true, plan: { select: { code: true } } } });
+  }
   async createOrder(userId: string, data: { packageId: BetaPackageId; idempotencyKey: string }) {
     if (process.env.BETA_MANUAL_PAYMENTS !== 'true') throw new Error('Los pagos manuales beta no están habilitados.');
     const selected = BETA_PACKAGES[data.packageId];

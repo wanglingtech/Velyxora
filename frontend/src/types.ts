@@ -95,7 +95,8 @@ export interface HistoryItem {
   status: "COMPLETED" | "FAILED" | "CANCELLED";
   outputName?: string;
   completedAt?: number;
-  processingLocation: "local" | "server";
+  processingLocation: "local" | "server" | "external";
+  creditsCost?: number;
   outputFileId?: string;
   [key: string]: unknown;
 }

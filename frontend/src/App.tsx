@@ -20,6 +20,7 @@ import { ToolDefinition, DetectedFileInfo } from './types';
 import { getToolById } from './registry/tools';
 import { AccountView, AdminView, AuthView, CurrentUser } from './components/views/AccountViews';
 import { apiClient } from './services/apiClient';
+import { historyService } from './services/historyService';
 
 export default function App() {
   const [activeView, setActiveView] = useState<string>('home');
@@ -38,6 +39,7 @@ export default function App() {
     setFavorites(favoritesService.getFavorites());
     apiClient.auth.me().then(setCurrentUser).catch(() => setCurrentUser(null));
   }, []);
+  useEffect(() => { historyService.setAuthenticated(Boolean(currentUser)); }, [currentUser]);
 
   const handleToggleFavorite = (toolId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -177,7 +179,7 @@ export default function App() {
           )}
 
           {activeView === 'history' && (
-            <HistoryView onSelectTool={handleSelectTool} onBack={() => handleNavigate('home')} />
+            <HistoryView authenticated={Boolean(currentUser)} onSelectTool={handleSelectTool} onBack={() => handleNavigate('home')} />
           )}
 
           {activeView === 'settings' && <SettingsView onBack={() => handleNavigate('home')} />}

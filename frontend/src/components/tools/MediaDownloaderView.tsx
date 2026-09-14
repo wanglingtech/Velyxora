@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   DownloadCloud,
   ArrowRight,
@@ -37,6 +37,9 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
   const [selectedFormat, setSelectedFormat] =
     useState<MediaFormatOption | null>(null);
   const [downloadJob, setDownloadJob] = useState<ConversionJobResponse | null>(null);
+  const [creditEstimate, setCreditEstimate] = useState<{ estimatedCredits: number; currentBalance: number; balanceAfter: number } | null>(null);
+  const actionRef = useRef(false); const cancelRef = useRef(false);
+  useEffect(() => { if (!selectedFormat) { setCreditEstimate(null); return; } let active = true; apiClient.estimateCredits('media-downloader', 0).then((value) => { if (active) setCreditEstimate(value); }).catch(() => { if (active) setCreditEstimate(null); }); return () => { active = false; }; }, [selectedFormat]);
 
   const handleAnalyze = async (inputUrl?: string) => {
     const targetUrl = (inputUrl || url).trim();
@@ -79,7 +82,9 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
   };
 
   const handleDownloadAction = async () => {
-    if (!selectedFormat || !metadata) return;
+    if (!selectedFormat || !metadata || actionRef.current) return;
+    if (creditEstimate && creditEstimate.balanceAfter < 0) { toast.error('Créditos insuficientes', 'Necesitas recargar créditos antes de descargar.'); return; }
+    actionRef.current = true;
     try {
       let job = await apiClient.startMediaDownload({
         url: metadata.originalUrl,
@@ -97,18 +102,21 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
           await downloadService.downloadBackendFile(job.output.fileId, job.output.filename);
           return;
         }
-        if (job.status === "FAILED" || job.status === "CANCELLED") throw new Error(job.error || `Trabajo ${job.status}.`);
+        if (job.status === "CANCELLED") return;
+        if (job.status === "FAILED") throw new Error(job.error || "El trabajo no pudo completarse.");
       }
       throw new Error("La descarga excedió el tiempo de espera.");
     } catch (error: any) {
       toast.error("No fue posible descargar", error.message);
-    }
+    } finally { actionRef.current = false; }
   };
 
   const handleCancel = async () => {
-    if (!downloadJob) return;
-    await apiClient.cancelJob(downloadJob.id);
-    setDownloadJob({ ...downloadJob, status: "CANCELLED" });
+    if (!downloadJob || cancelRef.current || !['QUEUED', 'DOWNLOADING', 'PROCESSING'].includes(downloadJob.status)) return;
+    cancelRef.current = true;
+    try { await apiClient.cancelJob(downloadJob.id); setDownloadJob({ ...downloadJob, status: "CANCELLED" }); }
+    catch (error: any) { toast.error('No se pudo cancelar', error.message); }
+    finally { cancelRef.current = false; }
   };
 
   return (
@@ -333,6 +341,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
               </div>
 
               <div className="flex justify-end pt-1">
+                {creditEstimate && <div className={`mr-auto text-xs ${creditEstimate.balanceAfter < 0 ? 'text-rose-300' : 'text-slate-400'}`}>Costo estimado: {creditEstimate.estimatedCredits} · Saldo actual: {creditEstimate.currentBalance} · Saldo después: {creditEstimate.balanceAfter}</div>}
                 {downloadJob && !["COMPLETED", "FAILED", "CANCELLED"].includes(downloadJob.status) ? (
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-slate-300">{downloadJob.progressMessage || downloadJob.status} · {Math.max(0, downloadJob.progress)}%</span>
@@ -341,7 +350,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
                 ) : (
                   <button
                     onClick={handleDownloadAction}
-                    disabled={!selectedFormat}
+                    disabled={!selectedFormat || Boolean(creditEstimate && creditEstimate.balanceAfter < 0)}
                     className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all"
                   >
                     <DownloadCloud className="w-4 h-4" />

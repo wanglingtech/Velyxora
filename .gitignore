@@ -48,7 +48,3 @@ Thumbs.db
 # Editor / IDE
 .vscode/
 .idea/
-
-# Accidental generated files
-({length
-JSON.stringify({root

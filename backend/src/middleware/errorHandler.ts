@@ -29,12 +29,13 @@ export function errorHandler(
     stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
   });
 
+  const isOperational = err instanceof AppError;
   res.status(statusCode).json({
     success: false,
     error: {
       code,
-      message: err.message || 'An unexpected internal error occurred',
-      details: (err as AppError).details,
+      message: isOperational ? err.message : 'Ocurrió un problema interno. Inténtalo de nuevo más tarde.',
+      ...(isOperational && process.env.NODE_ENV !== 'production' && (err as AppError).details ? { details: (err as AppError).details } : {}),
     },
     timestamp: new Date().toISOString(),
   });

@@ -8,6 +8,7 @@ export interface BackendHealth {
     libreOffice: boolean;
     storage: boolean;
     ytDlp: boolean;
+    database: boolean;
   };
 }
 
@@ -123,9 +124,13 @@ class ApiClient {
         throw new Error("El backend devolvió una respuesta no válida.");
       }
       if (!response.ok || payload.success === false) {
-        throw new Error(
-          payload.error?.message || `La solicitud falló (${response.status}).`,
-        );
+        const friendly: Record<number, string> = {
+          401: "Tu sesión terminó o necesitas iniciar sesión.", 403: "No tienes permiso para realizar esta acción.",
+          404: "El recurso solicitado no existe o ya expiró.", 409: "La operación entra en conflicto con el estado actual.",
+          413: "El archivo supera el tamaño permitido.", 429: "Hay demasiadas solicitudes. Espera un momento e inténtalo de nuevo.",
+          500: "Ocurrió un problema en el servidor. Inténtalo de nuevo más tarde.", 503: "El servicio está temporalmente no disponible.",
+        };
+        throw new Error(payload.error?.message || friendly[response.status] || "No se pudo completar la solicitud.");
       }
       return payload.data === undefined ? (payload as T) : payload.data;
     } catch (error) {
@@ -157,6 +162,21 @@ class ApiClient {
     account: () => this.request<any>('/api/account'),
     adminDashboard: () => this.request<any>('/api/admin/dashboard'),
     adminUsers: () => this.request<any[]>('/api/admin/users'),
+    adminPayments: () => this.request<any[]>('/api/admin/payments'),
+    reviewPayment: (orderId: string, decision: 'APPROVE' | 'REJECT', reason: string) => this.request<any>(`/api/admin/payments/${encodeURIComponent(orderId)}/review`, { method: 'POST', body: JSON.stringify({ decision, reason }) }),
+  };
+
+  history = {
+    list: (limit = 50) => this.request<{ items: any[]; nextCursor: string | null }>(`/api/history?limit=${limit}`),
+    create: (item: Record<string, unknown>) => this.request<any>('/api/history', { method: 'POST', body: JSON.stringify(item) }),
+    remove: (id: string) => this.request<void>(`/api/history/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  };
+
+  payments = {
+    config: () => this.request<any>('/api/payments/config'),
+    orders: () => this.request<any[]>('/api/payments/orders'),
+    createOrder: (packageId: string, idempotencyKey: string) => this.request<any>('/api/payments/orders', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ packageId }) }),
+    submitReference: (orderId: string, reference: string) => this.request<any>(`/api/payments/orders/${encodeURIComponent(orderId)}/reference`, { method: 'POST', body: JSON.stringify({ reference }) }),
   };
 
   estimateCredits(toolId: string, inputBytes: number, options: Record<string, unknown> = {}) {

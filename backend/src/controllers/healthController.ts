@@ -6,13 +6,15 @@ import fs from 'fs';
 import { ENV } from '../config/env';
 import { isFfprobeAvailable } from '../utils/mediaProbe';
 import { ytDlpService } from '../services/ytDlpService';
+import { prisma } from '../db/prisma';
 
 export async function getHealth(req: Request, res: Response): Promise<void> {
-  const [ffmpegReady, ffprobeReady, libreofficeReady, ytDlpReady] = await Promise.all([
+  const [ffmpegReady, ffprobeReady, libreofficeReady, ytDlpReady, databaseReady] = await Promise.all([
     serverFFmpegEngine.isAvailable(),
     isFfprobeAvailable(),
     libreOfficeEngine.isAvailable(),
     ytDlpService.isAvailable(),
+    prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
   ]);
 
   const storageReady = fs.existsSync(ENV.TEMP_DIR) && fs.existsSync(ENV.STORAGE_DIR);
@@ -20,8 +22,9 @@ export async function getHealth(req: Request, res: Response): Promise<void> {
   const mem = process.memoryUsage();
   const uptime = process.uptime();
 
+  const requiredReady = storageReady && databaseReady;
   res.status(HTTP_STATUS.OK).json({
-    status: 'ok',
+    status: requiredReady ? 'ok' : 'degraded',
     version: '1.0.0',
     uptimeSeconds: Math.floor(uptime),
     memoryUsageMb: {
@@ -35,6 +38,7 @@ export async function getHealth(req: Request, res: Response): Promise<void> {
       libreOffice: libreofficeReady,
       storage: storageReady,
       ytDlp: ytDlpReady,
+      database: databaseReady,
     },
     timestamp: new Date().toISOString(),
   });

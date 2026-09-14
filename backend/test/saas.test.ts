@@ -40,6 +40,6 @@ test('policy permite allowlist y bloquea adulto, desconocido y subdominio engañ
 
 test('schema y migración contienen persistencia e idempotencia requeridas', async () => {
   const [schema, migration] = await Promise.all([readFile('prisma/schema.prisma', 'utf8'), readFile('prisma/migrations/20260913000100_auth_credits_beta/migration.sql', 'utf8')]);
-  for (const model of ['User','Session','Plan','UserPlan','CreditLedger','ProcessingUsage','PaymentOrder','Payment','AdminAuditLog']) assert.match(schema, new RegExp(`model ${model}`));
+  for (const model of ['User','Session','Plan','UserPlan','CreditLedger','ProcessingUsage','ProcessingHistory','PaymentOrder','Payment','AdminAuditLog']) assert.match(schema, new RegExp(`model ${model}`));
   assert.match(migration, /idempotencyKey.*UNIQUE/); assert.match(schema, /ADMIN_TEST/);
 });

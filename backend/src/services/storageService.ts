@@ -101,6 +101,21 @@ class StorageService {
   }
 
   private startTtlCleanup(): void {
+    const cleanup = () => {
+      const now = Date.now();
+      for (const root of [ENV.TEMP_DIR, ENV.STORAGE_DIR]) {
+        for (const name of fs.readdirSync(root)) {
+          if (name === '.gitkeep') continue;
+          const filePath = path.join(root, name);
+          try {
+            assertSafePath(root, filePath);
+            const stat = fs.statSync(filePath);
+            if (stat.isFile() && now - stat.mtimeMs > ENV.TEMP_FILE_TTL_MS) fs.unlinkSync(filePath);
+          } catch (error: any) { if (error?.code !== 'ENOENT') logger.warn(`Temporary cleanup skipped a file: ${error.message}`); }
+        }
+      }
+    };
+    cleanup();
     const timer = setInterval(() => {
       const now = Date.now();
       for (const [fileId, record] of this.files.entries()) {
@@ -109,6 +124,7 @@ class StorageService {
           this.deleteFile(fileId);
         }
       }
+      cleanup();
     }, 5 * 60 * 1000); // Check every 5 minutes
     if (timer.unref) {
       timer.unref();

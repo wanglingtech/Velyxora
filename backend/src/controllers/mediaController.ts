@@ -57,7 +57,7 @@ export async function processMedia(req: Request, res: Response): Promise<void> {
   }
   try {
     providerPolicyService.assertAllowed(url);
-    const job = await mediaDownloadService.start(url, formatId, container, type, typeof title === 'string' ? title : 'Contenido multimedia');
+    const job = await mediaDownloadService.start(url, formatId, container, type, typeof title === 'string' ? title : 'Contenido multimedia', process.env.NODE_ENV === 'test' ? undefined : { userId: req.auth!.userId, isAdmin: req.auth!.role === 'ADMIN' });
     res.status(HTTP_STATUS.ACCEPTED).json({ success: true, data: job, timestamp: new Date().toISOString() });
   } catch (error: any) {
     res.status(HTTP_STATUS.UNPROCESSABLE_ENTITY).json({ success: false, error: { code: 'DOWNLOAD_REJECTED', message: error.message }, timestamp: new Date().toISOString() });

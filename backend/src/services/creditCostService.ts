@@ -6,7 +6,7 @@ const SERVER_TOOLS = new Set([
 ]);
 
 export class CreditCostService {
-  classify(toolId: string): ProcessingClass { return toolId === 'media-url-analyzer' ? 'EXTERNAL' : SERVER_TOOLS.has(toolId) ? 'SERVER' : 'LOCAL'; }
+  classify(toolId: string): ProcessingClass { return ['media-url-analyzer', 'media-downloader'].includes(toolId) ? 'EXTERNAL' : SERVER_TOOLS.has(toolId) ? 'SERVER' : 'LOCAL'; }
   estimate(toolId: string, inputBytes = 0, options: Record<string, unknown> = {}) {
     const processingClass = this.classify(toolId);
     if (processingClass === 'LOCAL') return { processingClass, baseCost: 0, sizeTier: 0, estimatedCredits: 0 };

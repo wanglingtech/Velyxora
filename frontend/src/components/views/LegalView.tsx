@@ -50,7 +50,8 @@ export const LegalView: React.FC<LegalViewProps> = ({ page, onBack }) => {
                 Las tareas de imágenes, recortado de audio, formateo de código,
                 hash criptográfico y códigos QR se ejecutan directamente en la
                 memoria de tu navegador mediante HTML5 Canvas, Web Audio y Web
-                Crypto. Tus datos nunca salen de tu equipo.
+                Crypto. En estas herramientas LOCAL, el archivo se procesa en
+                tu dispositivo y no se envía para ejecutar la operación.
               </p>
             </div>
 
@@ -108,13 +109,19 @@ export const LegalView: React.FC<LegalViewProps> = ({ page, onBack }) => {
             No transmitimos nombres de archivos privados ni parámetros sensibles
             a redes de publicidad o rastreadores de terceros.
           </p>
+          <p>
+            Las herramientas LOCAL pueden utilizarse sin cuenta. Al iniciar
+            sesión no se migra automáticamente el historial que ya exista en
+            el dispositivo; permanece local salvo una decisión futura explícita.
+          </p>
           <h3 className="text-sm sm:text-base font-semibold text-white">
             4. Cuenta, créditos y pagos beta
           </h3>
           <p>
             Podemos guardar email normalizado, display name si se proporciona,
             hash de contraseña, sesiones, estado y rol, plan, ledger de
-            créditos, metadata mínima de jobs, órdenes y pagos manuales beta, y
+            créditos, metadata mínima de jobs e historial sincronizado, órdenes
+            y pagos manuales beta, y
             logs administrativos mínimos. Las referencias de operación quedan
             pendientes de revisión hasta su aprobación. No almacenamos
             contraseñas en texto plano, tarjetas, CVV, cookies sociales ni

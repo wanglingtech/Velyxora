@@ -13,8 +13,8 @@ class JobService {
 
   deleteJob(id: string): boolean {
     const job = jobManager.getJob(id);
-    if (job?.output?.path) {
-      storageService.deleteFile(job.id);
+    if (job?.output?.fileId) {
+      storageService.deleteFile(job.output.fileId);
     }
     return jobManager.deleteJob(id);
   }

@@ -29,9 +29,11 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
     job.output?.filename || "",
   );
   const [copied, setCopied] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const handleDownload = async () => {
-    if (!job.output) return;
+    if (!job.output || isDownloading) return;
+    setIsDownloading(true);
     try {
       const filename = customFilename || job.output.filename;
       if (job.output.blob) downloadService.downloadBlob(job.output.blob, filename);
@@ -40,7 +42,7 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
       else throw new Error("DOWNLOAD_FAILED: no existe un archivo de salida.");
     } catch (error) {
       toast.error("No se pudo descargar", error instanceof Error ? error.message : "DOWNLOAD_FAILED");
-    }
+    } finally { setIsDownloading(false); }
   };
 
   const handleCopyText = () => {
@@ -53,6 +55,7 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
 
   // Processing state
   if (
+    job.status === "QUEUED" ||
     job.status === "PROCESSING" ||
     job.status === "ANALYZING" ||
     job.status === "UPLOADING" ||
@@ -63,7 +66,7 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
         <div className="w-12 h-12 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin flex items-center justify-center mb-4" />
 
         <h3 className="text-base font-semibold text-white">
-          Procesando {job.toolName}
+          {job.status === "QUEUED" ? "En cola" : "Procesando"} {job.toolName}
         </h3>
         <p className="text-xs text-slate-400 mt-1 font-mono">
           {job.stageDescription}
@@ -115,11 +118,6 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
             <p className="text-xs text-rose-300 mt-1">
               {job.error?.message || "Ocurrió un fallo inesperado."}
             </p>
-            {job.error?.details && (
-              <p className="text-[11px] font-mono text-slate-500 mt-2 bg-black/30 p-2 rounded border border-white/[0.05]">
-                {job.error.details}
-              </p>
-            )}
           </div>
         </div>
 
@@ -134,6 +132,10 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
         </div>
       </div>
     );
+  }
+
+  if (job.status === "CANCELLED") {
+    return <div className="w-full rounded-2xl bg-[#101218] border border-amber-500/30 p-6 text-center"><h3 className="font-semibold text-white">Procesamiento cancelado</h3><p className="mt-1 text-xs text-slate-400">No se realizó ningún cobro definitivo; cualquier reserva aplicable será reembolsada.</p><button onClick={onReset} className="mt-4 min-h-11 rounded-xl bg-slate-800 px-4 text-xs">Procesar otro</button></div>;
   }
 
   // Completed state
@@ -242,10 +244,11 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
               />
               <button
                 onClick={handleDownload}
+                disabled={isDownloading}
                 className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all shrink-0"
               >
                 <Download className="w-4 h-4" />
-                <span>Descargar archivo</span>
+                <span>{isDownloading ? "Descargando…" : "Descargar archivo"}</span>
               </button>
             </div>
           ) : (

@@ -8,10 +8,11 @@ import { probeMedia } from "../utils/mediaProbe";
 import { storageService } from "../services/storageService";
 import { sanitizeFilename } from "../utils/sanitize";
 import { logger } from "../utils/logger";
+import { creditLedgerService } from "../services/creditLedgerService";
 
 export const mediaDownloadQueue = new InMemoryQueue("media-downloads", 2);
 
-mediaDownloadQueue.process(async (jobId, data: { url: string; formatId: string; container: string; type: "video" | "audio"; title: string }) => {
+mediaDownloadQueue.process(async (jobId, data: { url: string; formatId: string; container: string; type: "video" | "audio"; title: string; billingUserId?: string }) => {
   const job = jobManager.getJob(jobId);
   if (!job) return;
   const stem = path.join(ENV.STORAGE_DIR, `download-${jobId}`);
@@ -26,7 +27,7 @@ mediaDownloadQueue.process(async (jobId, data: { url: string; formatId: string; 
     if (!probe.streams.length) throw new Error("El archivo descargado no contiene streams multimedia válidos.");
     const extension = path.extname(outputPath);
     const filename = sanitizeFilename(`${data.title || "media"}${extension}`);
-    const stored = storageService.registerOutput(outputPath, filename, mimeFor(extension));
+    const stored = storageService.registerOutput(outputPath, filename, mimeFor(extension), job.ownerId);
     jobManager.updateJob(jobId, { output: {
       fileId: stored.fileId, filename, mimeType: stored.mimeType, size: stored.size,
       path: stored.path, downloadUrl: `/api/download/${stored.fileId}`,
@@ -36,11 +37,13 @@ mediaDownloadQueue.process(async (jobId, data: { url: string; formatId: string; 
     }, metadata: { probe } });
     jobManager.updateProgress(jobId, 100, "Descarga lista.");
     jobManager.setStatus(jobId, "COMPLETED");
+    if (data.billingUserId) await creditLedgerService.settle(jobId, 'COMPLETED');
   } catch (error: any) {
     for (const filename of fs.readdirSync(ENV.STORAGE_DIR)) if (filename.startsWith(`download-${jobId}.`)) fs.unlinkSync(path.join(ENV.STORAGE_DIR, filename));
     if (jobManager.getJob(jobId)?.status !== "CANCELLED") {
       logger.warn(`Media download ${jobId} failed: ${error.message}`);
       jobManager.setStatus(jobId, "FAILED", error.message);
+      if (data.billingUserId) await creditLedgerService.settle(jobId, 'FAILED');
     }
   }
 });

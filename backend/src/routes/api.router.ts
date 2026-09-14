@@ -13,6 +13,7 @@ import creditsRoutes from './credits.routes';
 import accountRoutes from './account.routes';
 import paymentsRoutes from './payments.routes';
 import adminRoutes from './admin.routes';
+import historyRoutes from './history.routes';
 
 const router = Router();
 
@@ -22,6 +23,7 @@ router.use('/credits', creditsRoutes);
 router.use('/account', accountRoutes);
 router.use('/payments', paymentsRoutes);
 router.use('/admin', adminRoutes);
+router.use('/history', historyRoutes);
 router.use('/tools', toolsRoutes);
 router.use('/formats', formatsRoutes);
 router.use('/uploads', uploadsRoutes);

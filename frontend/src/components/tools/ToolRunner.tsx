@@ -61,6 +61,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   const [creditEstimate, setCreditEstimate] = useState<{ estimatedCredits: number; currentBalance: number; balanceAfter: number } | null>(null);
   const backendJobIdRef = useRef<string | null>(null);
   const pollingCancelledRef = useRef(false);
+  const submittingRef = useRef(false);
 
   // Common Options
   const [quality, setQuality] = useState<number>(90);
@@ -234,6 +235,9 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
 
   // ==================== REAL PROCESSING EXECUTION ====================
   const handleExecute = async () => {
+    if (submittingRef.current) return;
+    if (creditEstimate && creditEstimate.balanceAfter < 0) { toast.error("Créditos insuficientes", "Necesitas recargar créditos antes de procesar."); return; }
+    submittingRef.current = true;
     if (tool.id === "video-trimmer" && (serverTrimStart < 0 || serverTrimEnd <= serverTrimStart || (videoDuration > 0 && serverTrimEnd > videoDuration))) {
       toast.error("Intervalo inválido", "El final debe ser posterior al inicio y no superar la duración del video.");
       return;
@@ -536,7 +540,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
         message:
           err?.message || "Fallo durante el procesamiento en el navegador.",
       });
-    }
+    } finally { submittingRef.current = false; }
   };
 
   // ==================== DEVELOPER TOOLS LOGIC ====================
@@ -1068,11 +1072,11 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
               )}
 
               {/* Action Button */}
-              {creditEstimate && <p className="text-right text-xs text-slate-400">Esta operación utilizará <strong className="text-indigo-300">{creditEstimate.estimatedCredits} créditos</strong>. Saldo posterior: {creditEstimate.balanceAfter}.</p>}
+              {creditEstimate && <div className={`rounded-xl border p-3 text-xs ${creditEstimate.balanceAfter < 0 ? 'border-rose-500/30 text-rose-300' : 'border-indigo-500/20 text-slate-300'}`}><div className="grid gap-1 sm:grid-cols-3"><span>Costo estimado: <strong>{creditEstimate.estimatedCredits}</strong></span><span>Saldo actual: <strong>{creditEstimate.currentBalance}</strong></span><span>Saldo después: <strong>{creditEstimate.balanceAfter}</strong></span></div>{creditEstimate.balanceAfter < 0 && <p className="mt-2">Saldo insuficiente para iniciar.</p>}</div>}
               <div className="flex justify-end pt-2">
                 <button
                   onClick={handleExecute}
-                  disabled={!selectedFile}
+                  disabled={!selectedFile || Boolean(creditEstimate && creditEstimate.balanceAfter < 0)}
                   className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
                 >
                   <Sparkles className="w-4 h-4" />
