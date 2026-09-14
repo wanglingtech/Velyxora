@@ -11,7 +11,18 @@ export class PaymentService {
     const selected = BETA_PACKAGES[data.packageId];
     if (!selected || !data.idempotencyKey) throw new Error('Paquete o idempotency key inválido.');
     const plan = await prisma.plan.findUniqueOrThrow({ where: { code: selected.planCode } });
-    return prisma.paymentOrder.upsert({ where: { userId_idempotencyKey: { userId, idempotencyKey: data.idempotencyKey } }, update: {}, create: { userId, planId: plan.id, credits: selected.credits, amountMinor: selected.amountMinor, currency: selected.currency, idempotencyKey: data.idempotencyKey } });
+    const recent = await prisma.paymentOrder.findFirst({ where: { userId, planId: plan.id, status: 'PENDING_PAYMENT', createdAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) } }, orderBy: { createdAt: 'desc' } });
+    if (recent) return { ...recent, reused: true };
+    const order = await prisma.paymentOrder.upsert({ where: { userId_idempotencyKey: { userId, idempotencyKey: data.idempotencyKey } }, update: {}, create: { userId, planId: plan.id, credits: selected.credits, amountMinor: selected.amountMinor, currency: selected.currency, idempotencyKey: data.idempotencyKey } });
+    return { ...order, reused: false };
+  }
+  async cancelOrder(userId: string, orderId: string) {
+    const existing = await prisma.paymentOrder.findFirst({ where: { id: orderId, userId } });
+    if (!existing) throw new Error('Orden no encontrada.');
+    if (existing.status === 'CANCELLED_BY_USER') return existing;
+    if (existing.status !== 'PENDING_PAYMENT') throw new Error('Esta orden ya fue enviada a revisión o finalizada y no puede cancelarse.');
+    await prisma.paymentOrder.updateMany({ where: { id: orderId, userId, status: 'PENDING_PAYMENT' }, data: { status: 'CANCELLED_BY_USER' } });
+    return prisma.paymentOrder.findUniqueOrThrow({ where: { id: orderId } });
   }
   async submitReference(userId: string, orderId: string, reference: string) {
     const normalized = normalizePeruPhone(reference);

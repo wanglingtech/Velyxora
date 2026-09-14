@@ -67,6 +67,7 @@ enum PaymentOrderStatus {
   APPROVED
   REJECTED
   CANCELLED
+  CANCELLED_BY_USER
 }
 enum PaymentStatus {
   APPROVED
@@ -116,13 +117,21 @@ model DeniedIdentity {
 
 model Complaint {
   id           String          @id @default(uuid()) @db.Uuid
+  sequenceNumber Int           @unique @default(autoincrement())
   trackingCode String          @unique
   userId       String?         @db.Uuid
   claimantName String
+  documentId   String
+  phone        String
+  representativeName String?
+  representativeDocument String?
   email        String
   type         ComplaintType
   subject      String
   detail       String
+  serviceDescription String
+  amountMinor  Int?
+  consumerRequest String
   status       ComplaintStatus @default(RECEIVED)
   flagged      Boolean         @default(false)
   adminResponse String?

@@ -193,9 +193,11 @@ class ApiClient {
     orders: () => this.request<any[]>('/payments/orders'),
     createOrder: (packageId: string, idempotencyKey: string) => this.request<any>('/payments/orders', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ packageId }) }),
     submitReference: (orderId: string, reference: string) => this.request<any>(`/payments/orders/${encodeURIComponent(orderId)}/reference`, { method: 'POST', body: JSON.stringify({ reference }) }),
+    cancelOrder: (orderId: string) => this.request<any>(`/payments/orders/${encodeURIComponent(orderId)}/cancel`, { method: 'POST' }),
   };
 
   feedback = {
+    complaintConfig: () => this.request<any>('/feedback/complaints/config'),
     createComplaint: (data: Record<string, string>) => this.request<any>('/feedback/complaints', { method: 'POST', body: JSON.stringify(data) }),
     createSuggestion: (data: Record<string, string>) => this.request<any>('/feedback/suggestions', { method: 'POST', body: JSON.stringify(data) }),
   };

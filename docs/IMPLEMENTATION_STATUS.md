@@ -11,6 +11,16 @@
 | Yape manual | `BETA_MANUAL` | sin verificación automática |
 | PaymentProvider | `REQUIRES_EXTERNAL_PROVIDER` | contrato futuro, sin simulación |
 | Privacy/Terms | `LEGAL_REVIEW_REQUIRED` | borradores actualizados |
+| About | `COMPLETE` | arquitectura LOCAL/SERVER/EXTERNAL alineada |
+| Privacy technical | `COMPLETE` | datos y flujos reales documentados |
+| Privacy legal | `LEGAL_REVIEW_REQUIRED` | revisión profesional pendiente |
+| Terms technical | `COMPLETE` | beta, pagos y proveedores documentados |
+| Terms legal | `LEGAL_REVIEW_REQUIRED` | revisión profesional pendiente |
+| Complaint book technical | `COMPLETE` | persistencia, seguimiento y respuesta |
+| Complaint book legal | `LEGAL_REVIEW_REQUIRED` | formato peruano sujeto a revisión |
+| Yape | `BETA_MANUAL` | revisión manual |
+| Payment gateway | `POST_BETA` | no implementado |
+| License | `PROPRIETARY` | All Rights Reserved |
 
 ## Fase LibreOffice + UX funcional (2026-09-13)
 

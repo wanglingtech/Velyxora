@@ -43,7 +43,7 @@ test('reclamo, sugerencia, ownership, respuesta admin y ban persisten con seguri
   const cookie = (token: string) => `${SESSION_COOKIE}=${token}`;
   try {
     const app = createBackendApp();
-    const complaint = await request(app).post('/api/feedback/complaints').set('Cookie', cookie(userSession.token)).send({ claimantName: 'Beta User', email: userEmail, type: 'RECLAMO', subject: 'Cobro pendiente', detail: 'Necesito revisar el estado real de una operación de pago.' });
+    const complaint = await request(app).post('/api/feedback/complaints').set('Cookie', cookie(userSession.token)).send({ claimantName: 'Beta User', documentId: '12345678', phone: '968555200', email: userEmail, type: 'RECLAMO', serviceDescription: 'Paquete de créditos beta', subject: 'Cobro pendiente', detail: 'Necesito revisar el estado real de una operación de pago.', consumerRequest: 'Solicito confirmar el estado de la operación.' });
     assert.equal(complaint.status, 201); assert.match(complaint.body.data.trackingCode, /^VX-/);
     const suggestion = await request(app).post('/api/feedback/suggestions').set('Cookie', cookie(userSession.token)).set('X-CSRF-Token', userSession.csrf).send({ category: 'MEJORA', title: 'Mejor navegación', description: 'Agregar accesos más claros dentro de la cuenta.' });
     assert.equal(suggestion.status, 201);
@@ -51,6 +51,7 @@ test('reclamo, sugerencia, ownership, respuesta admin y ban persisten con seguri
     const anonAdmin = await request(app).get('/api/admin/suggestions'); assert.equal(anonAdmin.status, 401);
     const responded = await request(app).patch(`/api/admin/suggestions/${suggestion.body.data.id}`).set('Cookie', cookie(adminSession.token)).set('X-CSRF-Token', adminSession.csrf).send({ status: 'REVIEWING', response: 'La revisaremos.', reaction: '💡' }); assert.equal(responded.status, 200); assert.equal(responded.body.data.reaction, '💡');
     const order = await prisma.paymentOrder.create({ data: { userId: user.id, credits: 25, amountMinor: 500, currency: 'PEN', status: 'PENDING_REVIEW', reference: '968555200', idempotencyKey: `test:${suffix}` } }); await paymentService.review(admin.id, order.id, true, 'Pago validado en prueba'); await paymentService.review(admin.id, order.id, true, 'Segundo intento'); assert.equal(await prisma.creditLedger.count({ where: { idempotencyKey: `payment:${order.id}` } }), 1);
+    const cancellable = await prisma.paymentOrder.create({ data: { userId: user.id, credits: 10, amountMinor: 200, currency: 'PEN', idempotencyKey: `cancel:${suffix}` } }); const cancelled = await paymentService.cancelOrder(user.id, cancellable.id); assert.equal(cancelled.status, 'CANCELLED_BY_USER'); assert.equal((await paymentService.cancelOrder(user.id, cancellable.id)).status, 'CANCELLED_BY_USER');
     const banned = await request(app).post(`/api/admin/users/${user.id}/moderate`).set('Cookie', cookie(adminSession.token)).set('X-CSRF-Token', adminSession.csrf).send({ action: 'BAN', reason: 'Prueba automatizada de moderación beta' }); assert.equal(banned.status, 200);
     assert.equal(await authService.resolve(userSession.token), null); assert.ok(await prisma.deniedIdentity.findUnique({ where: { emailHash: identityHash(userEmail) } })); await assert.rejects(() => authService.register(userEmail, 'Una-clave-segura-123', 'Duplicado vetado'), /identificador/);
   } finally {

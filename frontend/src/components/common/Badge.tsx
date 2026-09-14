@@ -1,6 +1,7 @@
 import React from 'react';
 import { Lock, Cloud, Sparkles, Layers, Zap } from 'lucide-react';
 import { ProcessingMode } from '../../types';
+import { PROCESSING_POLICY } from '../../config/processingPolicy';
 
 interface BadgeProps {
   mode?: ProcessingMode;
@@ -18,6 +19,7 @@ export const CapabilityBadge: React.FC<BadgeProps> = ({
   className = ''
 }) => {
   const resolvedVariant = variant || (mode === 'CLIENT_SIDE' ? 'local' : mode === 'SERVER_SIDE' ? 'server' : mode === 'HYBRID' ? 'hybrid' : 'neutral');
+  const policy = mode ? PROCESSING_POLICY[mode] : undefined;
 
   const configs = {
     local: {
@@ -57,10 +59,11 @@ export const CapabilityBadge: React.FC<BadgeProps> = ({
 
   return (
     <span
+      title={policy?.message}
       className={`inline-flex items-center gap-1 font-mono font-medium uppercase tracking-wider rounded-md border ${config.bg} ${padding} ${className}`}
     >
       {config.icon}
-      <span>{label || config.defaultLabel}</span>
+      <span>{label || policy?.code || config.defaultLabel}</span>
     </span>
   );
 };

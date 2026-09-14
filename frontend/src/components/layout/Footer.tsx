@@ -23,7 +23,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         <div className="flex items-center justify-center gap-3 text-center sm:text-left">
           <VelyxoraLogo variant="isotype" size="sm" />
           <span className="text-xs text-slate-400">
-            VELYXORA © {new Date().getFullYear()} • Universal Conversion & Media Toolkit
+            VELYXORA © 2026 WangLing Tech. Todos los derechos reservados.
           </span>
         </div>
 

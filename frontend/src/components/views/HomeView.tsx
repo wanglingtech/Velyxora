@@ -123,11 +123,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <Shield className="w-4 h-4" />
           </div>
           <h4 className="text-xs sm:text-sm font-semibold text-white">
-            Privacidad Local Garantizada
+            Procesamiento local
           </h4>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Las conversiones de imagen, audio, JSON y códigos QR se ejecutan en
-            tu hardware sin subir tus archivos a servidores externos.
+            Las herramientas clasificadas como LOCAL se procesan en tu dispositivo.
           </p>
         </div>
 

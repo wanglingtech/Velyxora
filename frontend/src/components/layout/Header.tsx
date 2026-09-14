@@ -10,6 +10,10 @@ import {
   DownloadCloud,
   Server,
   CheckCircle2,
+  UserCircle,
+  LogOut,
+  CreditCard,
+  MessageSquare,
 } from "lucide-react";
 import { VelyxoraLogo } from "../logo/VelyxoraLogo";
 import { apiClient, BackendHealth } from "../../services/apiClient";
@@ -38,6 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [backendHealth, setBackendHealth] = useState<BackendHealth | null>(
     null,
   );
+  const [accountOpen, setAccountOpen] = useState(false);
 
   useEffect(() => {
     apiClient.checkHealth().then((health) => {
@@ -95,8 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Right Actions */}
       <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
         {currentUser?.role === 'ADMIN' && <button onClick={() => onNavigate('admin')} className="hidden sm:inline-flex min-h-11 items-center rounded-xl px-3 text-xs text-indigo-300">Administración</button>}
-        <button onClick={() => onNavigate(currentUser ? 'account' : 'auth')} className="hidden sm:inline-flex min-h-11 items-center rounded-xl px-3 text-xs text-slate-300">{currentUser ? 'Mi cuenta' : 'Entrar'}</button>
-        {currentUser && <button onClick={onLogout} className="hidden lg:inline-flex min-h-11 items-center rounded-xl px-2 text-xs text-slate-500">Salir</button>}
+        <div className="relative"><button onClick={() => setAccountOpen(!accountOpen)} className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-2 text-xs text-slate-300 hover:bg-white/5" aria-expanded={accountOpen} aria-label="Menú de cuenta"><UserCircle className="h-5 w-5"/><span className="hidden lg:inline">{currentUser?'Mi cuenta':'Entrar'}</span></button>{accountOpen&&<div className="absolute right-0 top-12 z-50 w-56 rounded-2xl border border-white/10 bg-[#11141d] p-2 shadow-2xl">{currentUser?<><button onClick={()=>{onNavigate('account');setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-white/5"><UserCircle className="h-4 w-4"/>Mi cuenta</button><button onClick={()=>{onNavigate('history');setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-white/5"><History className="h-4 w-4"/>Historial</button><button onClick={()=>{onNavigate('account');setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-white/5"><CreditCard className="h-4 w-4"/>Pagos</button><button onClick={()=>{onNavigate('suggestions');setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-white/5"><MessageSquare className="h-4 w-4"/>Sugerencias</button><button onClick={()=>{onLogout();setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm text-rose-300 hover:bg-rose-500/10"><LogOut className="h-4 w-4"/>Salir</button></>:<><button onClick={()=>{onNavigate('auth');setAccountOpen(false)}} className="min-h-11 w-full rounded-xl px-3 text-left text-sm hover:bg-white/5">Iniciar sesión</button><button onClick={()=>{onNavigate('auth');setAccountOpen(false)}} className="min-h-11 w-full rounded-xl bg-indigo-600 px-3 text-left text-sm">Crear cuenta</button></>}</div>}</div>
         {/* Backend Engine Status Badge */}
         {backendHealth && (
           <div
