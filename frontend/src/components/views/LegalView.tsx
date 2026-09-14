@@ -73,9 +73,6 @@ export const LegalView: React.FC<LegalViewProps> = ({ page, onBack }) => {
 
       {page === "privacy" && (
         <div className="text-xs sm:text-sm text-slate-300 space-y-4 leading-relaxed">
-          <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-amber-200">
-            Borrador informativo pendiente de revisión profesional.
-          </p>
           <h3 className="text-sm sm:text-base font-semibold text-white">
             1. Principio Fundamental: Procesamiento Local
           </h3>
@@ -133,9 +130,6 @@ export const LegalView: React.FC<LegalViewProps> = ({ page, onBack }) => {
 
       {page === "terms" && (
         <div className="text-xs sm:text-sm text-slate-300 space-y-4 leading-relaxed">
-          <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-amber-200">
-            Borrador informativo pendiente de revisión profesional.
-          </p>
           <h3 className="text-sm sm:text-base font-semibold text-white">
             1. Uso Aceptable
           </h3>

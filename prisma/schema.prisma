@@ -14,6 +14,31 @@ enum UserRole {
 enum UserStatus {
   ACTIVE
   SUSPENDED
+  BANNED
+  ANONYMIZED
+}
+enum ComplaintType {
+  RECLAMO
+  QUEJA
+}
+enum ComplaintStatus {
+  RECEIVED
+  IN_REVIEW
+  RESPONDED
+  CLOSED
+}
+enum SuggestionCategory {
+  MEJORA
+  NUEVA_FUNCION
+  PROBLEMA_UX
+  OTRO
+}
+enum SuggestionStatus {
+  SUBMITTED
+  REVIEWING
+  PLANNED
+  DECLINED
+  COMPLETED
 }
 enum PlanCode {
   FREE
@@ -76,6 +101,54 @@ model User {
   auditActions AdminAuditLog[] @relation("AdminActions")
   auditTargets AdminAuditLog[] @relation("AuditTargets")
   history ProcessingHistory[]
+  complaints Complaint[]
+  suggestions Suggestion[]
+}
+
+model DeniedIdentity {
+  id        String   @id @default(uuid()) @db.Uuid
+  emailHash String   @unique
+  reason    String
+  createdAt DateTime @default(now())
+  adminId   String   @db.Uuid
+  @@index([createdAt])
+}
+
+model Complaint {
+  id           String          @id @default(uuid()) @db.Uuid
+  trackingCode String          @unique
+  userId       String?         @db.Uuid
+  claimantName String
+  email        String
+  type         ComplaintType
+  subject      String
+  detail       String
+  status       ComplaintStatus @default(RECEIVED)
+  flagged      Boolean         @default(false)
+  adminResponse String?
+  respondedAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model Suggestion {
+  id            String             @id @default(uuid()) @db.Uuid
+  userId        String             @db.Uuid
+  category      SuggestionCategory
+  title         String
+  description   String
+  status        SuggestionStatus   @default(SUBMITTED)
+  adminResponse String?
+  reaction      String?
+  respondedAt   DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 model ProcessingHistory {

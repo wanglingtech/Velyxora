@@ -1,9 +1,10 @@
 import { prisma } from '../db/prisma';
 import { BETA_PACKAGES, BetaPackageId } from '../config/betaPayments';
+export const normalizePeruPhone = (value: string) => { const normalized = value.trim(); if (!/^\d{9}$/.test(normalized)) throw new Error('Ingresa un número celular peruano válido de 9 dígitos.'); return normalized; };
 
 export class PaymentService {
   async listOrders(userId: string) {
-    return prisma.paymentOrder.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 50, select: { id: true, status: true, credits: true, amountMinor: true, currency: true, reference: true, createdAt: true, updatedAt: true, plan: { select: { code: true } } } });
+    return prisma.paymentOrder.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 50, select: { id: true, status: true, credits: true, amountMinor: true, currency: true, reference: true, createdAt: true, updatedAt: true, plan: { select: { code: true } }, payment: { select: { status: true, reviewReason: true, createdAt: true } } } });
   }
   async createOrder(userId: string, data: { packageId: BetaPackageId; idempotencyKey: string }) {
     if (process.env.BETA_MANUAL_PAYMENTS !== 'true') throw new Error('Los pagos manuales beta no están habilitados.');
@@ -13,8 +14,8 @@ export class PaymentService {
     return prisma.paymentOrder.upsert({ where: { userId_idempotencyKey: { userId, idempotencyKey: data.idempotencyKey } }, update: {}, create: { userId, planId: plan.id, credits: selected.credits, amountMinor: selected.amountMinor, currency: selected.currency, idempotencyKey: data.idempotencyKey } });
   }
   async submitReference(userId: string, orderId: string, reference: string) {
-    if (!/^[A-Za-z0-9-]{4,64}$/.test(reference)) throw new Error('Referencia inválida.');
-    const result = await prisma.paymentOrder.updateMany({ where: { id: orderId, userId, status: 'PENDING_PAYMENT' }, data: { reference, status: 'PENDING_REVIEW' } });
+    const normalized = normalizePeruPhone(reference);
+    const result = await prisma.paymentOrder.updateMany({ where: { id: orderId, userId, status: 'PENDING_PAYMENT' }, data: { reference: normalized, status: 'PENDING_REVIEW' } });
     if (result.count !== 1) throw new Error('La orden no admite referencias en su estado actual.');
     return prisma.paymentOrder.findUniqueOrThrow({ where: { id: orderId } });
   }

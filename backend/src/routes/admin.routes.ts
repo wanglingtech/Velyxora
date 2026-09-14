@@ -4,16 +4,20 @@ import { prisma } from "../db/prisma";
 import { creditLedgerService } from "../services/creditLedgerService";
 import { paymentService } from "../services/paymentService";
 import { randomUUID } from "node:crypto";
+import { identityHash } from "../services/authService";
 const router = Router();
 router.use(requireAuth, requireRole("ADMIN"));
+const hasMarkup = (value: string) => /<[^>]*>|javascript:/i.test(value);
 
 router.get("/dashboard", async (_req, res) => {
-  const [users, activeUsers, jobs, creditTotals, payments] = await Promise.all([
+  const [users, activeUsers, jobs, creditTotals, payments, pendingComplaints, newSuggestions] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { status: "ACTIVE" } }),
     prisma.processingUsage.count(),
     prisma.creditLedger.aggregate({ _sum: { amount: true } }),
     prisma.paymentOrder.groupBy({ by: ["status"], _count: true }),
+    prisma.complaint.count({ where: { status: { in: ["RECEIVED", "IN_REVIEW"] } } }),
+    prisma.suggestion.count({ where: { status: "SUBMITTED" } }),
   ]);
   res.json({
     success: true,
@@ -23,6 +27,8 @@ router.get("/dashboard", async (_req, res) => {
       jobs,
       netCredits: creditTotals._sum.amount ?? 0,
       payments,
+      pendingComplaints,
+      newSuggestions,
     },
   });
 });
@@ -202,6 +208,30 @@ router.patch("/users/:id/status", async (req, res) => {
   });
   res.json({ success: true, data: { id: user.id, status: user.status } });
 });
+router.post("/users/:id/moderate", async (req, res) => {
+  const action = String(req.body.action || ""); const reason = String(req.body.reason || "").trim();
+  if (!['SUSPEND','REACTIVATE','BAN','ANONYMIZE'].includes(action) || reason.length < 5 || reason.length > 500 || hasMarkup(reason)) return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Acción y motivo obligatorio válidos.' } });
+  if (req.params.id === req.auth!.userId && ['BAN','ANONYMIZE'].includes(action)) return res.status(409).json({ success: false, error: { code: 'SELF_MODERATION_FORBIDDEN', message: 'No puedes bloquear o anonimizar tu propia cuenta administrativa.' } });
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const target = await tx.user.findUniqueOrThrow({ where: { id: req.params.id } });
+      if (target.role === 'ADMIN' && ['BAN','ANONYMIZE'].includes(action)) throw new Error('La moderación destructiva de administradores no está permitida desde esta acción.');
+      const status = action === 'SUSPEND' ? 'SUSPENDED' : action === 'REACTIVATE' ? 'ACTIVE' : action === 'BAN' ? 'BANNED' : 'ANONYMIZED';
+      if (action === 'BAN' || action === 'ANONYMIZE') await tx.deniedIdentity.upsert({ where: { emailHash: identityHash(target.email) }, update: { reason, adminId: req.auth!.userId }, create: { emailHash: identityHash(target.email), reason, adminId: req.auth!.userId } });
+      if (action !== 'REACTIVATE') await tx.session.deleteMany({ where: { userId: target.id } });
+      if (action === 'ANONYMIZE') { await tx.userPlan.updateMany({ where: { userId: target.id, active: true }, data: { active: false, endsAt: new Date() } }); await tx.user.update({ where: { id: target.id }, data: { status, email: `anonymized-${target.id}@invalid.local`, displayName: null, passwordHash: `disabled$${randomUUID()}` } }); }
+      else await tx.user.update({ where: { id: target.id }, data: { status } });
+      await tx.adminAuditLog.create({ data: { adminId: req.auth!.userId, targetUserId: target.id, action: `USER_${action}`, reason } });
+      return { id: target.id, status };
+    });
+    res.json({ success: true, data: result });
+  } catch (error: any) { res.status(400).json({ success: false, error: { code: 'MODERATION_FAILED', message: error.message } }); }
+});
+
+router.get('/complaints', async (req, res) => { const take = Math.min(100, Math.max(1, Number(req.query.limit) || 50)); const status = typeof req.query.status === 'string' ? req.query.status : undefined; res.json({ success: true, data: await prisma.complaint.findMany({ where: status ? { status: status as any } : {}, orderBy: { createdAt: 'desc' }, take }) }); });
+router.patch('/complaints/:id', async (req, res) => { const status = String(req.body.status || ''); const response = String(req.body.response || '').trim(); if (!['RECEIVED','IN_REVIEW','RESPONDED','CLOSED'].includes(status) || response.length > 2000 || (status === 'RESPONDED' && response.length < 3)) return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Estado o respuesta inválidos.' } }); const item = await prisma.complaint.update({ where: { id: req.params.id }, data: { status: status as any, adminResponse: response || undefined, respondedAt: response ? new Date() : undefined } }); await prisma.adminAuditLog.create({ data: { adminId: req.auth!.userId, targetUserId: item.userId, action: 'COMPLAINT_UPDATED', reason: `Estado ${status}`, metadata: { complaintId: item.id } } }); res.json({ success: true, data: item }); });
+router.get('/suggestions', async (req, res) => { const take = Math.min(100, Math.max(1, Number(req.query.limit) || 50)); res.json({ success: true, data: await prisma.suggestion.findMany({ orderBy: { createdAt: 'desc' }, take }) }); });
+router.patch('/suggestions/:id', async (req, res) => { const status = String(req.body.status || ''); const response = String(req.body.response || '').trim(); const reaction = String(req.body.reaction || ''); if (!['SUBMITTED','REVIEWING','PLANNED','DECLINED','COMPLETED'].includes(status) || response.length > 2000 || !['','👍','❤️','🎉','💡','👀'].includes(reaction)) return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Estado, respuesta o reacción inválidos.' } }); const item = await prisma.suggestion.update({ where: { id: req.params.id }, data: { status: status as any, adminResponse: response || undefined, reaction: reaction || undefined, respondedAt: response ? new Date() : undefined } }); await prisma.adminAuditLog.create({ data: { adminId: req.auth!.userId, targetUserId: item.userId, action: 'SUGGESTION_UPDATED', reason: `Estado ${status}`, metadata: { suggestionId: item.id } } }); res.json({ success: true, data: item }); });
 router.patch("/users/:id/plan", async (req, res) => {
   const reason = String(req.body.reason || "").trim();
   if (

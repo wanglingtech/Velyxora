@@ -41,6 +41,14 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             Acerca de
           </button>
           <button
+            onClick={() => onNavigate('complaints')}
+            className="min-h-11 rounded-lg px-2 hover:text-slate-300 transition-colors"
+          >Libro de Reclamaciones</button>
+          <button
+            onClick={() => onNavigate('suggestions')}
+            className="min-h-11 rounded-lg px-2 hover:text-slate-300 transition-colors"
+          >Sugerencias y mejoras</button>
+          <button
             onClick={() => onNavigate('privacy')}
             className="min-h-11 rounded-lg px-2 hover:text-slate-300 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
           >
@@ -62,6 +70,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             </a>
           ))}
         </nav>
+        <p className="text-center text-xs text-slate-500">Hecho con <span aria-label="amor">❤️</span> por WangLing Tech</p>
       </div>
     </footer>
   );

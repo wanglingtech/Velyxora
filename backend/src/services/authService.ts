@@ -5,11 +5,13 @@ import { hashPassword, verifyPassword } from '../security/password';
 export const SESSION_COOKIE = 'velyxora_session';
 const hashToken = (value: string) => createHash('sha256').update(value).digest('hex');
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
+export const identityHash = (email: string) => createHash('sha256').update(normalizeEmail(email)).digest('hex');
 
 export class AuthService {
   async register(email: string, password: string, displayName?: string) {
     const normalized = normalizeEmail(email);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) throw new Error('Email inválido.');
+    if (await prisma.deniedIdentity.findUnique({ where: { emailHash: identityHash(normalized) } })) throw new Error('No es posible crear una cuenta con este identificador.');
     const normalizedName = displayName?.trim() || '';
     if (!normalizedName) throw new Error('El nombre es obligatorio.');
     if (normalizedName.length > 80) throw new Error('El nombre no puede superar 80 caracteres.');

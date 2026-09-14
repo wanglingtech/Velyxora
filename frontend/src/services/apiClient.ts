@@ -174,6 +174,11 @@ class ApiClient {
     adminDashboard: () => this.deduped('admin:dashboard', () => this.request<any>('/admin/dashboard')),
     adminUsers: () => this.deduped('admin:users', () => this.request<any[]>('/admin/users')),
     adminPayments: () => this.deduped('admin:payments', () => this.request<any[]>('/admin/payments')),
+    adminComplaints: () => this.request<any[]>('/admin/complaints'),
+    adminSuggestions: () => this.request<any[]>('/admin/suggestions'),
+    moderateUser: (userId: string, action: string, reason: string) => this.request<any>(`/admin/users/${encodeURIComponent(userId)}/moderate`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
+    updateComplaint: (id: string, status: string, response: string) => this.request<any>(`/admin/complaints/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status, response }) }),
+    updateSuggestion: (id: string, status: string, response: string, reaction: string) => this.request<any>(`/admin/suggestions/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status, response, reaction }) }),
     reviewPayment: (orderId: string, decision: 'APPROVE' | 'REJECT', reason: string) => this.request<any>(`/admin/payments/${encodeURIComponent(orderId)}/review`, { method: 'POST', body: JSON.stringify({ decision, reason }) }),
   };
 
@@ -188,6 +193,11 @@ class ApiClient {
     orders: () => this.request<any[]>('/payments/orders'),
     createOrder: (packageId: string, idempotencyKey: string) => this.request<any>('/payments/orders', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ packageId }) }),
     submitReference: (orderId: string, reference: string) => this.request<any>(`/payments/orders/${encodeURIComponent(orderId)}/reference`, { method: 'POST', body: JSON.stringify({ reference }) }),
+  };
+
+  feedback = {
+    createComplaint: (data: Record<string, string>) => this.request<any>('/feedback/complaints', { method: 'POST', body: JSON.stringify(data) }),
+    createSuggestion: (data: Record<string, string>) => this.request<any>('/feedback/suggestions', { method: 'POST', body: JSON.stringify(data) }),
   };
 
   estimateCredits(toolId: string, inputBytes: number, options: Record<string, unknown> = {}) {

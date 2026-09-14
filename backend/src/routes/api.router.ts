@@ -14,6 +14,7 @@ import accountRoutes from './account.routes';
 import paymentsRoutes from './payments.routes';
 import adminRoutes from './admin.routes';
 import historyRoutes from './history.routes';
+import feedbackRoutes from './feedback.routes';
 
 const router = Router();
 
@@ -24,6 +25,7 @@ router.use('/account', accountRoutes);
 router.use('/payments', paymentsRoutes);
 router.use('/admin', adminRoutes);
 router.use('/history', historyRoutes);
+router.use('/feedback', feedbackRoutes);
 router.use('/tools', toolsRoutes);
 router.use('/formats', formatsRoutes);
 router.use('/uploads', uploadsRoutes);

@@ -23,6 +23,7 @@ import { historyService } from './services/historyService';
 import { useAuth } from './auth/AuthContext';
 import { AdminRoute, ProtectedRoute } from './auth/RouteGuards';
 import { AppLoader } from './components/common/AppLoader';
+import { FeedbackView } from './components/views/FeedbackViews';
 
 export default function App() {
   const { user: currentUser, isLoading: authLoading, logout } = useAuth();
@@ -203,6 +204,8 @@ export default function App() {
           {activeView === 'auth' && <AuthView onAuthenticated={(user) => handleNavigate(user.role === 'ADMIN' ? 'admin' : 'account')} onBack={() => handleNavigate('home')} />}
           {activeView === 'account' && <ProtectedRoute fallback={authFallback}><AccountView onBack={() => handleNavigate('home')} /></ProtectedRoute>}
           {activeView === 'admin' && <AdminRoute fallback={<section className="mx-auto max-w-xl rounded-2xl border border-red-500/20 bg-[#101218] p-8"><h1 className="text-xl font-bold">Acceso denegado</h1><p className="mt-2 text-slate-400">Esta sección requiere una sesión administrativa.</p><button onClick={() => handleNavigate('home')} className="mt-5 min-h-11 text-indigo-400">Regresar</button></section>}><AdminView onBack={() => handleNavigate('account')} /></AdminRoute>}
+          {activeView === 'complaints' && <FeedbackView kind="complaint" onBack={() => handleNavigate('home')} />}
+          {activeView === 'suggestions' && <FeedbackView kind="suggestion" onBack={() => handleNavigate('home')} />}
 
           {(activeView === 'about' || activeView === 'privacy' || activeView === 'terms') && (
             <LegalView page={activeView as any} onBack={() => handleNavigate('home')} />
