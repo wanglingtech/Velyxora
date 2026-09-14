@@ -89,9 +89,11 @@ class ApiClient {
   };
 
   constructor() {
-    // One strategy: an absolute backend origin. Paths below always include /api.
-    const envUrl = (import.meta as any).env?.VITE_API_URL || "http://localhost:3000";
-    this.baseUrl = envUrl ? envUrl.replace(/\/+$/, "") : "";
+    // VITE_API_URL is the complete API base. Accepting a bare origin here keeps
+    // older local environments safe while canonical configuration ends in /api.
+    const envUrl = (import.meta as any).env?.VITE_API_URL || "http://localhost:3000/api";
+    const normalized = envUrl ? envUrl.replace(/\/+$/, "") : "/api";
+    this.baseUrl = normalized.endsWith("/api") ? normalized : `${normalized}/api`;
   }
 
   private async request<T>(
@@ -155,32 +157,32 @@ class ApiClient {
   }
 
   auth = {
-    register: (email: string, password: string, displayName?: string) => this.request<any>('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, password, displayName }) }),
-    login: (email: string, password: string) => this.request<any>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-    me: () => this.request<any>('/api/auth/me'),
-    logout: () => this.request<void>('/api/auth/logout', { method: 'POST' }),
-    account: () => this.request<any>('/api/account'),
-    adminDashboard: () => this.request<any>('/api/admin/dashboard'),
-    adminUsers: () => this.request<any[]>('/api/admin/users'),
-    adminPayments: () => this.request<any[]>('/api/admin/payments'),
-    reviewPayment: (orderId: string, decision: 'APPROVE' | 'REJECT', reason: string) => this.request<any>(`/api/admin/payments/${encodeURIComponent(orderId)}/review`, { method: 'POST', body: JSON.stringify({ decision, reason }) }),
+    register: (email: string, password: string, displayName?: string) => this.request<any>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, displayName }) }),
+    login: (email: string, password: string) => this.request<any>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    me: () => this.request<any>('/auth/me'),
+    logout: () => this.request<void>('/auth/logout', { method: 'POST' }),
+    account: () => this.request<any>('/account'),
+    adminDashboard: () => this.request<any>('/admin/dashboard'),
+    adminUsers: () => this.request<any[]>('/admin/users'),
+    adminPayments: () => this.request<any[]>('/admin/payments'),
+    reviewPayment: (orderId: string, decision: 'APPROVE' | 'REJECT', reason: string) => this.request<any>(`/admin/payments/${encodeURIComponent(orderId)}/review`, { method: 'POST', body: JSON.stringify({ decision, reason }) }),
   };
 
   history = {
-    list: (limit = 50) => this.request<{ items: any[]; nextCursor: string | null }>(`/api/history?limit=${limit}`),
-    create: (item: Record<string, unknown>) => this.request<any>('/api/history', { method: 'POST', body: JSON.stringify(item) }),
-    remove: (id: string) => this.request<void>(`/api/history/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    list: (limit = 50) => this.request<{ items: any[]; nextCursor: string | null }>(`/history?limit=${limit}`),
+    create: (item: Record<string, unknown>) => this.request<any>('/history', { method: 'POST', body: JSON.stringify(item) }),
+    remove: (id: string) => this.request<void>(`/history/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   };
 
   payments = {
-    config: () => this.request<any>('/api/payments/config'),
-    orders: () => this.request<any[]>('/api/payments/orders'),
-    createOrder: (packageId: string, idempotencyKey: string) => this.request<any>('/api/payments/orders', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ packageId }) }),
-    submitReference: (orderId: string, reference: string) => this.request<any>(`/api/payments/orders/${encodeURIComponent(orderId)}/reference`, { method: 'POST', body: JSON.stringify({ reference }) }),
+    config: () => this.request<any>('/payments/config'),
+    orders: () => this.request<any[]>('/payments/orders'),
+    createOrder: (packageId: string, idempotencyKey: string) => this.request<any>('/payments/orders', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ packageId }) }),
+    submitReference: (orderId: string, reference: string) => this.request<any>(`/payments/orders/${encodeURIComponent(orderId)}/reference`, { method: 'POST', body: JSON.stringify({ reference }) }),
   };
 
   estimateCredits(toolId: string, inputBytes: number, options: Record<string, unknown> = {}) {
-    return this.request<{ estimatedCredits: number; currentBalance: number; balanceAfter: number; processingClass: string }>('/api/credits/estimate', { method: 'POST', body: JSON.stringify({ toolId, inputBytes, options }) });
+    return this.request<{ estimatedCredits: number; currentBalance: number; balanceAfter: number; processingClass: string }>('/credits/estimate', { method: 'POST', body: JSON.stringify({ toolId, inputBytes, options }) });
   }
 
   /**
@@ -200,7 +202,7 @@ class ApiClient {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2500);
 
-      const res = await fetch(`${this.baseUrl}/api/health`, {
+      const res = await fetch(`${this.baseUrl}/health`, {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -278,7 +280,7 @@ class ApiClient {
         reject(new Error("File upload was cancelled")),
       );
 
-      xhr.open("POST", `${this.baseUrl}/api/uploads`);
+      xhr.open("POST", `${this.baseUrl}/uploads`);
       xhr.withCredentials = true;
       const csrf = this.csrfToken();
       if (csrf) xhr.setRequestHeader('X-CSRF-Token', csrf);
@@ -295,7 +297,7 @@ class ApiClient {
     targetFormat: string;
     options?: Record<string, any>;
   }): Promise<ConversionJobResponse> {
-    return this.request<ConversionJobResponse>("/api/conversions", {
+    return this.request<ConversionJobResponse>("/conversions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
@@ -307,7 +309,7 @@ class ApiClient {
    */
   async getJobStatus(jobId: string): Promise<ConversionJobResponse> {
     return this.request<ConversionJobResponse>(
-      `/api/jobs/${encodeURIComponent(jobId)}`,
+      `/jobs/${encodeURIComponent(jobId)}`,
     );
   }
 
@@ -315,7 +317,7 @@ class ApiClient {
    * Cancels a job
    */
   async cancelJob(jobId: string): Promise<void> {
-    await this.request<unknown>(`/api/conversions/${encodeURIComponent(jobId)}`, {
+    await this.request<unknown>(`/conversions/${encodeURIComponent(jobId)}`, {
       method: "DELETE",
     });
   }
@@ -324,7 +326,7 @@ class ApiClient {
    * Safe media URL analysis
    */
   async analyzeMediaUrl(url: string): Promise<MediaAnalysisResponse> {
-    return this.request<MediaAnalysisResponse>("/api/media/analyze", {
+    return this.request<MediaAnalysisResponse>("/media/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
@@ -332,7 +334,7 @@ class ApiClient {
   }
 
   async startMediaDownload(params: { url: string; formatId: string; container: string; type: "video" | "audio"; title: string }): Promise<ConversionJobResponse> {
-    return this.request<ConversionJobResponse>("/api/media/process", {
+    return this.request<ConversionJobResponse>("/media/process", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
@@ -342,7 +344,7 @@ class ApiClient {
   async downloadFile(fileId: string): Promise<{ blob: Blob; filename: string; contentType: string }> {
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}/api/download/${encodeURIComponent(fileId)}`, { credentials: 'include' });
+      response = await fetch(`${this.baseUrl}/download/${encodeURIComponent(fileId)}`, { credentials: 'include' });
     } catch {
       throw new Error("Backend no disponible: no se pudo establecer conexión.");
     }

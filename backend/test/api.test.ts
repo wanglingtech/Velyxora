@@ -19,6 +19,28 @@ test("GET /api/health returns valid health schema and dynamic service status", a
   assert.strictEqual(body.services.storage, true);
 });
 
+test("CORS permits the local frontend on health and auth preflight", async () => {
+  const origin = "http://localhost:5173";
+  const health = await request(backendApp).get("/api/health").set("Origin", origin);
+  assert.strictEqual(health.status, 200);
+  assert.strictEqual(health.headers["access-control-allow-origin"], origin);
+  assert.strictEqual(health.headers["access-control-allow-credentials"], "true");
+
+  const preflight = await request(backendApp)
+    .options("/api/auth/login")
+    .set("Origin", origin)
+    .set("Access-Control-Request-Method", "POST")
+    .set("Access-Control-Request-Headers", "content-type,x-csrf-token");
+  assert.ok(preflight.status === 200 || preflight.status === 204);
+  assert.strictEqual(preflight.headers["access-control-allow-origin"], origin);
+  assert.strictEqual(preflight.headers["access-control-allow-credentials"], "true");
+  assert.match(preflight.headers["access-control-allow-methods"], /POST/);
+
+  const me = await request(backendApp).get("/api/auth/me").set("Origin", origin);
+  assert.strictEqual(me.status, 401);
+  assert.strictEqual(me.headers["access-control-allow-origin"], origin);
+});
+
 test("GET /api/tools returns available tool capabilities", async () => {
   const res = await request(backendApp).get("/api/tools");
   assert.strictEqual(res.status, 200);
