@@ -823,6 +823,8 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     subcategory: 'Conversión',
     icon: 'FileText',
     inputTypes: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    acceptedExtensions: ['docx'],
+    acceptedMimeTypes: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
     outputTypes: ['application/pdf'],
     processingMode: 'SERVER_SIDE',
     engine: 'server-libreoffice',
@@ -836,6 +838,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     id: 'xlsx-to-pdf', slug: 'xlsx-to-pdf', name: 'Excel (XLSX) a PDF',
     description: 'Convierte hojas de cálculo XLSX a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Sheet',
     inputTypes: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'], outputTypes: ['application/pdf'],
+    acceptedExtensions: ['xlsx'], acceptedMimeTypes: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
     processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true,
     serverEngineNotice: 'Requiere LibreOffice headless en el backend.', keywords: ['excel', 'xlsx', 'pdf', 'libreoffice'], popular: true, isClientReady: true
   },
@@ -843,17 +846,18 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     id: 'pptx-to-pdf', slug: 'pptx-to-pdf', name: 'PowerPoint (PPTX) a PDF',
     description: 'Convierte presentaciones PPTX a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Presentation',
     inputTypes: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'], outputTypes: ['application/pdf'],
+    acceptedExtensions: ['pptx'], acceptedMimeTypes: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'],
     processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true,
     serverEngineNotice: 'Requiere LibreOffice headless en el backend.', keywords: ['powerpoint', 'pptx', 'pdf', 'libreoffice'], popular: true, isClientReady: true
   },
   {
-    id: 'odt-to-pdf', slug: 'odt-to-pdf', name: 'OpenDocument (ODT) a PDF', description: 'Convierte documentos ODT a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'FileText', inputTypes: ['application/vnd.oasis.opendocument.text'], outputTypes: ['application/pdf'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['odt','opendocument','writer','pdf'], isClientReady: true
+    id: 'odt-to-pdf', slug: 'odt-to-pdf', name: 'OpenDocument (ODT) a PDF', description: 'Convierte documentos ODT a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'FileText', inputTypes: ['application/vnd.oasis.opendocument.text'], outputTypes: ['application/pdf'], acceptedExtensions: ['odt'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.text'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['odt','opendocument','writer','pdf'], isClientReady: true
   },
   {
-    id: 'ods-to-pdf', slug: 'ods-to-pdf', name: 'OpenDocument (ODS) a PDF', description: 'Convierte hojas ODS a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Sheet', inputTypes: ['application/vnd.oasis.opendocument.spreadsheet'], outputTypes: ['application/pdf'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['ods','opendocument','calc','pdf'], isClientReady: true
+    id: 'ods-to-pdf', slug: 'ods-to-pdf', name: 'OpenDocument (ODS) a PDF', description: 'Convierte hojas ODS a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Sheet', inputTypes: ['application/vnd.oasis.opendocument.spreadsheet'], outputTypes: ['application/pdf'], acceptedExtensions: ['ods'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.spreadsheet'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['ods','opendocument','calc','pdf'], isClientReady: true
   },
   {
-    id: 'odp-to-pdf', slug: 'odp-to-pdf', name: 'OpenDocument (ODP) a PDF', description: 'Convierte presentaciones ODP a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Presentation', inputTypes: ['application/vnd.oasis.opendocument.presentation'], outputTypes: ['application/pdf'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['odp','opendocument','impress','pdf'], isClientReady: true
+    id: 'odp-to-pdf', slug: 'odp-to-pdf', name: 'OpenDocument (ODP) a PDF', description: 'Convierte presentaciones ODP a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Presentation', inputTypes: ['application/vnd.oasis.opendocument.presentation'], outputTypes: ['application/pdf'], acceptedExtensions: ['odp'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.presentation'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['odp','opendocument','impress','pdf'], isClientReady: true
   },
 
   // ==================== UTILITIES ====================

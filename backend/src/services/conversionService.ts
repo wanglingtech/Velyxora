@@ -35,9 +35,9 @@ class ConversionService {
     const targetFormat = dto.targetFormat.toLowerCase();
 
     const officeMimes: Record<string, string[]> = {
-      docx: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/octet-stream'],
-      xlsx: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/octet-stream'],
-      pptx: ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/octet-stream'],
+      docx: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/octet-stream', 'application/zip', 'application/x-zip-compressed'],
+      xlsx: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/octet-stream', 'application/zip', 'application/x-zip-compressed'],
+      pptx: ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/octet-stream', 'application/zip', 'application/x-zip-compressed'],
       odt: ['application/vnd.oasis.opendocument.text', 'application/octet-stream'],
       ods: ['application/vnd.oasis.opendocument.spreadsheet', 'application/octet-stream'],
       odp: ['application/vnd.oasis.opendocument.presentation', 'application/octet-stream'],

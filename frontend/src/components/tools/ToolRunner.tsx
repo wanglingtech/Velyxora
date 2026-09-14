@@ -17,6 +17,7 @@ import { ToolDefinition, ProcessingJob } from "../../types";
 import { jobService } from "../../services/jobService";
 import { historyService } from "../../services/historyService";
 import { getToolRunnerKind } from "../../registry/tools";
+import { getToolAcceptAttribute, validateFileForTool } from "../../services/fileValidation";
 import {
   convertImage,
   cropImage,
@@ -230,10 +231,9 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
       return;
     }
     if (tool.category === "documents" && selectedFile) {
-      const extension = selectedFile.name.split(".").pop()?.toLowerCase();
-      const expected = tool.id.split("-to-")[0];
-      if (extension !== expected) {
-        toast.error(`Selecciona un archivo .${expected.toUpperCase()} válido.`);
+      const validation = validateFileForTool(tool, selectedFile);
+      if (validation.valid === false) {
+        toast.error(validation.message);
         return;
       }
     }
@@ -751,7 +751,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
                     type="file"
                     id="tool-file-input"
                     className="hidden"
-                    accept={tool.inputTypes.join(",")}
+                    accept={getToolAcceptAttribute(tool)}
                     onChange={(e) => {
                       if (e.target.files?.[0])
                         setSelectedFile(e.target.files[0]);

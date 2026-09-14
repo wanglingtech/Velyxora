@@ -13,9 +13,16 @@ export interface ToastMessage {
 
 type ToastListener = (toast: ToastMessage) => void;
 const listeners: Set<ToastListener> = new Set();
+let lastToastFingerprint = '';
+let lastToastAt = 0;
 
 export const toast = {
   show(title: string, message?: string, type: ToastType = 'info', duration: number = 4000) {
+    const fingerprint = `${type}\u0000${title}\u0000${message || ''}`;
+    const now = Date.now();
+    if (fingerprint === lastToastFingerprint && now - lastToastAt < 750) return;
+    lastToastFingerprint = fingerprint;
+    lastToastAt = now;
     const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const msg: ToastMessage = { id, type, title, message, duration };
     listeners.forEach(l => l(msg));

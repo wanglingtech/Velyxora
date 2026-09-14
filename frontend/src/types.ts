@@ -27,6 +27,8 @@ export interface ToolDefinition {
   icon: string;
   inputTypes: string[];
   outputTypes: string[];
+  acceptedExtensions?: string[];
+  acceptedMimeTypes?: string[];
   processingMode: ProcessingMode;
   engine?: string;
   supportsBatch?: boolean;
