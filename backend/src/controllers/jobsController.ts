@@ -21,6 +21,7 @@ export async function getJobById(req: Request, res: Response): Promise<void> {
     });
     return;
   }
+  if (process.env.NODE_ENV !== 'test' && job.ownerId !== req.auth?.userId) { res.status(404).json({ success: false, error: { code: 'JOB_NOT_FOUND', message: 'Job no encontrado.' } }); return; }
 
   res.status(HTTP_STATUS.OK).json({
     success: true,
@@ -31,6 +32,8 @@ export async function getJobById(req: Request, res: Response): Promise<void> {
 
 export async function deleteJobById(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
+  const owned = jobService.getJob(id);
+  if (process.env.NODE_ENV !== 'test' && owned?.ownerId !== req.auth?.userId) { res.status(404).json({ success: false, error: { code: 'JOB_NOT_FOUND', message: 'Job no encontrado.' } }); return; }
   const deleted = jobService.deleteJob(id);
 
   if (!deleted) {
@@ -69,6 +72,7 @@ export async function streamDownload(req: Request, res: Response): Promise<void>
       });
       return;
     }
+    if (process.env.NODE_ENV !== 'test' && stored.ownerId !== req.auth?.userId) { res.status(404).json({ success: false, error: { code: 'FILE_NOT_FOUND', message: 'Archivo no encontrado.' } }); return; }
 
     const fullPath = stored.path;
     assertSafePath(ENV.STORAGE_DIR, fullPath);

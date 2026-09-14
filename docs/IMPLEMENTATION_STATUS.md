@@ -1,5 +1,17 @@
 # VELYXORA — Tool Implementation Status Matrix
 
+## Fase Auth + PostgreSQL + Credits + Admin Beta
+
+| Área | Estado | Nota |
+|---|---|---|
+| Schema/migración PostgreSQL | `PARTIAL` | Prisma valida; no aplicada por falta de DATABASE_URL |
+| Auth/sesión/roles/CSRF | `PARTIAL` | implementado; E2E DB pendiente |
+| Créditos/ledger/jobs | `PARTIAL` | lifecycle transaccional; E2E DB pendiente |
+| Admin/UI de cuenta | `PARTIAL` | rutas/vistas; prueba visual pendiente |
+| Yape manual | `BETA_MANUAL` | sin verificación automática |
+| PaymentProvider | `REQUIRES_EXTERNAL_PROVIDER` | contrato futuro, sin simulación |
+| Privacy/Terms | `LEGAL_REVIEW_REQUIRED` | borradores actualizados |
+
 ## Fase LibreOffice + UX funcional (2026-09-13)
 
 | Área | Estado | Evidencia/limitación |

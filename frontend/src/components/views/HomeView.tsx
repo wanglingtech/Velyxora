@@ -1,10 +1,10 @@
-import React from 'react';
-import { Sparkles, Shield, Zap, Layers, ArrowRight } from 'lucide-react';
-import { UniversalInput } from '../common/UniversalInput';
-import { ToolCard } from '../common/ToolCard';
-import { SmartFileInspector } from '../common/SmartFileInspector';
-import { PUBLIC_TOOL_REGISTRY, CATEGORIES_CONFIG } from '../../registry/tools';
-import { ToolDefinition, DetectedFileInfo } from '../../types';
+import React from "react";
+import { Sparkles, Shield, Zap, Layers, ArrowRight } from "lucide-react";
+import { UniversalInput } from "../common/UniversalInput";
+import { ToolCard } from "../common/ToolCard";
+import { SmartFileInspector } from "../common/SmartFileInspector";
+import { PUBLIC_TOOL_REGISTRY, CATEGORIES_CONFIG } from "../../registry/tools";
+import { ToolDefinition, DetectedFileInfo } from "../../types";
 
 interface HomeViewProps {
   onSelectTool: (tool: ToolDefinition, file?: File) => void;
@@ -25,9 +25,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onToggleFavorite,
   detectedFile,
   onClearDetectedFile,
-  onFileDetected
+  onFileDetected,
 }) => {
-  const popularTools = PUBLIC_TOOL_REGISTRY.filter((t) => t.popular).slice(0, 8);
+  const popularTools = PUBLIC_TOOL_REGISTRY.filter((t) => t.popular).slice(
+    0,
+    8,
+  );
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-10">
@@ -41,7 +44,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
           ¿Qué quieres hacer hoy?
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
-          Convierte, procesa, edita y analiza archivos multimedia y enlaces de video directamente en tu navegador.
+          Convierte, procesa, edita y analiza archivos multimedia y enlaces de
+          video directamente en tu navegador.
         </p>
       </div>
 
@@ -68,10 +72,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
               Herramientas populares
             </h2>
-            <p className="text-xs text-slate-400">Las utilidades más frecuentes listas para usar.</p>
+            <p className="text-xs text-slate-400">
+              Las utilidades más frecuentes listas para usar.
+            </p>
           </div>
           <button
-            onClick={() => onSelectCategory('all')}
+            onClick={() => onSelectCategory("all")}
             className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 transition-colors"
           >
             <span>Ver catálogo completo ({PUBLIC_TOOL_REGISTRY.length})</span>
@@ -98,7 +104,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           Explorar por categoría
         </h3>
         <div className="flex flex-wrap gap-2">
-          {CATEGORIES_CONFIG.filter((c) => c.id !== 'all').map((cat) => (
+          {CATEGORIES_CONFIG.filter((c) => c.id !== "all").map((cat) => (
             <button
               key={cat.id}
               onClick={() => onSelectCategory(cat.id)}
@@ -116,9 +122,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
             <Shield className="w-4 h-4" />
           </div>
-          <h4 className="text-xs sm:text-sm font-semibold text-white">Privacidad Local Garantizada</h4>
+          <h4 className="text-xs sm:text-sm font-semibold text-white">
+            Privacidad Local Garantizada
+          </h4>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Las conversiones de imagen, audio, JSON y códigos QR se ejecutan en tu hardware sin subir tus archivos a servidores externos.
+            Las conversiones de imagen, audio, JSON y códigos QR se ejecutan en
+            tu hardware sin subir tus archivos a servidores externos.
           </p>
         </div>
 
@@ -126,9 +135,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
             <Zap className="w-4 h-4" />
           </div>
-          <h4 className="text-xs sm:text-sm font-semibold text-white">Velocidad Nativa</h4>
+          <h4 className="text-xs sm:text-sm font-semibold text-white">
+            Velocidad Nativa
+          </h4>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Aceleración por Canvas 2D, Web Audio API y Web Crypto para resultados instantáneos sin colas de espera.
+            Aceleración por Canvas 2D, Web Audio API y Web Crypto para
+            resultados instantáneos sin colas de espera.
           </p>
         </div>
 
@@ -136,9 +148,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="w-8 h-8 rounded-lg bg-sky-500/10 flex items-center justify-center text-sky-400">
             <Layers className="w-4 h-4" />
           </div>
-          <h4 className="text-xs sm:text-sm font-semibold text-white">Arquitectura Modular</h4>
+          <h4 className="text-xs sm:text-sm font-semibold text-white">
+            Arquitectura Modular
+          </h4>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Contratos de API desacoplados y adaptadores de medios preparados para conectar microservicios backend en VS Code.
+            Herramientas LOCAL en el navegador y operaciones SERVER con FFmpeg,
+            LibreOffice y motores de documentos temporales.
           </p>
         </div>
       </div>

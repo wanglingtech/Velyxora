@@ -15,7 +15,7 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const stored = storageService.registerFile(req.file);
+  const stored = storageService.registerFile(req.file, req.auth?.userId);
 
   res.status(HTTP_STATUS.CREATED).json({
     success: true,

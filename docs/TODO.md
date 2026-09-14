@@ -1,5 +1,17 @@
 # VELYXORA — Actionable Roadmap & Engineering Next Steps
 
+## Fase SaaS beta
+
+- [x] Schema Prisma y migración PostgreSQL.
+- [x] Auth por sesión, roles, CSRF, rate limit y seed administrativo.
+- [x] Planes, ledger, reserva/consumo/reembolso y ADMIN_TEST.
+- [x] Yape manual, revisión idempotente y allowlist de providers.
+- [ ] Aplicar migración y ejecutar E2E DB: falta `DATABASE_URL` en este entorno.
+- [ ] Recuperación de contraseña: `REQUIRES_EXTERNAL_PROVIDER`.
+- [ ] `ApiHistoryRepository` y migración consentida de metadata.
+- [ ] Revisión legal profesional: `LEGAL_REVIEW_REQUIRED`.
+- [ ] Gateway/webhooks: `REQUIRES_EXTERNAL_PROVIDER`.
+
 ## Pendientes de la fase LibreOffice + UX
 
 - [x] Validar DOCX → PDF con LibreOffice real y comprobar estructura PDF.

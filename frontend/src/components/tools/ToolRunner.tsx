@@ -58,6 +58,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
     initialFile || null,
   );
   const [activeJob, setActiveJob] = useState<ProcessingJob | null>(null);
+  const [creditEstimate, setCreditEstimate] = useState<{ estimatedCredits: number; currentBalance: number; balanceAfter: number } | null>(null);
   const backendJobIdRef = useRef<string | null>(null);
   const pollingCancelledRef = useRef(false);
 
@@ -125,6 +126,13 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
     });
     return unsub;
   }, [activeJob]);
+
+  useEffect(() => {
+    if (!selectedFile || !(tool.requiresServer || tool.id === 'video-to-mp3')) { setCreditEstimate(null); return; }
+    let active = true;
+    apiClient.estimateCredits(tool.id, selectedFile.size).then((value) => { if (active) setCreditEstimate(value); }).catch(() => { if (active) setCreditEstimate(null); });
+    return () => { active = false; };
+  }, [selectedFile, tool.id, tool.requiresServer]);
 
   // Load preview and natural dimensions for file
   useEffect(() => {
@@ -1060,6 +1068,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
               )}
 
               {/* Action Button */}
+              {creditEstimate && <p className="text-right text-xs text-slate-400">Esta operación utilizará <strong className="text-indigo-300">{creditEstimate.estimatedCredits} créditos</strong>. Saldo posterior: {creditEstimate.balanceAfter}.</p>}
               <div className="flex justify-end pt-2">
                 <button
                   onClick={handleExecute}

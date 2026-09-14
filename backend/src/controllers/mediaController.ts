@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { mediaService } from '../services/mediaService';
 import { HTTP_STATUS } from '../config/constants';
 import { mediaDownloadService } from '../services/mediaDownloadService';
+import { providerPolicyService } from '../services/providerPolicyService';
 
 export async function analyzeMedia(req: Request, res: Response): Promise<void> {
   const { url } = req.body;
@@ -55,6 +56,7 @@ export async function processMedia(req: Request, res: Response): Promise<void> {
     return;
   }
   try {
+    providerPolicyService.assertAllowed(url);
     const job = await mediaDownloadService.start(url, formatId, container, type, typeof title === 'string' ? title : 'Contenido multimedia');
     res.status(HTTP_STATUS.ACCEPTED).json({ success: true, data: job, timestamp: new Date().toISOString() });
   } catch (error: any) {

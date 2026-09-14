@@ -7,9 +7,10 @@ import { JobRecord } from '../types/jobs';
 import { serverFFmpegEngine } from '../engines/ServerFFmpegEngine';
 import { libreOfficeEngine } from '../engines/LibreOfficeEngine';
 import { serverImageEngine } from '../engines/ServerImageEngine';
+import { creditLedgerService } from './creditLedgerService';
 
 class ConversionService {
-  async startConversion(dto: ConversionRequestDto): Promise<JobRecord> {
+  async startConversion(dto: ConversionRequestDto, billing?: { userId: string; isAdmin: boolean }): Promise<JobRecord> {
     // 1. Resolve source file
     let sourcePath = dto.sourceFilePath;
     let originalName = 'input-file';
@@ -25,6 +26,7 @@ class ConversionService {
       originalName = stored.originalName;
       mimeType = stored.mimeType;
       size = stored.size;
+      if (billing && stored.ownerId !== billing.userId) throw new Error('El archivo no pertenece al usuario autenticado.');
     }
 
     if (!sourcePath) {
@@ -57,8 +59,14 @@ class ConversionService {
 
     // 3. Create Job
     const jobId = `job-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    if (billing) {
+      try { await creditLedgerService.reserve(billing.userId, jobId, dto.toolId, size, billing.isAdmin, dto.options); }
+      catch (error) { if (dto.fileId) storageService.deleteFile(dto.fileId); throw error; }
+    }
+
     const job = jobManager.createJob({
       id: jobId,
+      ownerId: billing?.userId,
       toolId: dto.toolId,
       input: {
         fileId: dto.fileId,
@@ -75,6 +83,7 @@ class ConversionService {
     await conversionQueue.add(jobId, {
       targetFormat: dto.targetFormat,
       options: dto.options,
+      billingUserId: billing?.userId,
     });
 
     return job;

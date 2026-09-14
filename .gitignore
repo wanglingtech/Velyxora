@@ -8,7 +8,7 @@ coverage/
 frontend/dist/
 backend/dist/
 
-# Environment files
+# Environment files / secrets
 .env
 .env.*
 !.env.example

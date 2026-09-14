@@ -9,6 +9,7 @@ import { logger } from '../utils/logger';
 import fs from 'fs';
 import { probeMedia } from '../utils/mediaProbe';
 import { storageService } from '../services/storageService';
+import { creditLedgerService } from '../services/creditLedgerService';
 
 export const conversionQueue = new InMemoryQueue('conversions', 2);
 
@@ -74,7 +75,7 @@ conversionQueue.process(async (jobId: string, data: any) => {
       }
     }
 
-    const storedOutput = storageService.registerOutput(result.outputPath, result.outputFilename, result.mimeType);
+    const storedOutput = storageService.registerOutput(result.outputPath, result.outputFilename, result.mimeType, job.ownerId);
 
     jobManager.updateJob(jobId, {
       metadata: probe ? { probe } : undefined,
@@ -92,6 +93,7 @@ conversionQueue.process(async (jobId: string, data: any) => {
     });
 
     jobManager.setStatus(jobId, 'COMPLETED');
+    if (data.billingUserId) await creditLedgerService.settle(jobId, 'COMPLETED');
   } catch (err: any) {
     if (outputPath && fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
     if (jobManager.getJob(jobId)?.status === 'CANCELLED') {
@@ -107,6 +109,7 @@ conversionQueue.process(async (jobId: string, data: any) => {
         PDF_VALIDATION_FAILED: 'El documento no pudo convertirse en un PDF válido.',
       };
       jobManager.setStatus(jobId, 'FAILED', publicMessages[err.message] || 'El archivo no pudo procesarse.');
+      if (data.billingUserId) await creditLedgerService.settle(jobId, 'FAILED');
     }
   } finally {
     if (job.input.fileId) storageService.deleteFile(job.input.fileId);

@@ -1,0 +1,23 @@
+CREATE TYPE "UserRole" AS ENUM ('USER', 'ADMIN');
+CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'SUSPENDED');
+CREATE TYPE "PlanCode" AS ENUM ('FREE', 'PLUS', 'PRO');
+CREATE TYPE "LedgerType" AS ENUM ('MONTHLY_GRANT','PURCHASE','RESERVATION','CONSUMPTION','REFUND','ADMIN_ADJUSTMENT','ADMIN_TEST');
+CREATE TYPE "UsageStatus" AS ENUM ('RESERVED','COMPLETED','FAILED','CANCELLED','ADMIN_TEST');
+CREATE TYPE "PaymentOrderStatus" AS ENUM ('PENDING_PAYMENT','PENDING_REVIEW','APPROVED','REJECTED','CANCELLED');
+CREATE TYPE "PaymentStatus" AS ENUM ('APPROVED','REJECTED');
+
+CREATE TABLE "User" ("id" UUID PRIMARY KEY, "email" TEXT NOT NULL UNIQUE, "passwordHash" TEXT NOT NULL, "displayName" TEXT, "role" "UserRole" NOT NULL DEFAULT 'USER', "status" "UserStatus" NOT NULL DEFAULT 'ACTIVE', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "Session" ("id" UUID PRIMARY KEY, "userId" UUID NOT NULL REFERENCES "User"("id") ON DELETE CASCADE, "tokenHash" TEXT NOT NULL UNIQUE, "csrfHash" TEXT NOT NULL, "expiresAt" TIMESTAMP(3) NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE "Plan" ("id" UUID PRIMARY KEY, "code" "PlanCode" NOT NULL UNIQUE, "monthlyCredits" INTEGER NOT NULL, "maxUploadSize" INTEGER NOT NULL, "maxConcurrentJobs" INTEGER NOT NULL, "priority" INTEGER NOT NULL DEFAULT 0, "historyRetention" INTEGER, "active" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "UserPlan" ("id" UUID PRIMARY KEY, "userId" UUID NOT NULL REFERENCES "User"("id") ON DELETE CASCADE, "planId" UUID NOT NULL REFERENCES "Plan"("id"), "startsAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "endsAt" TIMESTAMP(3), "nextResetAt" TIMESTAMP(3), "active" BOOLEAN NOT NULL DEFAULT true);
+CREATE TABLE "CreditLedger" ("id" UUID PRIMARY KEY, "userId" UUID NOT NULL REFERENCES "User"("id") ON DELETE CASCADE, "amount" INTEGER NOT NULL, "type" "LedgerType" NOT NULL, "reason" TEXT NOT NULL, "toolId" TEXT, "jobId" TEXT, "paymentId" UUID, "idempotencyKey" TEXT NOT NULL UNIQUE, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE "ProcessingUsage" ("id" UUID PRIMARY KEY, "userId" UUID NOT NULL REFERENCES "User"("id") ON DELETE CASCADE, "jobId" TEXT NOT NULL UNIQUE, "toolId" TEXT NOT NULL, "estimatedCredits" INTEGER NOT NULL, "reservedCredits" INTEGER NOT NULL, "consumedCredits" INTEGER NOT NULL DEFAULT 0, "inputBytes" BIGINT NOT NULL, "status" "UsageStatus" NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "PaymentOrder" ("id" UUID PRIMARY KEY, "userId" UUID NOT NULL REFERENCES "User"("id") ON DELETE CASCADE, "planId" UUID REFERENCES "Plan"("id"), "credits" INTEGER NOT NULL, "amountMinor" INTEGER NOT NULL, "currency" TEXT NOT NULL DEFAULT 'PEN', "status" "PaymentOrderStatus" NOT NULL DEFAULT 'PENDING_PAYMENT', "reference" TEXT, "idempotencyKey" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, UNIQUE("userId", "idempotencyKey"));
+CREATE TABLE "Payment" ("id" UUID PRIMARY KEY, "orderId" UUID NOT NULL UNIQUE REFERENCES "PaymentOrder"("id"), "status" "PaymentStatus" NOT NULL, "reviewedBy" UUID NOT NULL REFERENCES "User"("id"), "reviewReason" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+ALTER TABLE "CreditLedger" ADD CONSTRAINT "CreditLedger_paymentId_fkey" FOREIGN KEY ("paymentId") REFERENCES "Payment"("id");
+CREATE TABLE "AdminAuditLog" ("id" UUID PRIMARY KEY, "adminId" UUID NOT NULL REFERENCES "User"("id"), "targetUserId" UUID REFERENCES "User"("id"), "action" TEXT NOT NULL, "reason" TEXT NOT NULL, "metadata" JSONB, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX "Session_userId_expiresAt_idx" ON "Session"("userId", "expiresAt");
+CREATE INDEX "UserPlan_userId_active_idx" ON "UserPlan"("userId", "active");
+CREATE INDEX "CreditLedger_userId_createdAt_idx" ON "CreditLedger"("userId", "createdAt");
+CREATE INDEX "CreditLedger_jobId_idx" ON "CreditLedger"("jobId");
+CREATE INDEX "AdminAuditLog_adminId_createdAt_idx" ON "AdminAuditLog"("adminId", "createdAt");

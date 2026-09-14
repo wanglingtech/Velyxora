@@ -13,6 +13,7 @@ export interface StoredFileInfo {
   size: number;
   mimeType: string;
   createdAt: number;
+  ownerId?: string;
 }
 
 class StorageService {
@@ -32,7 +33,7 @@ class StorageService {
     }
   }
 
-  public registerFile(file: Express.Multer.File): StoredFileInfo {
+  public registerFile(file: Express.Multer.File, ownerId?: string): StoredFileInfo {
     // IDs are API identifiers, not filenames. Keeping them independent avoids
     // otherwise-safe characters in user filenames (dots, spaces, Unicode)
     // being rejected by the conversion request schema.
@@ -45,13 +46,14 @@ class StorageService {
       size: file.size,
       mimeType: file.mimetype,
       createdAt: Date.now(),
+      ownerId,
     };
 
     this.files.set(fileId, record);
     return record;
   }
 
-  public registerOutput(outputPath: string, originalName: string, mimeType: string): StoredFileInfo {
+  public registerOutput(outputPath: string, originalName: string, mimeType: string, ownerId?: string): StoredFileInfo {
     assertSafePath(ENV.STORAGE_DIR, outputPath);
     const stat = fs.statSync(outputPath);
     const filename = path.basename(outputPath);
@@ -63,6 +65,7 @@ class StorageService {
       size: stat.size,
       mimeType,
       createdAt: Date.now(),
+      ownerId,
     };
     this.files.set(record.fileId, record);
     return record;

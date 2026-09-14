@@ -103,6 +103,12 @@ class ApiClient {
     try {
       const response = await fetch(`${this.baseUrl}${path}`, {
         ...init,
+        credentials: "include",
+        headers: {
+          ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+          ...(this.csrfToken() ? { "X-CSRF-Token": this.csrfToken() } : {}),
+          ...init.headers,
+        },
         signal: init.signal || controller.signal,
       });
       const text = await response.text();
@@ -137,6 +143,24 @@ class ApiClient {
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+
+  private csrfToken(): string {
+    return document.cookie.split('; ').find((part) => part.startsWith('velyxora_csrf='))?.split('=')[1] || '';
+  }
+
+  auth = {
+    register: (email: string, password: string, displayName?: string) => this.request<any>('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, password, displayName }) }),
+    login: (email: string, password: string) => this.request<any>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    me: () => this.request<any>('/api/auth/me'),
+    logout: () => this.request<void>('/api/auth/logout', { method: 'POST' }),
+    account: () => this.request<any>('/api/account'),
+    adminDashboard: () => this.request<any>('/api/admin/dashboard'),
+    adminUsers: () => this.request<any[]>('/api/admin/users'),
+  };
+
+  estimateCredits(toolId: string, inputBytes: number, options: Record<string, unknown> = {}) {
+    return this.request<{ estimatedCredits: number; currentBalance: number; balanceAfter: number; processingClass: string }>('/api/credits/estimate', { method: 'POST', body: JSON.stringify({ toolId, inputBytes, options }) });
   }
 
   /**
@@ -235,6 +259,9 @@ class ApiClient {
       );
 
       xhr.open("POST", `${this.baseUrl}/api/uploads`);
+      xhr.withCredentials = true;
+      const csrf = this.csrfToken();
+      if (csrf) xhr.setRequestHeader('X-CSRF-Token', csrf);
       xhr.send(formData);
     });
   }
@@ -295,7 +322,7 @@ class ApiClient {
   async downloadFile(fileId: string): Promise<{ blob: Blob; filename: string; contentType: string }> {
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}/api/download/${encodeURIComponent(fileId)}`);
+      response = await fetch(`${this.baseUrl}/api/download/${encodeURIComponent(fileId)}`, { credentials: 'include' });
     } catch {
       throw new Error("Backend no disponible: no se pudo establecer conexión.");
     }

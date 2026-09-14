@@ -18,6 +18,8 @@ import { favoritesService } from './services/favoritesService';
 import { detectFile } from './services/detectionService';
 import { ToolDefinition, DetectedFileInfo } from './types';
 import { getToolById } from './registry/tools';
+import { AccountView, AdminView, AuthView, CurrentUser } from './components/views/AccountViews';
+import { apiClient } from './services/apiClient';
 
 export default function App() {
   const [activeView, setActiveView] = useState<string>('home');
@@ -30,9 +32,11 @@ export default function App() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
   useEffect(() => {
     setFavorites(favoritesService.getFavorites());
+    apiClient.auth.me().then(setCurrentUser).catch(() => setCurrentUser(null));
   }, []);
 
   const handleToggleFavorite = (toolId: string, e: React.MouseEvent) => {
@@ -103,6 +107,8 @@ export default function App() {
         favoritesCount={favorites.length}
         isMobileMenuOpen={isMobileMenuOpen}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        currentUser={currentUser}
+        onLogout={async () => { await apiClient.auth.logout(); setCurrentUser(null); handleNavigate('home'); }}
       />
 
       {/* Main App Body */}
@@ -175,6 +181,10 @@ export default function App() {
           )}
 
           {activeView === 'settings' && <SettingsView onBack={() => handleNavigate('home')} />}
+
+          {activeView === 'auth' && <AuthView onAuthenticated={(user) => { setCurrentUser(user); handleNavigate('account'); }} onBack={() => handleNavigate('home')} />}
+          {activeView === 'account' && (currentUser ? <AccountView onBack={() => handleNavigate('home')} /> : <AuthView onAuthenticated={setCurrentUser} onBack={() => handleNavigate('home')} />)}
+          {activeView === 'admin' && (currentUser?.role === 'ADMIN' ? <AdminView onBack={() => handleNavigate('account')} /> : <section className="mx-auto max-w-xl rounded-2xl border border-red-500/20 bg-[#101218] p-8"><h1 className="text-xl font-bold">Acceso denegado</h1><p className="mt-2 text-slate-400">Esta sección requiere rol ADMIN.</p><button onClick={() => handleNavigate('home')} className="mt-5 min-h-11 text-indigo-400">Regresar</button></section>)}
 
           {(activeView === 'about' || activeView === 'privacy' || activeView === 'terms') && (
             <LegalView page={activeView as any} onBack={() => handleNavigate('home')} />

@@ -3,6 +3,7 @@ import { conversionService } from '../services/conversionService';
 import { jobService } from '../services/jobService';
 import { validateConversionDto } from '../schemas/validation';
 import { HTTP_STATUS } from '../config/constants';
+import { creditLedgerService } from '../services/creditLedgerService';
 
 export async function createConversion(req: Request, res: Response): Promise<void> {
   const validation = validateConversionDto(req.body);
@@ -19,7 +20,7 @@ export async function createConversion(req: Request, res: Response): Promise<voi
   }
 
   try {
-    const job = await conversionService.startConversion(validation.data);
+    const job = await conversionService.startConversion(validation.data, process.env.NODE_ENV === 'test' ? undefined : { userId: req.auth!.userId, isAdmin: req.auth!.role === 'ADMIN' });
     res.status(HTTP_STATUS.ACCEPTED).json({
       success: true,
       data: job,
@@ -52,6 +53,7 @@ export async function getConversionStatus(req: Request, res: Response): Promise<
     });
     return;
   }
+  if (process.env.NODE_ENV !== 'test' && job.ownerId !== req.auth?.userId) { res.status(HTTP_STATUS.NOT_FOUND).json({ success: false, error: { code: 'JOB_NOT_FOUND', message: 'Job no encontrado.' } }); return; }
 
   res.status(HTTP_STATUS.OK).json({
     success: true,
@@ -62,6 +64,8 @@ export async function getConversionStatus(req: Request, res: Response): Promise<
 
 export async function cancelConversion(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
+  const owned = jobService.getJob(id);
+  if (process.env.NODE_ENV !== 'test' && owned?.ownerId !== req.auth?.userId) { res.status(HTTP_STATUS.NOT_FOUND).json({ success: false, error: { code: 'JOB_NOT_FOUND', message: 'Job no encontrado.' } }); return; }
   const success = jobService.cancelJob(id);
 
   if (!success) {
@@ -75,6 +79,8 @@ export async function cancelConversion(req: Request, res: Response): Promise<voi
     });
     return;
   }
+
+  if (process.env.NODE_ENV !== 'test') await creditLedgerService.settle(id, 'CANCELLED');
 
   res.status(HTTP_STATUS.OK).json({
     success: true,

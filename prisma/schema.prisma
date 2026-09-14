@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+enum PlanCode {
+  FREE
+  PLUS
+  PRO
+}
+enum LedgerType {
+  MONTHLY_GRANT
+  PURCHASE
+  RESERVATION
+  CONSUMPTION
+  REFUND
+  ADMIN_ADJUSTMENT
+  ADMIN_TEST
+}
+enum UsageStatus {
+  RESERVED
+  COMPLETED
+  FAILED
+  CANCELLED
+  ADMIN_TEST
+}
+enum PaymentOrderStatus {
+  PENDING_PAYMENT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+enum PaymentStatus {
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  passwordHash String
+  displayName  String?
+  role         UserRole   @default(USER)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  sessions Session[]
+  plans UserPlan[]
+  ledger CreditLedger[]
+  usages ProcessingUsage[]
+  orders PaymentOrder[]
+  reviewedPayments Payment[] @relation("PaymentReviewer")
+  auditActions AdminAuditLog[] @relation("AdminActions")
+  auditTargets AdminAuditLog[] @relation("AuditTargets")
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  tokenHash String   @unique
+  csrfHash  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, expiresAt])
+}
+
+model Plan {
+  id                String   @id @default(uuid()) @db.Uuid
+  code              PlanCode @unique
+  monthlyCredits    Int
+  maxUploadSize     Int
+  maxConcurrentJobs Int
+  priority          Int      @default(0)
+  historyRetention  Int?
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  users UserPlan[]
+  orders PaymentOrder[]
+}
+
+model UserPlan {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  planId      String   @db.Uuid
+  startsAt    DateTime @default(now())
+  endsAt      DateTime?
+  nextResetAt DateTime?
+  active      Boolean  @default(true)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+  @@index([userId, active])
+}
+
+model CreditLedger {
+  id             String     @id @default(uuid()) @db.Uuid
+  userId         String     @db.Uuid
+  amount         Int
+  type           LedgerType
+  reason         String
+  toolId         String?
+  jobId          String?
+  paymentId      String?    @db.Uuid
+  idempotencyKey String      @unique
+  createdAt      DateTime    @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment Payment? @relation(fields: [paymentId], references: [id])
+  @@index([userId, createdAt])
+  @@index([jobId])
+}
+
+model ProcessingUsage {
+  id               String      @id @default(uuid()) @db.Uuid
+  userId           String      @db.Uuid
+  jobId             String      @unique
+  toolId            String
+  estimatedCredits  Int
+  reservedCredits   Int
+  consumedCredits   Int         @default(0)
+  inputBytes        BigInt
+  status            UsageStatus
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PaymentOrder {
+  id             String             @id @default(uuid()) @db.Uuid
+  userId         String             @db.Uuid
+  planId         String?            @db.Uuid
+  credits        Int
+  amountMinor    Int
+  currency       String             @default("PEN")
+  status         PaymentOrderStatus @default(PENDING_PAYMENT)
+  reference      String?
+  idempotencyKey String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan? @relation(fields: [planId], references: [id])
+  payment Payment?
+  @@unique([userId, idempotencyKey])
+}
+
+model Payment {
+  id          String        @id @default(uuid()) @db.Uuid
+  orderId     String        @unique @db.Uuid
+  status      PaymentStatus
+  reviewedBy  String        @db.Uuid
+  reviewReason String
+  createdAt   DateTime      @default(now())
+  order PaymentOrder @relation(fields: [orderId], references: [id])
+  reviewer User @relation("PaymentReviewer", fields: [reviewedBy], references: [id])
+  ledger CreditLedger[]
+}
+
+model AdminAuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  adminId      String   @db.Uuid
+  targetUserId String?  @db.Uuid
+  action       String
+  reason       String
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  admin User @relation("AdminActions", fields: [adminId], references: [id])
+  targetUser User? @relation("AuditTargets", fields: [targetUserId], references: [id])
+  @@index([adminId, createdAt])
+  @@index([targetUserId, createdAt])
+}

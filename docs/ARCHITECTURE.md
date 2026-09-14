@@ -1,5 +1,15 @@
 # VELYXORA — System Architecture & Design
 
+## SaaS beta
+
+PostgreSQL es la persistencia de producción mediante Prisma. La migración crea `User`, `Session`, `Plan`, `UserPlan`, `CreditLedger`, `ProcessingUsage`, `PaymentOrder`, `Payment` y `AdminAuditLog`, unidos por UUID. El saldo es la suma del ledger, no un campo mutable.
+
+Una operación SERVER autenticada calcula costo en backend, comprueba plan/concurrencia, reserva con clave idempotente y confirma consumo al completar. `FAILED` y `CANCELLED` reembolsan íntegramente. ADMIN registra `ADMIN_TEST` con costo estimado y reserva cero.
+
+Yape beta exige revisión ADMIN. Aprobar converge en Payment, PURCHASE, UserPlan y audit log dentro de una transacción. `PaymentProvider` queda como contrato sin checkout/webhook simulado. El downloader aplica `ProviderPolicyService` antes de SSRF/yt-dlp; GenericProvider no elude la allowlist.
+
+El historial local no se borra. Una futura `ApiHistoryRepository` importará solo metadata tras consentimiento.
+
 VELYXORA is engineered as a resilient, privacy-first, hybrid media and document transformation platform. It strictly enforces separation of concerns between client-side compute, server-side media processing, and external provider integrations.
 
 The active Vite configuration is the single root `vite.config.ts`; it uses `frontend/` as the Vite root and writes the production frontend to `dist/`. The frontend does not have a second Vite configuration.

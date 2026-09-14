@@ -21,6 +21,8 @@ interface HeaderProps {
   favoritesCount: number;
   isMobileMenuOpen: boolean;
   onToggleMobileMenu: () => void;
+  currentUser: { email: string; role: 'USER'|'ADMIN' } | null;
+  onLogout: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -30,6 +32,8 @@ export const Header: React.FC<HeaderProps> = ({
   favoritesCount,
   isMobileMenuOpen,
   onToggleMobileMenu,
+  currentUser,
+  onLogout,
 }) => {
   const [backendHealth, setBackendHealth] = useState<BackendHealth | null>(
     null,
@@ -90,6 +94,9 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right Actions */}
       <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        {currentUser?.role === 'ADMIN' && <button onClick={() => onNavigate('admin')} className="hidden sm:inline-flex min-h-11 items-center rounded-xl px-3 text-xs text-indigo-300">Administración</button>}
+        <button onClick={() => onNavigate(currentUser ? 'account' : 'auth')} className="hidden sm:inline-flex min-h-11 items-center rounded-xl px-3 text-xs text-slate-300">{currentUser ? 'Mi cuenta' : 'Entrar'}</button>
+        {currentUser && <button onClick={onLogout} className="hidden lg:inline-flex min-h-11 items-center rounded-xl px-2 text-xs text-slate-500">Salir</button>}
         {/* Backend Engine Status Badge */}
         {backendHealth && (
           <div

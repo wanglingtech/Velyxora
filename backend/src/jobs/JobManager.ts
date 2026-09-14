@@ -7,6 +7,7 @@ class JobManager {
 
   createJob(params: {
     id: string;
+    ownerId?: string;
     toolId: string;
     toolName?: string;
     input: JobRecord['input'];
@@ -14,6 +15,7 @@ class JobManager {
   }): JobRecord {
     const job: JobRecord = {
       id: params.id,
+      ownerId: params.ownerId,
       toolId: params.toolId,
       toolName: params.toolName,
       status: 'QUEUED',

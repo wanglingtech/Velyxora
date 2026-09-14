@@ -13,6 +13,7 @@ export type JobStatus =
 
 export interface JobRecord {
   id: string;
+  ownerId?: string;
   toolId: string;
   toolName?: string;
   status: JobStatus;
