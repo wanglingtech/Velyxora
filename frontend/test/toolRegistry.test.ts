@@ -10,6 +10,17 @@ test('todas las herramientas públicas tienen metadata, categoría, ruta y runne
     assert.equal(ids.has(tool.id), false, `ID duplicado: ${tool.id}`); ids.add(tool.id);
     assert.ok(categories.has(tool.category as never), `Categoría inválida: ${tool.id}`);
     assert.ok(tool.inputTypes.length && tool.outputTypes.length && tool.keywords.length, `Metadata incompleta: ${tool.id}`);
+    for (const extension of tool.acceptedExtensions ?? []) {
+      assert.match(extension, /^[a-z0-9]+$/, `Extensión no normalizada: ${tool.id}/${extension}`);
+    }
+    for (const mime of tool.acceptedMimeTypes ?? []) {
+      assert.match(mime, /^[\w.+-]+\/[\w.+-]+$/, `MIME inválido: ${tool.id}/${mime}`);
+    }
+    assert.equal(
+      Boolean(tool.acceptedExtensions?.length),
+      Boolean(tool.acceptedMimeTypes?.length),
+      `Extensiones/MIME incompletos: ${tool.id}`,
+    );
     assert.equal(getToolById(tool.slug)?.id, tool.id, `Ruta no resoluble: ${tool.id}`);
     assert.ok(getToolRunnerKind(tool), `Sin runner: ${tool.id}`);
     assert.ok(searchTools(tool.name).some((match) => match.id === tool.id), `No searchable: ${tool.id}`);
@@ -23,4 +34,8 @@ test('búsqueda cubre formatos y aliases sin duplicados', () => {
     assert.ok(results.some((tool) => tool.id === id), `${query} no encontró ${id}`);
     assert.equal(new Set(results.map((tool) => tool.id)).size, results.length);
   }
+});
+
+test('password-generator resuelve al runner de texto funcional', () => {
+  assert.equal(getToolRunnerKind(getToolById('password-generator')!), 'text');
 });

@@ -953,6 +953,7 @@ export const PUBLIC_TOOL_REGISTRY = TOOL_REGISTRY.filter((tool) => tool.public !
 
 export type ToolRunnerKind = 'standard-file' | 'pdf' | 'image-advanced' | 'data-code' | 'utilities' | 'barcode' | 'qr' | 'text';
 export function getToolRunnerKind(tool: ToolDefinition): ToolRunnerKind | null {
+  if (tool.id === 'password-generator') return 'text';
   if (['images-to-pdf', 'text-to-pdf'].includes(tool.id)) return 'pdf';
   if (tool.id === 'barcode-generator') return 'barcode';
   if (tool.id === 'qr-generator') return 'qr';
@@ -960,7 +961,7 @@ export function getToolRunnerKind(tool: ToolDefinition): ToolRunnerKind | null {
   if (['csv-to-json','json-to-csv','markdown-to-html','color-converter','diff-checker'].includes(tool.id)) return 'data-code';
   if (tool.category === 'utilities' || tool.id === 'video-metadata-inspector') return 'utilities';
   if (['audio','video','image','documents'].includes(tool.category)) return 'standard-file';
-  if (tool.category === 'developer' || tool.category === 'text' || tool.id === 'password-generator') return 'text';
+  if (tool.category === 'developer' || tool.category === 'text') return 'text';
   return null;
 }
 
