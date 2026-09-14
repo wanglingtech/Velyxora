@@ -18,11 +18,14 @@ import { favoritesService } from './services/favoritesService';
 import { detectFile } from './services/detectionService';
 import { ToolDefinition, DetectedFileInfo } from './types';
 import { getToolById } from './registry/tools';
-import { AccountView, AdminView, AuthView, CurrentUser } from './components/views/AccountViews';
-import { apiClient } from './services/apiClient';
+import { AccountView, AdminView, AuthView } from './components/views/AccountViews';
 import { historyService } from './services/historyService';
+import { useAuth } from './auth/AuthContext';
+import { AdminRoute, ProtectedRoute } from './auth/RouteGuards';
+import { AppLoader } from './components/common/AppLoader';
 
 export default function App() {
+  const { user: currentUser, isLoading: authLoading, logout } = useAuth();
   const [activeView, setActiveView] = useState<string>('home');
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [activeTool, setActiveTool] = useState<ToolDefinition | null>(null);
@@ -33,12 +36,21 @@ export default function App() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [bootstrapReady, setBootstrapReady] = useState(false);
+  const [progress, setProgress] = useState(12);
 
   useEffect(() => {
     setFavorites(favoritesService.getFavorites());
-    apiClient.auth.me().then(setCurrentUser).catch(() => setCurrentUser(null));
   }, []);
+  useEffect(() => {
+    const started = Date.now();
+    const interval = window.setInterval(() => setProgress((value) => Math.min(authLoading ? 82 : 96, value + Math.ceil(Math.random() * 8))), 120);
+    if (!authLoading) {
+      const timeout = window.setTimeout(() => { setProgress(100); window.setTimeout(() => setBootstrapReady(true), 180); }, Math.max(0, 900 - (Date.now() - started)));
+      return () => { window.clearInterval(interval); window.clearTimeout(timeout); };
+    }
+    return () => window.clearInterval(interval);
+  }, [authLoading]);
   useEffect(() => { historyService.setAuthenticated(Boolean(currentUser)); }, [currentUser]);
 
   const handleToggleFavorite = (toolId: string, e: React.MouseEvent) => {
@@ -96,6 +108,10 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  if (!bootstrapReady) return <AppLoader progress={progress} />;
+
+  const authFallback = <AuthView onAuthenticated={(user) => handleNavigate(user.role === 'ADMIN' ? 'admin' : 'account')} onBack={() => handleNavigate('home')} />;
+
   return (
     <div className="min-h-screen bg-[#08090D] text-[#F5F7FA] flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
       {/* Global Drag and Drop Overlay */}
@@ -110,7 +126,7 @@ export default function App() {
         isMobileMenuOpen={isMobileMenuOpen}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         currentUser={currentUser}
-        onLogout={async () => { await apiClient.auth.logout(); setCurrentUser(null); handleNavigate('home'); }}
+        onLogout={async () => { await logout(); handleNavigate('auth'); }}
       />
 
       {/* Main App Body */}
@@ -184,9 +200,9 @@ export default function App() {
 
           {activeView === 'settings' && <SettingsView onBack={() => handleNavigate('home')} />}
 
-          {activeView === 'auth' && <AuthView onAuthenticated={(user) => { setCurrentUser(user); handleNavigate('account'); }} onBack={() => handleNavigate('home')} />}
-          {activeView === 'account' && (currentUser ? <AccountView onBack={() => handleNavigate('home')} /> : <AuthView onAuthenticated={setCurrentUser} onBack={() => handleNavigate('home')} />)}
-          {activeView === 'admin' && (currentUser?.role === 'ADMIN' ? <AdminView onBack={() => handleNavigate('account')} /> : <section className="mx-auto max-w-xl rounded-2xl border border-red-500/20 bg-[#101218] p-8"><h1 className="text-xl font-bold">Acceso denegado</h1><p className="mt-2 text-slate-400">Esta sección requiere rol ADMIN.</p><button onClick={() => handleNavigate('home')} className="mt-5 min-h-11 text-indigo-400">Regresar</button></section>)}
+          {activeView === 'auth' && <AuthView onAuthenticated={(user) => handleNavigate(user.role === 'ADMIN' ? 'admin' : 'account')} onBack={() => handleNavigate('home')} />}
+          {activeView === 'account' && <ProtectedRoute fallback={authFallback}><AccountView onBack={() => handleNavigate('home')} /></ProtectedRoute>}
+          {activeView === 'admin' && <AdminRoute fallback={<section className="mx-auto max-w-xl rounded-2xl border border-red-500/20 bg-[#101218] p-8"><h1 className="text-xl font-bold">Acceso denegado</h1><p className="mt-2 text-slate-400">Esta sección requiere una sesión administrativa.</p><button onClick={() => handleNavigate('home')} className="mt-5 min-h-11 text-indigo-400">Regresar</button></section>}><AdminView onBack={() => handleNavigate('account')} /></AdminRoute>}
 
           {(activeView === 'about' || activeView === 'privacy' || activeView === 'terms') && (
             <LegalView page={activeView as any} onBack={() => handleNavigate('home')} />

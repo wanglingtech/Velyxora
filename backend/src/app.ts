@@ -12,7 +12,10 @@ export function createBackendApp(): Express {
 
   // Security & Middleware
   app.use(cors({
-    origin: ENV.CORS_ORIGIN,
+    origin(origin, callback) {
+      if (!origin || ENV.CORS_ORIGINS.includes(origin.replace(/\/$/, ""))) return callback(null, true);
+      callback(new Error("Origen no permitido por CORS."));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'Idempotency-Key'],

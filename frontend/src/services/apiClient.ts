@@ -87,6 +87,7 @@ class ApiClient {
     data: null,
     timestamp: 0,
   };
+  private inFlight = new Map<string, Promise<unknown>>();
 
   constructor() {
     // VITE_API_URL is the complete API base. Accepting a bare origin here keeps
@@ -118,7 +119,7 @@ class ApiClient {
       let payload: {
         success?: boolean;
         data?: T;
-        error?: { message?: string };
+        error?: { code?: string; message?: string; retryAfter?: number };
       } = {};
       try {
         payload = text ? JSON.parse(text) : {};
@@ -132,7 +133,7 @@ class ApiClient {
           413: "El archivo supera el tamaño permitido.", 429: "Hay demasiadas solicitudes. Espera un momento e inténtalo de nuevo.",
           500: "Ocurrió un problema en el servidor. Inténtalo de nuevo más tarde.", 503: "El servicio está temporalmente no disponible.",
         };
-        throw new Error(payload.error?.message || friendly[response.status] || "No se pudo completar la solicitud.");
+        throw new ApiError(payload.error?.message || friendly[response.status] || "No se pudo completar la solicitud.", response.status, payload.error?.code, payload.error?.retryAfter);
       }
       return payload.data === undefined ? (payload as T) : payload.data;
     } catch (error) {
@@ -152,6 +153,14 @@ class ApiClient {
     }
   }
 
+  private deduped<T>(key: string, factory: () => Promise<T>): Promise<T> {
+    const existing = this.inFlight.get(key) as Promise<T> | undefined;
+    if (existing) return existing;
+    const request = factory().finally(() => this.inFlight.delete(key));
+    this.inFlight.set(key, request);
+    return request;
+  }
+
   private csrfToken(): string {
     return document.cookie.split('; ').find((part) => part.startsWith('velyxora_csrf='))?.split('=')[1] || '';
   }
@@ -159,12 +168,12 @@ class ApiClient {
   auth = {
     register: (email: string, password: string, displayName?: string) => this.request<any>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, displayName }) }),
     login: (email: string, password: string) => this.request<any>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-    me: () => this.request<any>('/auth/me'),
+    me: () => this.deduped('auth:me', () => this.request<any>('/auth/me').then((result) => result.user)),
     logout: () => this.request<void>('/auth/logout', { method: 'POST' }),
-    account: () => this.request<any>('/account'),
-    adminDashboard: () => this.request<any>('/admin/dashboard'),
-    adminUsers: () => this.request<any[]>('/admin/users'),
-    adminPayments: () => this.request<any[]>('/admin/payments'),
+    account: () => this.deduped('account', () => this.request<any>('/account')),
+    adminDashboard: () => this.deduped('admin:dashboard', () => this.request<any>('/admin/dashboard')),
+    adminUsers: () => this.deduped('admin:users', () => this.request<any[]>('/admin/users')),
+    adminPayments: () => this.deduped('admin:payments', () => this.request<any[]>('/admin/payments')),
     reviewPayment: (orderId: string, decision: 'APPROVE' | 'REJECT', reason: string) => this.request<any>(`/admin/payments/${encodeURIComponent(orderId)}/review`, { method: 'POST', body: JSON.stringify({ decision, reason }) }),
   };
 
@@ -175,7 +184,7 @@ class ApiClient {
   };
 
   payments = {
-    config: () => this.request<any>('/payments/config'),
+    config: () => this.deduped('payments:config', () => this.request<any>('/payments/config')),
     orders: () => this.request<any[]>('/payments/orders'),
     createOrder: (packageId: string, idempotencyKey: string) => this.request<any>('/payments/orders', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ packageId }) }),
     submitReference: (orderId: string, reference: string) => this.request<any>(`/payments/orders/${encodeURIComponent(orderId)}/reference`, { method: 'POST', body: JSON.stringify({ reference }) }),
@@ -371,3 +380,10 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient();
+
+export class ApiError extends Error {
+  constructor(message: string, public status: number, public code?: string, public retryAfter?: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}

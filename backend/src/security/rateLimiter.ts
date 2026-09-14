@@ -28,6 +28,12 @@ export function rateLimiter(
   res: Response,
   next: NextFunction,
 ): void {
+  // Authentication has its own failure-aware limiter. These bootstrap endpoints
+  // must not exhaust the general API budget merely by restoring a session.
+  if (["/api/health", "/api/auth/me", "/api/auth/logout"].some((path) => req.path === path || req.path.startsWith(`${path}/`))) {
+    next();
+    return;
+  }
   const clientIp =
     (req.headers["x-forwarded-for"] as string) ||
     req.socket.remoteAddress ||
@@ -50,7 +56,8 @@ export function rateLimiter(
       success: false,
       error: {
         code: "RATE_LIMIT_EXCEEDED",
-        message: "Too many requests. Please slow down and try again later.",
+        message: "Hay demasiadas solicitudes. Espera un momento e inténtalo de nuevo.",
+        retryAfter: Math.max(1, Math.ceil((record.resetTime - now) / 1000)),
       },
       timestamp: new Date().toISOString(),
     });
