@@ -24,7 +24,7 @@ Checks server health and presence of native system binaries.
   },
   "services": {
     "ffmpeg": true,
-    "libreoffice": false,
+    "libreOffice": false,
     "storage": true
   },
   "timestamp": "2026-09-13T15:30:00.000Z"

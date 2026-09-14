@@ -17,7 +17,7 @@ import {
   ShieldCheck,
   X
 } from 'lucide-react';
-import { CATEGORIES_CONFIG, TOOL_REGISTRY } from '../../registry/tools';
+import { CATEGORIES_CONFIG, PUBLIC_TOOL_REGISTRY } from '../../registry/tools';
 import { VelyxoraLogo } from '../logo/VelyxoraLogo';
 
 interface SidebarProps {
@@ -84,7 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const getCategoryCount = (catId: string) => {
-    return TOOL_REGISTRY.filter((t) => t.category === catId).length;
+    return PUBLIC_TOOL_REGISTRY.filter((t) => t.category === catId).length;
   };
 
   const handleNav = (view: string, param?: any) => {

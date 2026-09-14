@@ -34,6 +34,7 @@ export interface ToolDefinition {
   keywords: string[];
   popular?: boolean;
   isClientReady?: boolean;
+  public?: boolean;
   requiresServer?: boolean;
   serverEngineNotice?: string;
   [key: string]: unknown;

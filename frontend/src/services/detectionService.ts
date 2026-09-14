@@ -1,4 +1,4 @@
-import { TOOL_REGISTRY } from "../registry/tools";
+import { PUBLIC_TOOL_REGISTRY } from "../registry/tools";
 import { DetectedFileInfo } from "../types";
 
 export const formatFileSize = (bytes: number): string => {
@@ -52,7 +52,7 @@ const inspectDimensions = (
 
 export const detectFile = async (file: File): Promise<DetectedFileInfo> => {
   const dimensions = await inspectDimensions(file);
-  const matchingToolIds = TOOL_REGISTRY.filter((tool) =>
+  const matchingToolIds = PUBLIC_TOOL_REGISTRY.filter((tool) =>
     tool.inputTypes.some((type) => type === file.type || type === "*/*"),
   ).map((tool) => tool.id);
 

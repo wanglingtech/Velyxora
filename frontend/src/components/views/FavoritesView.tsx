@@ -1,7 +1,7 @@
 import React from 'react';
 import { Star } from 'lucide-react';
 import { ToolCard } from '../common/ToolCard';
-import { TOOL_REGISTRY } from '../../registry/tools';
+import { PUBLIC_TOOL_REGISTRY } from '../../registry/tools';
 import { ToolDefinition } from '../../types';
 
 interface FavoritesViewProps {
@@ -15,7 +15,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
   onToggleFavorite,
   onSelectTool
 }) => {
-  const favoriteTools = TOOL_REGISTRY.filter((t) => favorites.includes(t.id));
+  const favoriteTools = PUBLIC_TOOL_REGISTRY.filter((t) => favorites.includes(t.id));
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6">

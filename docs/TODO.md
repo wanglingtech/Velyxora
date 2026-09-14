@@ -6,7 +6,8 @@
 - [x] Aislar perfil de LibreOffice por job e integrar AbortSignal, timeout y cleanup.
 - [x] Registrar estados terminales reales en un repositorio de historial local versionado.
 - [x] Hacer funcionales `saveHistory`, confirmación y reducción de movimiento.
-- [ ] Añadir fixtures automatizados XLSX y PPTX y ejecutar su E2E real.
+- [x] Añadir fixtures automatizados XLSX y PPTX y ejecutar upload → job → conversión → descarga real.
+- [ ] Implementar runners reales para las definiciones internas marcadas `public: false` antes de publicarlas.
 - [ ] Migrar a `ApiHistoryRepository` cuando existan autenticación y base de datos.
 - [ ] Completar una pasada manual/controlada en todos los breakpoints y rutas legales.
 

@@ -5,8 +5,7 @@ export interface BackendHealth {
   services: {
     ffmpeg: boolean;
     ffprobe: boolean;
-    libreoffice: boolean;
-    libreOffice?: boolean;
+    libreOffice: boolean;
     storage: boolean;
     ytDlp: boolean;
   };

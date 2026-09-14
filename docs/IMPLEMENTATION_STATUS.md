@@ -5,12 +5,14 @@
 | Área | Estado | Evidencia/limitación |
 | :-- | :-- | :-- |
 | DOCX → PDF | `COMPLETE` | LibreOffice 26.8.0.3, prueba real y validación PDF |
-| XLSX/PPTX → PDF | `PARTIAL` | rutas públicas y motor real; falta fixture E2E automatizado |
+| XLSX/PPTX → PDF | `COMPLETE` | upload, job, LibreOffice, validación y descarga PDF probados realmente |
 | ODT/ODS/ODP → PDF | `PARTIAL` | motor acepta estos formatos; sin herramientas públicas dedicadas |
 | Cancelación/timeout/cleanup | `COMPLETE` | AbortSignal, límite configurable, perfil aislado por job y limpieza final |
 | Historial local | `COMPLETE` | repositorio versionado, ciclo terminal central, filtros y borrado |
 | Preferencias locales | `COMPLETE` | validación, update/reset, saveHistory, confirmación y movimiento reducido |
 | Persistencia en cuenta/DB | `NOT_IMPLEMENTED` | fuera de alcance hasta autenticación |
+
+El catálogo contiene 65 definiciones y publica 55 herramientas utilizables. Diez definiciones internas se excluyen explícitamente con `public: false` hasta contar con runner real: `image-cropper`, `audio-channel-converter`, `audio-format-converter`, `base64-text-converter`, `url-encoder-decoder`, `regex-tester`, `line-cleaner-sorter`, `slug-generator`, `media-url-analyzer` (la vista dedicada sigue disponible en navegación) y `merge-pdf`.
 
 
 ## FFmpeg closure status

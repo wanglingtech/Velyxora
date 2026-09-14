@@ -16,6 +16,7 @@ import {
 import { ToolDefinition, ProcessingJob } from "../../types";
 import { jobService } from "../../services/jobService";
 import { historyService } from "../../services/historyService";
+import { getToolRunnerKind } from "../../registry/tools";
 import {
   convertImage,
   cropImage,
@@ -51,6 +52,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   initialFile,
   onBack,
 }) => {
+  const runnerKind = getToolRunnerKind(tool);
   const [selectedFile, setSelectedFile] = useState<File | null>(
     initialFile || null,
   );
@@ -226,6 +228,14 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
     if (tool.id === "video-trimmer" && (serverTrimStart < 0 || serverTrimEnd <= serverTrimStart || (videoDuration > 0 && serverTrimEnd > videoDuration))) {
       toast.error("Intervalo inválido", "El final debe ser posterior al inicio y no superar la duración del video.");
       return;
+    }
+    if (tool.category === "documents" && selectedFile) {
+      const extension = selectedFile.name.split(".").pop()?.toLowerCase();
+      const expected = tool.id.split("-to-")[0];
+      if (extension !== expected) {
+        toast.error(`Selecciona un archivo .${expected.toUpperCase()} válido.`);
+        return;
+      }
     }
     const job = jobService.createJob(
       tool.id,
@@ -700,7 +710,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
       {!activeJob && (
         <div className="space-y-6">
           {/* ==================== PDF TOOLS (Client-Side & Server) ==================== */}
-          {(tool.category === "pdf" || tool.id === "text-to-pdf") && (
+          {runnerKind === "pdf" && (
             <PdfToolRunner
               tool={tool}
               initialFile={selectedFile || undefined}
@@ -708,15 +718,10 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
           )}
 
           {/* ==================== BARCODE GENERATOR ==================== */}
-          {tool.id === "barcode-generator" && <BarcodeToolRunner tool={tool} />}
+          {runnerKind === "barcode" && <BarcodeToolRunner tool={tool} />}
 
           {/* ==================== ADVANCED IMAGE TOOLS ==================== */}
-          {(tool.id === "svg-to-png" ||
-            tool.id === "svg-to-jpg" ||
-            tool.id === "image-filters" ||
-            tool.id === "image-watermark" ||
-            tool.id === "color-picker-image" ||
-            tool.id === "image-to-base64") && (
+          {runnerKind === "image-advanced" && (
             <ImageAdvancedTools
               tool={tool}
               selectedFile={selectedFile}
@@ -725,17 +730,10 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
           )}
 
           {/* ==================== DATA & CODE TOOLS ==================== */}
-          {(tool.id === "csv-to-json" ||
-            tool.id === "json-to-csv" ||
-            tool.id === "markdown-to-html" ||
-            tool.id === "color-converter" ||
-            tool.id === "diff-checker") && <DataAndCodeTools tool={tool} />}
+          {runnerKind === "data-code" && <DataAndCodeTools tool={tool} />}
 
           {/* ==================== UTILITIES TOOLS ==================== */}
-          {(tool.category === "utilities" ||
-            tool.id === "video-metadata-inspector") &&
-            tool.id !== "barcode-generator" &&
-            tool.id !== "color-converter" && (
+          {runnerKind === "utilities" && (
               <UtilitiesToolRunner
                 tool={tool}
                 selectedFile={selectedFile}
@@ -744,19 +742,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
             )}
 
           {/* ==================== STANDARD FILE INPUT TOOLS ==================== */}
-          {(tool.category === "audio" ||
-            (tool.category === "video" &&
-              tool.id !== "video-metadata-inspector") ||
-            (tool.category === "image" &&
-              ![
-                "svg-to-png",
-                "svg-to-jpg",
-                "image-filters",
-                "image-watermark",
-                "color-picker-image",
-                "image-to-base64",
-              ].includes(tool.id))) &&
-          tool.id !== "text-to-pdf" ? (
+          {runnerKind === "standard-file" ? (
             <div className="space-y-5">
               {/* File Selection Card */}
               {!selectedFile ? (
@@ -1207,14 +1193,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
           )}
 
           {/* ==================== DEVELOPER TEXT / JSON / JWT / HASH TOOLS ==================== */}
-          {(tool.category === "developer" ||
-            tool.category === "text" ||
-            tool.id === "password-generator") &&
-            tool.id !== "qr-generator" &&
-            tool.id !== "diff-checker" &&
-            tool.id !== "markdown-to-html" &&
-            tool.id !== "text-to-pdf" &&
-            tool.category !== "pdf" && (
+          {runnerKind === "text" && (
               <div className="space-y-4">
                 {/* Password Generator specific */}
                 {tool.id === "password-generator" ? (

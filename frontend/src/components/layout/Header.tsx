@@ -98,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
                 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                 : "bg-amber-500/10 text-amber-400 border-amber-500/20"
             }`}
-            title={`Backend Velyxora Activo | FFmpeg: ${backendHealth.services.ffmpeg ? "Conectado" : "No disponible"} | LibreOffice: ${backendHealth.services.libreoffice ? "Conectado" : "Pendiente"}`}
+            title={`Backend Velyxora Activo | FFmpeg: ${backendHealth.services.ffmpeg ? "Conectado" : "No disponible"} | LibreOffice: ${backendHealth.services.libreOffice ? "Conectado" : "Pendiente"}`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span>

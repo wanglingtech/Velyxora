@@ -1,14 +1,16 @@
 import React from 'react';
-import { ShieldCheck, FileText, Lock, Server, Cpu } from 'lucide-react';
+import { ShieldCheck, FileText, Lock, Server, Cpu, ArrowLeft } from 'lucide-react';
 import { VelyxoraLogo } from '../logo/VelyxoraLogo';
 
 interface LegalViewProps {
   page: 'privacy' | 'terms' | 'about';
+  onBack: () => void;
 }
 
-export const LegalView: React.FC<LegalViewProps> = ({ page }) => {
+export const LegalView: React.FC<LegalViewProps> = ({ page, onBack }) => {
   return (
     <div className="w-full max-w-3xl mx-auto space-y-8 py-2">
+      <button onClick={onBack} className="min-h-11 px-3 rounded-xl border border-white/10 text-sm text-slate-300 flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-indigo-400"><ArrowLeft className="w-4 h-4" />Regresar</button>
       <div className="text-center space-y-3 pb-4 border-b border-white/[0.08]">
         <VelyxoraLogo variant="full" size="lg" className="justify-center" showTagline />
         <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">

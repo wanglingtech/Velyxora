@@ -20,8 +20,7 @@ export interface HealthCheckResponse {
   };
   services: {
     ffmpeg: boolean;
-    libreoffice: boolean;
-    libreOffice?: boolean;
+    libreOffice: boolean;
     storage: boolean;
   };
   timestamp: string;

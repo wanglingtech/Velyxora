@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, ArrowLeft } from 'lucide-react';
 import { ToolCard } from '../common/ToolCard';
-import { TOOL_REGISTRY, CATEGORIES_CONFIG } from '../../registry/tools';
+import { PUBLIC_TOOL_REGISTRY, CATEGORIES_CONFIG, searchTools } from '../../registry/tools';
 import { ToolDefinition } from '../../types';
 
 interface CategoryViewProps {
@@ -10,6 +10,7 @@ interface CategoryViewProps {
   onSelectTool: (tool: ToolDefinition) => void;
   favorites: string[];
   onToggleFavorite: (toolId: string, e: React.MouseEvent) => void;
+  onBack: () => void;
 }
 
 export const CategoryView: React.FC<CategoryViewProps> = ({
@@ -17,7 +18,8 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
   onSelectCategory,
   onSelectTool,
   favorites,
-  onToggleFavorite
+  onToggleFavorite,
+  onBack
 }) => {
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('all');
@@ -25,8 +27,8 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
   const categoryConfig = CATEGORIES_CONFIG.find((c) => c.id === currentCategory) || CATEGORIES_CONFIG[0];
 
   const toolsInCategory = currentCategory === 'all'
-    ? TOOL_REGISTRY
-    : TOOL_REGISTRY.filter((t) => t.category === currentCategory);
+    ? PUBLIC_TOOL_REGISTRY
+    : PUBLIC_TOOL_REGISTRY.filter((t) => t.category === currentCategory);
 
   // Extract unique subcategories
   const subcategories = Array.from(
@@ -37,14 +39,13 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
     const matchesSub = selectedSubcategory === 'all' || t.subcategory === selectedSubcategory;
     const matchesQuery =
       !searchFilter.trim() ||
-      t.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      t.description.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      t.keywords.some((k) => k.toLowerCase().includes(searchFilter.toLowerCase()));
+      searchTools(searchFilter).some((match) => match.id === t.id);
     return matchesSub && matchesQuery;
   });
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">
+      <button onClick={onBack} className="min-h-11 px-3 rounded-xl border border-white/10 text-sm text-slate-300 flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-indigo-400"><ArrowLeft className="w-4 h-4" />Regresar</button>
       {/* Category Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
         <div>

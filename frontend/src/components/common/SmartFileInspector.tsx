@@ -1,7 +1,7 @@
 import React from 'react';
 import { File, Clock, Maximize, X, ArrowRight, ShieldCheck } from 'lucide-react';
 import { DetectedFileInfo, ToolDefinition } from '../../types';
-import { TOOL_REGISTRY } from '../../registry/tools';
+import { PUBLIC_TOOL_REGISTRY } from '../../registry/tools';
 import { IconRenderer } from './IconRenderer';
 
 interface SmartFileInspectorProps {
@@ -16,7 +16,7 @@ export const SmartFileInspector: React.FC<SmartFileInspectorProps> = ({
   onClear
 }) => {
   const recommendedTools = info.recommendedToolIds
-    .map((id) => TOOL_REGISTRY.find((t) => t.id === id))
+    .map((id) => PUBLIC_TOOL_REGISTRY.find((t) => t.id === id))
     .filter((t): t is ToolDefinition => Boolean(t))
     .slice(0, 6);
 

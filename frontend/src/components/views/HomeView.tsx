@@ -3,7 +3,7 @@ import { Sparkles, Shield, Zap, Layers, ArrowRight } from 'lucide-react';
 import { UniversalInput } from '../common/UniversalInput';
 import { ToolCard } from '../common/ToolCard';
 import { SmartFileInspector } from '../common/SmartFileInspector';
-import { TOOL_REGISTRY, CATEGORIES_CONFIG } from '../../registry/tools';
+import { PUBLIC_TOOL_REGISTRY, CATEGORIES_CONFIG } from '../../registry/tools';
 import { ToolDefinition, DetectedFileInfo } from '../../types';
 
 interface HomeViewProps {
@@ -27,7 +27,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onClearDetectedFile,
   onFileDetected
 }) => {
-  const popularTools = TOOL_REGISTRY.filter((t) => t.popular).slice(0, 8);
+  const popularTools = PUBLIC_TOOL_REGISTRY.filter((t) => t.popular).slice(0, 8);
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-10">
@@ -74,7 +74,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             onClick={() => onSelectCategory('all')}
             className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 transition-colors"
           >
-            <span>Ver catálogo completo ({TOOL_REGISTRY.length})</span>
+            <span>Ver catálogo completo ({PUBLIC_TOOL_REGISTRY.length})</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

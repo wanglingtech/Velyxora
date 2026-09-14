@@ -112,6 +112,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
   },
   {
     id: 'image-cropper',
+    public: false,
     slug: 'image-cropper',
     name: 'Recortador de Imágenes',
     description: 'Recorta áreas específicas con proporciones libres, cuadradas (1:1) o 16:9 con preview en vivo.',
@@ -360,6 +361,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
   },
   {
     id: 'audio-channel-converter',
+    public: false,
     slug: 'audio-channel-converter',
     name: 'Convertidor Estéreo / Mono',
     description: 'Convierte audio estéreo a pista monofónica balanceada o duplica canales.',
@@ -378,6 +380,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
   },
   {
     id: 'audio-format-converter',
+    public: false,
     slug: 'audio-format-converter',
     name: 'Conversor de Audio (WAV / FLAC / MP3)',
     description: 'Transcodificación de alta fidelidad entre contenedores de audio digital.',
@@ -474,6 +477,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
   },
   {
     id: 'base64-text-converter',
+    public: false,
     slug: 'base64-text-converter',
     name: 'Codificador / Decodificador Base64',
     description: 'Convierte cadenas de texto UTF-8 a Base64 estándar o URL-Safe con verificación de errores.',
@@ -492,6 +496,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
   },
   {
     id: 'url-encoder-decoder',
+    public: false,
     slug: 'url-encoder-decoder',
     name: 'URL Encoder / Decoder',
     description: 'Codifica y decodifica parámetros de consulta y URLs completas según RFC 3986.',
@@ -510,6 +515,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
   },
   {
     id: 'regex-tester',
+    public: false,
     slug: 'regex-tester',
     name: 'Probador de Expresiones Regulares',
     description: 'Prueba patrones RegExp en tiempo real con resaltado de coincidencias y grupos de captura.',
@@ -656,6 +662,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
   },
   {
     id: 'line-cleaner-sorter',
+    public: false,
     slug: 'line-cleaner-sorter',
     name: 'Limpiador & Ordenador de Líneas',
     description: 'Elimina líneas duplicadas, limpia espacios en blanco y ordena alfabéticamente (A-Z, Z-A).',
@@ -674,6 +681,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
   },
   {
     id: 'slug-generator',
+    public: false,
     slug: 'slug-generator',
     name: 'Generador de Slugs URL',
     description: 'Convierte títulos y frases en slugs limpios compatibles con SEO y URLs amigables.',
@@ -746,7 +754,8 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     serverEngineNotice: 'Análisis de metadatos y embeds activo; la descarga de flujos combinados requiere microservicio yt-dlp + ffmpeg.',
     keywords: ['youtube', 'tiktok', 'instagram', 'twitter', 'facebook', 'descargar video', 'vimeo', 'reels'],
     popular: true,
-    isClientReady: true
+    isClientReady: true,
+    public: false
   },
 
   // ==================== PDF & DOCUMENTS ====================
@@ -802,7 +811,8 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     serverEngineNotice: 'Motor PDF de ensamblaje server-side requerido.',
     keywords: ['unir pdf', 'merge', 'combinar pdf'],
     popular: true,
-    isClientReady: false
+    isClientReady: false,
+    public: false
   },
   {
     id: 'word-to-pdf',
@@ -835,6 +845,15 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     inputTypes: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'], outputTypes: ['application/pdf'],
     processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true,
     serverEngineNotice: 'Requiere LibreOffice headless en el backend.', keywords: ['powerpoint', 'pptx', 'pdf', 'libreoffice'], popular: true, isClientReady: true
+  },
+  {
+    id: 'odt-to-pdf', slug: 'odt-to-pdf', name: 'OpenDocument (ODT) a PDF', description: 'Convierte documentos ODT a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'FileText', inputTypes: ['application/vnd.oasis.opendocument.text'], outputTypes: ['application/pdf'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['odt','opendocument','writer','pdf'], isClientReady: true
+  },
+  {
+    id: 'ods-to-pdf', slug: 'ods-to-pdf', name: 'OpenDocument (ODS) a PDF', description: 'Convierte hojas ODS a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Sheet', inputTypes: ['application/vnd.oasis.opendocument.spreadsheet'], outputTypes: ['application/pdf'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['ods','opendocument','calc','pdf'], isClientReady: true
+  },
+  {
+    id: 'odp-to-pdf', slug: 'odp-to-pdf', name: 'OpenDocument (ODP) a PDF', description: 'Convierte presentaciones ODP a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Presentation', inputTypes: ['application/vnd.oasis.opendocument.presentation'], outputTypes: ['application/pdf'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['odp','opendocument','impress','pdf'], isClientReady: true
   },
 
   // ==================== UTILITIES ====================
@@ -926,27 +945,36 @@ export const CATEGORIES_CONFIG = [
   { id: 'utilities', name: 'Utilidades', icon: 'Wrench' },
 ] as const;
 
+export const PUBLIC_TOOL_REGISTRY = TOOL_REGISTRY.filter((tool) => tool.public !== false);
+
+export type ToolRunnerKind = 'standard-file' | 'pdf' | 'image-advanced' | 'data-code' | 'utilities' | 'barcode' | 'qr' | 'text';
+export function getToolRunnerKind(tool: ToolDefinition): ToolRunnerKind | null {
+  if (['images-to-pdf', 'text-to-pdf'].includes(tool.id)) return 'pdf';
+  if (tool.id === 'barcode-generator') return 'barcode';
+  if (tool.id === 'qr-generator') return 'qr';
+  if (['svg-to-png','svg-to-jpg','image-filters','image-watermark','color-picker-image','image-to-base64'].includes(tool.id)) return 'image-advanced';
+  if (['csv-to-json','json-to-csv','markdown-to-html','color-converter','diff-checker'].includes(tool.id)) return 'data-code';
+  if (tool.category === 'utilities' || tool.id === 'video-metadata-inspector') return 'utilities';
+  if (['audio','video','image','documents'].includes(tool.category)) return 'standard-file';
+  if (tool.category === 'developer' || tool.category === 'text' || tool.id === 'password-generator') return 'text';
+  return null;
+}
+
 export function getToolById(id: string): ToolDefinition | undefined {
-  return TOOL_REGISTRY.find(t => t.id === id || t.slug === id);
+  return PUBLIC_TOOL_REGISTRY.find(t => t.id === id || t.slug === id);
 }
 
 export function getToolsByCategory(category: string): ToolDefinition[] {
-  if (category === 'all') return TOOL_REGISTRY;
-  return TOOL_REGISTRY.filter(t => t.category === category);
+  if (category === 'all') return PUBLIC_TOOL_REGISTRY;
+  return PUBLIC_TOOL_REGISTRY.filter(t => t.category === category);
 }
 
 export function searchTools(query: string): ToolDefinition[] {
   const clean = query.toLowerCase().trim();
-  if (!clean) return TOOL_REGISTRY;
+  if (!clean) return PUBLIC_TOOL_REGISTRY;
 
-  return TOOL_REGISTRY.filter(tool => {
-    return (
-      tool.name.toLowerCase().includes(clean) ||
-      tool.description.toLowerCase().includes(clean) ||
-      tool.category.toLowerCase().includes(clean) ||
-      tool.keywords.some(k => k.toLowerCase().includes(clean)) ||
-      tool.inputTypes.some(it => it.toLowerCase().includes(clean)) ||
-      tool.outputTypes?.some(ot => ot.toLowerCase().includes(clean))
-    );
+  return PUBLIC_TOOL_REGISTRY.filter(tool => {
+    const haystack = [tool.id, tool.slug, tool.name, tool.description, tool.category, tool.subcategory || '', ...tool.keywords, ...tool.inputTypes, ...tool.outputTypes].join(' ').toLowerCase();
+    return clean.split(/\s+/).every((token) => haystack.includes(token));
   });
 }

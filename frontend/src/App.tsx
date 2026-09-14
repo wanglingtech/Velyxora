@@ -139,6 +139,7 @@ export default function App() {
               onSelectTool={handleSelectTool}
               favorites={favorites}
               onToggleFavorite={handleToggleFavorite}
+              onBack={() => handleNavigate('home')}
             />
           )}
 
@@ -176,7 +177,7 @@ export default function App() {
           {activeView === 'settings' && <SettingsView onBack={() => handleNavigate('home')} />}
 
           {(activeView === 'about' || activeView === 'privacy' || activeView === 'terms') && (
-            <LegalView page={activeView as any} />
+            <LegalView page={activeView as any} onBack={() => handleNavigate('home')} />
           )}
 
           {/* Minimalist Footer */}
