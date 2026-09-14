@@ -11,6 +11,9 @@ import shortRedirectRoutes from './routes/shortRedirect.routes';
 export function createBackendApp(): Express {
   const app = express();
 
+  app.set('trust proxy', ENV.TRUST_PROXY);
+  app.disable('x-powered-by');
+
   // Security & Middleware
   app.use(cors({
     origin(origin, callback) {

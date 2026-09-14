@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { storageService } from '../services/storageService';
 import { HTTP_STATUS } from '../config/constants';
+import { ENV } from '../config/env';
 
 export async function uploadFile(req: Request, res: Response): Promise<void> {
   if (!req.file) {
@@ -25,7 +26,7 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
       originalName: stored.originalName,
       size: stored.size,
       mimeType: stored.mimeType,
-      expiresInMinutes: 30,
+      expiresInMinutes: Math.floor(ENV.TEMP_FILE_TTL_MS / 60_000),
     },
     timestamp: new Date().toISOString(),
   });

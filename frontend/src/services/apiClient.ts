@@ -83,6 +83,7 @@ export interface MediaAnalysisResponse {
 
 class ApiClient {
   private baseUrl: string;
+  private csrf = '';
   private cachedHealth: { data: BackendHealth | null; timestamp: number } = {
     data: null,
     timestamp: 0,
@@ -135,6 +136,9 @@ class ApiClient {
         };
         throw new ApiError(payload.error?.message || friendly[response.status] || "No se pudo completar la solicitud.", response.status, payload.error?.code, payload.error?.retryAfter);
       }
+      if (payload.data && typeof payload.data === 'object' && 'csrf' in payload.data) {
+        this.csrf = String((payload.data as { csrf?: string }).csrf || '');
+      }
       return payload.data === undefined ? (payload as T) : payload.data;
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -162,7 +166,7 @@ class ApiClient {
   }
 
   private csrfToken(): string {
-    return document.cookie.split('; ').find((part) => part.startsWith('velyxora_csrf='))?.split('=')[1] || '';
+    return this.csrf;
   }
 
   auth = {

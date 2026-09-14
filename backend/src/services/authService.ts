@@ -49,6 +49,11 @@ export class AuthService {
   }
 
   verifyCsrf(session: { csrfHash: string }, csrf?: string) { return Boolean(csrf && hashToken(csrf) === session.csrfHash); }
+  async rotateCsrf(sessionId: string) {
+    const csrf = randomBytes(24).toString('base64url');
+    await prisma.session.update({ where: { id: sessionId }, data: { csrfHash: hashToken(csrf) } });
+    return csrf;
+  }
   async logout(token?: string) { if (token) await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } }); }
 }
 

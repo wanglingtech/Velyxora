@@ -9,6 +9,9 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.mjs",
+    "build:frontend": "vite build",
+    "build:backend": "prisma generate && esbuild backend/src/server.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=backend/dist/server.mjs",
+    "start:backend": "node backend/dist/server.mjs",
     "start": "cross-env NODE_ENV=production node dist/server.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",

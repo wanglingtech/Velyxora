@@ -39,4 +39,5 @@ export const ENV = {
   LIBREOFFICE_TIMEOUT_MS: Number(process.env.LIBREOFFICE_TIMEOUT_MS || 10 * 60 * 1000),
   RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: 1000,
+  TRUST_PROXY: process.env.TRUST_PROXY === "true" ? 1 : false,
 };

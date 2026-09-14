@@ -34,10 +34,7 @@ export function rateLimiter(
     next();
     return;
   }
-  const clientIp =
-    (req.headers["x-forwarded-for"] as string) ||
-    req.socket.remoteAddress ||
-    "unknown-ip";
+  const clientIp = req.ip || req.socket.remoteAddress || "unknown-ip";
   const now = Date.now();
 
   let record = clientHits.get(clientIp);

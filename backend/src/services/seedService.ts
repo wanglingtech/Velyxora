@@ -15,12 +15,14 @@ export async function seedInitialData(
     });
   }
   if (!admin?.email || !admin.password) return { adminSeeded: false };
-  const passwordHash = await hashPassword(admin.password);
-  const user = await prisma.user.upsert({
-    where: { email: normalizeEmail(admin.email) },
-    update: { role: "ADMIN", passwordHash, status: "ACTIVE" },
-    create: { email: normalizeEmail(admin.email), passwordHash, role: "ADMIN" },
-  });
+  const email = normalizeEmail(admin.email);
+  let user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    const passwordHash = await hashPassword(admin.password);
+    user = await prisma.user.create({ data: { email, passwordHash, role: "ADMIN" } });
+  } else if (user.role !== "ADMIN") {
+    user = await prisma.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
+  }
   const plan = await prisma.plan.findUniqueOrThrow({ where: { code: "FREE" } });
   const activePlan = await prisma.userPlan.findFirst({
     where: { userId: user.id, active: true },

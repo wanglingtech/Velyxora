@@ -82,7 +82,7 @@ export async function streamDownload(req: Request, res: Response): Promise<void>
     res.setHeader('Content-Length', String(stat.size));
     res.download(fullPath, stored.filename, (err) => {
       if (err) {
-        // stream was closed or aborted
+        // Interrupted downloads remain available until TTL cleanup for retry.
       }
     });
   } catch (err: any) {
