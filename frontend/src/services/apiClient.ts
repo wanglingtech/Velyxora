@@ -202,6 +202,14 @@ class ApiClient {
     createSuggestion: (data: Record<string, string>) => this.request<any>('/feedback/suggestions', { method: 'POST', body: JSON.stringify(data) }),
   };
 
+  links = {
+    create: (url: string, expiresInDays: number) => this.request<{ slug: string; shortPath: string; targetUrl: string; expiresAt: string }>('/links', { method: 'POST', body: JSON.stringify({ url, expiresInDays }) }),
+  };
+
+  probeMedia(fileId: string) {
+    return this.request<{ format: string; duration?: number; bitRate?: number; streams: Array<{ codecType?: string; codecName?: string; width?: number; height?: number; sampleRate?: number; channels?: number; bitRate?: number; avg_frame_rate?: string; r_frame_rate?: string }> }>('/tools/probe', { method: 'POST', body: JSON.stringify({ fileId }) }, 30000);
+  }
+
   estimateCredits(toolId: string, inputBytes: number, options: Record<string, unknown> = {}) {
     return this.request<{ estimatedCredits: number; currentBalance: number; balanceAfter: number; processingClass: string }>('/credits/estimate', { method: 'POST', body: JSON.stringify({ toolId, inputBytes, options }) });
   }

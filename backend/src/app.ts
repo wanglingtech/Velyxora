@@ -6,6 +6,7 @@ import { requestLogger } from './middleware/requestLogger';
 import { rateLimiter } from './security/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import cookieParser from 'cookie-parser';
+import shortRedirectRoutes from './routes/shortRedirect.routes';
 
 export function createBackendApp(): Express {
   const app = express();
@@ -30,6 +31,7 @@ export function createBackendApp(): Express {
 
   // API Routes
   app.use('/api', apiRouter);
+  app.use('/s', shortRedirectRoutes);
 
   // Global Error Handler
   app.use(errorHandler);

@@ -14,6 +14,11 @@ test("SSRF Validator blocks loopback and private addresses", async () => {
   const fileResult = await validateSafeUrl("file:///etc/passwd");
   assert.strictEqual(fileResult.valid, false);
   assert.match(fileResult.error || "", /protocol/);
+
+  for (const unsafe of [
+    "javascript:alert(1)", "data:text/html,test", "ftp://example.com/file",
+    "http://10.0.0.1/", "http://172.16.0.1/", "http://192.168.1.1/", "http://169.254.169.254/",
+  ]) assert.strictEqual((await validateSafeUrl(unsafe)).valid, false, unsafe);
 });
 
 test("SSRF Validator blocks private IPv6 and IPv4-mapped IPv6 addresses", async () => {

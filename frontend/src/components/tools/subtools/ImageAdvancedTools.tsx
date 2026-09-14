@@ -38,6 +38,10 @@ export const ImageAdvancedTools: React.FC<ImageAdvancedToolsProps> = ({
 
   // SVG to Raster states
   const [svgScale, setSvgScale] = useState<number>(2);
+  const [svgWidth, setSvgWidth] = useState(200);
+  const [svgHeight, setSvgHeight] = useState(200);
+  const [svgAspectLocked, setSvgAspectLocked] = useState(true);
+  const [svgBackground, setSvgBackground] = useState('#FFFFFF');
   const [svgCode, setSvgCode] = useState<string>(
     '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>'
   );
@@ -95,6 +99,21 @@ export const ImageAdvancedTools: React.FC<ImageAdvancedToolsProps> = ({
     }
   }, [selectedFile, tool.id]);
 
+  useEffect(() => {
+    if (!['svg-to-png', 'svg-to-jpg'].includes(tool.id)) return;
+    let active = true;
+    let objectUrl = '';
+    const load = async () => {
+      const source = svgMode === 'file' ? selectedFile : null;
+      if (svgMode === 'file' && (!source || !/svg/i.test(source.type || source.name))) { setSvgPreviewUrl(null); return; }
+      const blob = source || new Blob([svgCode], { type: 'image/svg+xml;charset=utf-8' });
+      objectUrl = URL.createObjectURL(blob);
+      if (active) setSvgPreviewUrl(objectUrl);
+    };
+    void load();
+    return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [selectedFile, svgCode, svgMode, tool.id]);
+
   const copyText = async (text: string, key: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -114,7 +133,7 @@ export const ImageAdvancedTools: React.FC<ImageAdvancedToolsProps> = ({
       const targetFormat = isJpg ? 'image/jpeg' : 'image/png';
       const source = svgMode === 'file' && selectedFile ? selectedFile : svgCode;
 
-      const result = await renderSvgToRaster(source, targetFormat, svgScale);
+      const result = await renderSvgToRaster(source, targetFormat, svgScale, { width: svgWidth, height: svgHeight, background: isJpg ? svgBackground : undefined });
       const url = URL.createObjectURL(result.blob);
       const a = document.createElement('a');
       a.href = url;
@@ -204,6 +223,7 @@ export const ImageAdvancedTools: React.FC<ImageAdvancedToolsProps> = ({
 
   return (
     <div className="space-y-6">
+      {!['svg-to-png','svg-to-jpg'].includes(tool.id) && <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-white/10 bg-[#101218] p-6 text-center hover:border-indigo-500/50"><ImageIcon className="mx-auto mb-2 h-8 w-8 text-indigo-300"/><span className="block text-sm text-slate-200">{selectedFile ? selectedFile.name : 'Selecciona o arrastra una imagen'}</span>{selectedFile&&<span className="mt-1 block text-xs text-slate-500">{formatFileSize(selectedFile.size)}</span>}<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e)=>e.target.files?.[0]&&onFileSelect(e.target.files[0])}/></label>}
       {/* ==================== SVG TO PNG / JPG ==================== */}
       {(tool.id === 'svg-to-png' || tool.id === 'svg-to-jpg') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -276,6 +296,13 @@ export const ImageAdvancedTools: React.FC<ImageAdvancedToolsProps> = ({
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-xs text-slate-400">Ancho base (px)<input type="number" min={1} max={8192} value={svgWidth} onChange={(e) => { const width=Math.max(1, Number(e.target.value)); setSvgWidth(width); if (svgAspectLocked) setSvgHeight(width); }} className="mt-1 w-full rounded-lg border border-white/[0.08] bg-[#08090D] p-2 text-white" /></label>
+              <label className="text-xs text-slate-400">Alto base (px)<input type="number" min={1} max={8192} value={svgHeight} onChange={(e) => { const height=Math.max(1, Number(e.target.value)); setSvgHeight(height); if (svgAspectLocked) setSvgWidth(height); }} className="mt-1 w-full rounded-lg border border-white/[0.08] bg-[#08090D] p-2 text-white" /></label>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" checked={svgAspectLocked} onChange={(e)=>setSvgAspectLocked(e.target.checked)} className="accent-indigo-500" />Bloquear proporción 1:1</label>
+            {tool.id === 'svg-to-jpg' && <label className="text-xs text-slate-400">Fondo JPEG<input type="color" value={svgBackground} onChange={(e)=>setSvgBackground(e.target.value)} className="ml-3 h-8 w-14 align-middle" /></label>}
+
             <button
               onClick={handleExportSvg}
               disabled={isProcessing || (svgMode === 'file' && !selectedFile)}
@@ -293,10 +320,10 @@ export const ImageAdvancedTools: React.FC<ImageAdvancedToolsProps> = ({
           {/* SVG Preview Card */}
           <div className="p-6 rounded-2xl bg-[#101218] border border-white/[0.08] flex flex-col items-center justify-center text-center">
             <h4 className="text-xs text-slate-400 mb-3 uppercase tracking-wider">Previsualización Vectorial</h4>
-            <div
-              className="p-6 bg-[#08090D] border border-white/[0.06] rounded-2xl max-w-full max-h-[300px] overflow-hidden flex items-center justify-center"
-              dangerouslySetInnerHTML={{ __html: svgMode === 'code' ? svgCode : '<p class="text-xs text-slate-500">Vector cargado</p>' }}
-            />
+            <div className="p-6 border border-white/[0.06] rounded-2xl w-full min-h-64 overflow-hidden flex items-center justify-center" style={{ backgroundColor: tool.id === 'svg-to-jpg' ? svgBackground : '#08090D' }}>
+              {svgPreviewUrl ? <img src={svgPreviewUrl} alt="Previsualización SVG" className="max-h-[280px] max-w-full object-contain" onError={()=>setSvgPreviewUrl(null)} /> : <p className="text-xs text-rose-300">SVG inválido o no compatible.</p>}
+            </div>
+            <p className="mt-3 text-xs text-slate-400">Salida: {svgWidth * svgScale} × {svgHeight * svgScale} px</p>
           </div>
         </div>
       )}

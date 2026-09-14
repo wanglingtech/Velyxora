@@ -411,7 +411,8 @@ export async function generateQrCode(
 export async function renderSvgToRaster(
   svgFileOrText: File | string,
   format: 'image/png' | 'image/jpeg' = 'image/png',
-  scale: number = 2
+  scale: number = 2,
+  options: { width?: number; height?: number; background?: string } = {}
 ): Promise<{ blob: Blob; filename: string; width: number; height: number }> {
   let svgText = '';
   let baseName = 'vector';
@@ -430,8 +431,8 @@ export async function renderSvgToRaster(
   return new Promise((resolve, reject) => {
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const width = Math.max(1, Math.round((img.naturalWidth || 512) * scale));
-      const height = Math.max(1, Math.round((img.naturalHeight || 512) * scale));
+      const width = Math.max(1, Math.round((options.width || img.naturalWidth || 512) * scale));
+      const height = Math.max(1, Math.round((options.height || img.naturalHeight || 512) * scale));
 
       const canvas = document.createElement('canvas');
       canvas.width = width;
@@ -442,8 +443,8 @@ export async function renderSvgToRaster(
         return;
       }
 
-      if (format === 'image/jpeg') {
-        ctx.fillStyle = '#FFFFFF';
+      if (format === 'image/jpeg' || options.background) {
+        ctx.fillStyle = options.background || '#FFFFFF';
         ctx.fillRect(0, 0, width, height);
       }
 
@@ -720,4 +721,3 @@ export async function inspectVideoMetadata(videoFile: File): Promise<{
     };
   });
 }
-

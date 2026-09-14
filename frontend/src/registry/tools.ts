@@ -279,14 +279,14 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     id: 'video-metadata-inspector',
     slug: 'video-metadata-inspector',
     name: 'Inspector Técnico de Video',
-    description: 'Analiza resolución exacta, relación de aspecto, duración, tasa de bits y códecs soportados.',
+    description: 'Muestra metadata local y usa FFprobe temporalmente para códecs y parámetros técnicos fiables.',
     category: 'video',
     subcategory: 'Análisis',
     icon: 'Info',
     inputTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'],
     outputTypes: ['text/json'],
-    processingMode: 'CLIENT_SIDE',
-    engine: 'browser-canvas',
+    processingMode: 'HYBRID',
+    engine: 'browser-metadata+server-ffprobe',
     supportsBatch: false,
     supportsPreview: true,
     keywords: ['metadata', 'inspector', 'resolucion', 'fps', 'codec', 'duracion'],
@@ -326,7 +326,6 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     processingMode: 'SERVER_SIDE',
     engine: 'server-ffmpeg',
     requiresServer: true,
-    serverEngineNotice: 'Requiere microservicio de backend con binario FFmpeg compilado.',
     keywords: ['comprimir video', 'h264', 'crf', 'discord', 'reducir mp4'],
     popular: true,
     isClientReady: false
@@ -443,7 +442,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     id: 'hash-generator',
     slug: 'hash-generator',
     name: 'Generador Criptográfico de Hash',
-    description: 'Calcula digests SHA-256, SHA-384, SHA-512 y SHA-1 utilizando la Web Crypto API del navegador.',
+    description: 'Calcula huellas unidireccionales SHA-256, SHA-384 y SHA-512 utilizando Web Crypto en el navegador.',
     category: 'developer',
     subcategory: 'Criptografía',
     icon: 'ShieldCheck',
@@ -453,7 +452,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     engine: 'browser-crypto',
     supportsBatch: false,
     supportsPreview: true,
-    keywords: ['hash', 'sha256', 'sha512', 'sha1', 'checksum', 'crypto'],
+    keywords: ['hash', 'sha256', 'sha384', 'sha512', 'checksum', 'crypto'],
     popular: true,
     isClientReady: true
   },
@@ -932,7 +931,11 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     keywords: ['bytes', 'kb', 'mb', 'gb', 'tb', 'almacenamiento', 'disco', 'tamano'],
     popular: false,
     isClientReady: true
-  }
+  },
+  { id: 'url-shortener', slug: 'url-shortener', name: 'Acortador de URL', description: 'Crea un enlace corto con expiración y redirección segura.', category: 'developer', subcategory: 'Web', icon: 'Link', inputTypes: ['text/plain'], outputTypes: ['text/plain'], processingMode: 'SERVER_SIDE', engine: 'velyxora-links', requiresServer: true, supportsPreview: true, keywords: ['url','enlace','acortar','short link'], isClientReady: true },
+  { id: 'icon-maker', slug: 'icon-maker', name: 'Icon Maker', description: 'Diseña iconos SVG locales con texto, emoji, forma y colores.', category: 'image', subcategory: 'Diseño', icon: 'Shapes', inputTypes: ['text/plain'], outputTypes: ['image/svg+xml'], processingMode: 'CLIENT_SIDE', engine: 'browser-svg', supportsPreview: true, keywords: ['icono','logo','svg','emoji'], isClientReady: true },
+  { id: 'social-text-studio', slug: 'social-text-studio', name: 'Social Text Studio', description: 'Redacta y valida textos para redes sociales con contadores por plataforma.', category: 'text', subcategory: 'Redes sociales', icon: 'MessagesSquare', inputTypes: ['text/plain'], outputTypes: ['text/plain'], processingMode: 'CLIENT_SIDE', engine: 'browser-text', supportsPreview: true, keywords: ['instagram','x','tiktok','linkedin','social'], isClientReady: true },
+  { id: 'emoji-tool', slug: 'emoji-tool', name: 'Emoji Tool', description: 'Explora, copia y guarda emojis favoritos localmente.', category: 'utilities', subcategory: 'Texto', icon: 'Smile', inputTypes: ['text/plain'], outputTypes: ['text/plain'], processingMode: 'CLIENT_SIDE', engine: 'browser-text', supportsPreview: true, keywords: ['emoji','copiar','favoritos'], isClientReady: true }
 ];
 
 export const CATEGORIES_CONFIG = [
@@ -951,8 +954,9 @@ export const CATEGORIES_CONFIG = [
 
 export const PUBLIC_TOOL_REGISTRY = TOOL_REGISTRY.filter((tool) => tool.public !== false);
 
-export type ToolRunnerKind = 'standard-file' | 'pdf' | 'image-advanced' | 'data-code' | 'utilities' | 'barcode' | 'qr' | 'text';
+export type ToolRunnerKind = 'standard-file' | 'pdf' | 'image-advanced' | 'data-code' | 'utilities' | 'barcode' | 'qr' | 'text' | 'creative';
 export function getToolRunnerKind(tool: ToolDefinition): ToolRunnerKind | null {
+  if (['url-shortener','icon-maker','social-text-studio','emoji-tool'].includes(tool.id)) return 'creative';
   if (tool.id === 'password-generator') return 'text';
   if (['images-to-pdf', 'text-to-pdf'].includes(tool.id)) return 'pdf';
   if (tool.id === 'barcode-generator') return 'barcode';

@@ -5,8 +5,8 @@ import { MobileNav } from './components/layout/MobileNav';
 import { Footer } from './components/layout/Footer';
 import { HomeView } from './components/views/HomeView';
 import { CategoryView } from './components/views/CategoryView';
-import { ToolRunner } from './components/tools/ToolRunner';
-import { MediaDownloaderView } from './components/tools/MediaDownloaderView';
+const ToolRunner = React.lazy(() => import('./components/tools/ToolRunner').then((module) => ({ default: module.ToolRunner })));
+const MediaDownloaderView = React.lazy(() => import('./components/tools/MediaDownloaderView').then((module) => ({ default: module.MediaDownloaderView })));
 import { HistoryView } from './components/views/HistoryView';
 import { FavoritesView } from './components/views/FavoritesView';
 import { SettingsView } from './components/views/SettingsView';
@@ -169,7 +169,7 @@ export default function App() {
           )}
 
           {activeView === 'tool' && activeTool && (
-            <ToolRunner
+            <React.Suspense fallback={<div className="p-8 text-sm text-slate-400">Cargando herramienta…</div>}><ToolRunner
               tool={activeTool}
               initialFile={activeFile}
               onBack={() => {
@@ -177,14 +177,14 @@ export default function App() {
                 setActiveFile(undefined);
                 setActiveView('home');
               }}
-            />
+            /></React.Suspense>
           )}
 
           {activeView === 'media-downloader' && (
-            <MediaDownloaderView
+            <React.Suspense fallback={<div className="p-8 text-sm text-slate-400">Cargando herramienta…</div>}><MediaDownloaderView
               initialUrl={mediaUrl}
               onBack={() => setActiveView('home')}
-            />
+            /></React.Suspense>
           )}
 
           {activeView === 'favorites' && (

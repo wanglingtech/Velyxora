@@ -15,6 +15,7 @@ import paymentsRoutes from './payments.routes';
 import adminRoutes from './admin.routes';
 import historyRoutes from './history.routes';
 import feedbackRoutes from './feedback.routes';
+import linksRoutes from './links.routes';
 
 const router = Router();
 
@@ -26,6 +27,7 @@ router.use('/payments', paymentsRoutes);
 router.use('/admin', adminRoutes);
 router.use('/history', historyRoutes);
 router.use('/feedback', feedbackRoutes);
+router.use('/links', linksRoutes);
 router.use('/tools', toolsRoutes);
 router.use('/formats', formatsRoutes);
 router.use('/uploads', uploadsRoutes);

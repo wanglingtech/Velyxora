@@ -15,6 +15,7 @@ import { ToolDefinition } from '../../../types';
 import { inspectVideoMetadata } from '../../../services/conversionEngine';
 import { formatFileSize, formatDuration } from '../../../services/detectionService';
 import { toast } from '../../common/ToastContainer';
+import { apiClient } from '../../../services/apiClient';
 
 interface UtilitiesToolRunnerProps {
   tool: ToolDefinition;
@@ -57,6 +58,8 @@ export const UtilitiesToolRunner: React.FC<UtilitiesToolRunnerProps> = ({
     size: number;
     estimatedBitrateKbps: number;
   } | null>(null);
+  const [serverMeta, setServerMeta] = useState<any>(null);
+  const [serverProbeStatus, setServerProbeStatus] = useState<'idle'|'loading'|'ready'|'unavailable'>('idle');
 
   const copyText = async (text: string, key: string) => {
     try {
@@ -97,6 +100,8 @@ export const UtilitiesToolRunner: React.FC<UtilitiesToolRunnerProps> = ({
       inspectVideoMetadata(selectedFile)
         .then(setVideoMeta)
         .catch((err) => toast.error(err.message || 'Error al inspeccionar video'));
+      setServerMeta(null); setServerProbeStatus('loading');
+      apiClient.uploadFile(selectedFile).then(({ fileId }) => apiClient.probeMedia(fileId)).then((data) => { setServerMeta(data); setServerProbeStatus('ready'); }).catch(() => setServerProbeStatus('unavailable'));
     }
   }, [tool.id, selectedFile]);
 
@@ -114,6 +119,7 @@ export const UtilitiesToolRunner: React.FC<UtilitiesToolRunnerProps> = ({
 
   return (
     <div className="space-y-6">
+      {tool.id === 'video-metadata-inspector' && <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-white/10 bg-[#101218] p-6 text-center hover:border-indigo-500/50"><Video className="mx-auto mb-2 h-8 w-8 text-indigo-300"/><span className="text-sm text-slate-200">{selectedFile ? selectedFile.name : 'Selecciona un video para inspeccionarlo'}</span><input type="file" accept="video/*" className="hidden" onChange={(e)=>e.target.files?.[0]&&onFileSelect(e.target.files[0])}/></label>}
       {/* ==================== ASPECT RATIO CALCULATOR ==================== */}
       {tool.id === 'aspect-ratio-calculator' && (
         <div className="p-6 rounded-2xl bg-[#101218] border border-white/[0.08] space-y-6">
@@ -372,7 +378,7 @@ export const UtilitiesToolRunner: React.FC<UtilitiesToolRunnerProps> = ({
               </div>
 
               <div className="p-3.5 rounded-xl bg-[#08090D] border border-white/[0.06]">
-                <span className="text-[10px] text-slate-400 uppercase block font-medium">Bitrate Estimado</span>
+                <span className="text-[10px] text-slate-400 uppercase block font-medium">Bitrate estimado local</span>
                 <p className="text-sm font-mono font-bold text-emerald-400">
                   {videoMeta.estimatedBitrateKbps} kbps
                 </p>
@@ -384,9 +390,12 @@ export const UtilitiesToolRunner: React.FC<UtilitiesToolRunnerProps> = ({
               </div>
 
               <div className="p-3.5 rounded-xl bg-[#08090D] border border-white/[0.06] sm:col-span-3">
-                <span className="text-[10px] text-slate-400 uppercase block font-medium">Contenedor / Códec</span>
-                <p className="text-xs font-mono font-medium text-slate-300">{videoMeta.mimeType}</p>
+                <span className="text-[10px] text-slate-400 uppercase block font-medium">Tipo declarado por el archivo</span>
+                <p className="text-xs font-mono font-medium text-slate-300">{videoMeta.mimeType} (no identifica el códec)</p>
               </div>
+              {serverProbeStatus === 'loading' && <p className="col-span-full text-xs text-slate-400">Obteniendo datos técnicos exactos con FFprobe…</p>}
+              {serverProbeStatus === 'unavailable' && <p className="col-span-full rounded-xl border border-amber-500/20 p-3 text-xs text-amber-200">Metadata local disponible. Inicia sesión y verifica que FFprobe esté activo para ver códecs y parámetros exactos.</p>}
+              {serverMeta && (()=>{const video=serverMeta.streams.find((s:any)=>s.codecType==='video');const audio=serverMeta.streams.find((s:any)=>s.codecType==='audio');const fpsRaw=video?.avg_frame_rate||video?.r_frame_rate;const [n,d]=String(fpsRaw||'0/1').split('/').map(Number);const fps=d? n/d:0;return <><div className="col-span-full mt-2 text-xs font-semibold uppercase tracking-wider text-indigo-300">FFprobe · datos técnicos</div><Meta label="Contenedor" value={serverMeta.format}/><Meta label="Códec de video" value={video?.codecName}/><Meta label="FPS" value={fps?fps.toFixed(3):undefined}/><Meta label="Bitrate total" value={serverMeta.bitRate?`${Math.round(serverMeta.bitRate/1000)} kbps`:undefined}/><Meta label="Códec de audio" value={audio?.codecName}/><Meta label="Sample rate" value={audio?.sampleRate?`${audio.sampleRate} Hz`:undefined}/><Meta label="Canales" value={audio?.channels}/></>})()}
             </div>
           ) : (
             <p className="text-xs text-slate-400 text-center">Analizando flujo multimedia...</p>
@@ -396,3 +405,5 @@ export const UtilitiesToolRunner: React.FC<UtilitiesToolRunnerProps> = ({
     </div>
   );
 };
+
+function Meta({label,value}:{label:string;value:React.ReactNode}) { return <div className="rounded-xl border border-white/[0.06] bg-[#08090D] p-3"><span className="block text-[10px] uppercase text-slate-400">{label}</span><strong className="font-mono text-sm text-white">{value ?? 'No informado'}</strong></div>; }

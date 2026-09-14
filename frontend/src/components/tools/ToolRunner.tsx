@@ -4,7 +4,6 @@ import {
   Settings,
   Sparkles,
   Download,
-  AlertTriangle,
   Play,
   Scissors,
   Copy,
@@ -41,6 +40,8 @@ import { BarcodeToolRunner } from "./subtools/BarcodeToolRunner";
 import { ImageAdvancedTools } from "./subtools/ImageAdvancedTools";
 import { DataAndCodeTools } from "./subtools/DataAndCodeTools";
 import { UtilitiesToolRunner } from "./subtools/UtilitiesToolRunner";
+import { useAuth } from "../../auth/AuthContext";
+const CreativeTools = React.lazy(() => import("./subtools/CreativeTools").then((module) => ({ default: module.CreativeTools })));
 
 interface ToolRunnerProps {
   tool: ToolDefinition;
@@ -53,6 +54,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   initialFile,
   onBack,
 }) => {
+  const { user } = useAuth();
   const runnerKind = getToolRunnerKind(tool);
   const [selectedFile, setSelectedFile] = useState<File | null>(
     initialFile || null,
@@ -84,7 +86,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   const [serverBitrate, setServerBitrate] = useState("192k");
   const [serverTrimStart, setServerTrimStart] = useState(0);
   const [serverTrimEnd, setServerTrimEnd] = useState(3);
-  const [serverSpeed, setServerSpeed] = useState(1.5);
+  const [serverSpeed, setServerSpeed] = useState(1);
   const [gifWidth, setGifWidth] = useState(320);
   const [gifFps, setGifFps] = useState(15);
   const [videoResolution, setVideoResolution] = useState("1280x720");
@@ -94,6 +96,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   // Developer & Text Tools states
   const [textInput, setTextInput] = useState<string>("");
   const [textOutput, setTextOutput] = useState<string>("");
+  const [hashAlgorithm, setHashAlgorithm] = useState<"SHA-256" | "SHA-384" | "SHA-512">("SHA-256");
   const [copied, setCopied] = useState<boolean>(false);
 
   // QR Code States
@@ -236,9 +239,8 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   // ==================== REAL PROCESSING EXECUTION ====================
   const handleExecute = async () => {
     if (submittingRef.current) return;
-    if (creditEstimate && creditEstimate.balanceAfter < 0) { toast.error("Créditos insuficientes", "Necesitas recargar créditos antes de procesar."); return; }
-    submittingRef.current = true;
-    if (tool.id === "video-trimmer" && (serverTrimStart < 0 || serverTrimEnd <= serverTrimStart || (videoDuration > 0 && serverTrimEnd > videoDuration))) {
+    if (user?.role !== 'ADMIN' && creditEstimate && creditEstimate.balanceAfter < 0) { toast.error("Créditos insuficientes", "Necesitas obtener créditos antes de procesar."); return; }
+    if (["video-trimmer", "video-to-gif"].includes(tool.id) && (serverTrimStart < 0 || serverTrimEnd <= serverTrimStart || (videoDuration > 0 && serverTrimEnd > videoDuration))) {
       toast.error("Intervalo inválido", "El final debe ser posterior al inicio y no superar la duración del video.");
       return;
     }
@@ -249,6 +251,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
         return;
       }
     }
+    submittingRef.current = true;
     const job = jobService.createJob(
       tool.id,
       tool.name,
@@ -281,7 +284,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
         if (tool.id === "video-trimmer") { options.trimStart = serverTrimStart; options.trimEnd = serverTrimEnd; }
         if (tool.id === "video-mute") options.muteAudio = true;
         if (tool.id === "video-speed") options.speedMultiplier = serverSpeed;
-        if (tool.id === "video-to-gif") { options.gifWidth = gifWidth; options.fps = gifFps; }
+        if (tool.id === "video-to-gif") { options.gifWidth = gifWidth; options.fps = gifFps; options.trimStart = serverTrimStart; options.trimEnd = serverTrimEnd; }
         if (tool.id === "audio-normalize") options.normalizeAudio = true;
         if (tool.id === "video-resize") options.resolution = videoResolution;
         const remote = await uploadAndStartConversion(
@@ -296,9 +299,10 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
           jobService.updateStatus(job.id, state.status, state.progressMessage || "Procesando en backend...", state.progress);
           if (state.status === "COMPLETED" && state.output) {
             jobService.completeJob(job.id, { ...state.output });
+            window.dispatchEvent(new Event('velyxora:credits-changed'));
             return;
           }
-          if (state.status === "FAILED" || state.status === "CANCELLED") throw new Error(state.error || `Trabajo ${state.status}.`);
+          if (state.status === "FAILED" || state.status === "CANCELLED") { window.dispatchEvent(new Event('velyxora:credits-changed')); throw new Error(state.error || `Trabajo ${state.status}.`); }
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
         if (pollingCancelledRef.current) return;
@@ -603,16 +607,16 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
     }
   };
 
-  const handleGenerateHash = async (algo: "SHA-256" | "SHA-512" | "SHA-1") => {
+  const handleGenerateHash = async (algo: "SHA-256" | "SHA-384" | "SHA-512") => {
     try {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(textInput);
+      const data = selectedFile ? await selectedFile.arrayBuffer() : new TextEncoder().encode(textInput);
       const hashBuffer = await window.crypto.subtle.digest(algo, data);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const hashHex = hashArray
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
       setTextOutput(hashHex);
+      setHashAlgorithm(algo);
       toast.success(`Hash ${algo} generado`);
     } catch (err: any) {
       toast.error("Error criptográfico", err.message);
@@ -686,32 +690,13 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
         )}
       </div>
 
-      {/* Backend Required Warning if applicable */}
-      {tool.requiresServer && !tool.isClientReady && (
-        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold text-amber-200">
-              Microservicio Backend Requerido
-            </p>
-            <p className="text-amber-300/90 mt-0.5 leading-relaxed">
-              {tool.serverEngineNotice ||
-                "Esta herramienta requiere un contenedor con FFmpeg o LibreOffice compilado."}
-            </p>
-            <p className="text-[11px] text-amber-400/80 mt-1 font-mono">
-              Endpoint asignado: POST /api/conversions (preparado en VS Code)
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Active Job State */}
       {activeJob && (
         <JobProgressView
           job={activeJob}
           onCancel={() => {
             pollingCancelledRef.current = true;
-            if (backendJobIdRef.current) void apiClient.cancelJob(backendJobIdRef.current);
+            if (backendJobIdRef.current) void apiClient.cancelJob(backendJobIdRef.current).finally(()=>window.dispatchEvent(new Event('velyxora:credits-changed')));
             if (activeJob) jobService.cancelJob(activeJob.id);
           }}
           onReset={() => setActiveJob(null)}
@@ -752,6 +737,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
                 onFileSelect={(file) => setSelectedFile(file)}
               />
             )}
+          {runnerKind === "creative" && <React.Suspense fallback={<div className="rounded-2xl border border-white/10 p-6 text-sm text-slate-400">Cargando editor local…</div>}><CreativeTools tool={tool} /></React.Suspense>}
 
           {/* ==================== STANDARD FILE INPUT TOOLS ==================== */}
           {runnerKind === "standard-file" ? (
@@ -989,6 +975,10 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
                     />
                   )}
 
+                  <button type="button" onClick={() => { const audio = audioRef.current; if (!audio) return; audio.currentTime = audioStart; void audio.play(); window.setTimeout(() => { if (audio.currentTime >= audioEnd) audio.pause(); }, Math.max(0, (audioEnd - audioStart) * 1000)); }} className="min-h-11 rounded-xl border border-indigo-500/30 px-4 text-xs text-indigo-200">
+                    Reproducir selección ({Math.max(0, audioEnd - audioStart).toFixed(1)} s)
+                  </button>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs text-slate-400 block mb-1">
@@ -1053,12 +1043,15 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
                   </div>}
 
                   {tool.id === "video-speed" && <label className="block text-xs text-slate-300">Velocidad
-                    <select value={serverSpeed} onChange={(e) => setServerSpeed(Number(e.target.value))} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]">
-                      {[0.5,0.75,1.25,1.5,2].map((speed) => <option key={speed} value={speed}>{speed}× — {speed < 1 ? "más lento" : "más rápido"}</option>)}
+                    <select value={serverSpeed} onChange={(e) => { const speed=Number(e.target.value); setServerSpeed(speed); if (videoRef.current) videoRef.current.playbackRate=speed; }} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]">
+                      {[0.5,0.75,1,1.25,1.5,2].map((speed) => <option key={speed} value={speed}>{speed}× — {speed === 1 ? "normal" : speed < 1 ? "más lento" : "más rápido"}</option>)}
                     </select>
+                    {videoDuration > 0 && <span className="mt-2 block text-[11px] text-slate-500">Duración estimada: {formatDuration(videoDuration / serverSpeed)}. La previsualización usa esta velocidad.</span>}
                   </label>}
 
                   {tool.id === "video-to-gif" && <div className="grid grid-cols-2 gap-3">
+                    <label className="text-xs text-slate-300">Inicio (segundos)<input type="number" min={0} max={videoDuration || undefined} step={0.1} value={serverTrimStart} onChange={(e) => setServerTrimStart(Number(e.target.value))} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]" /></label>
+                    <label className="text-xs text-slate-300">Fin (segundos)<input type="number" min={0.1} max={videoDuration || undefined} step={0.1} value={serverTrimEnd} onChange={(e) => setServerTrimEnd(Number(e.target.value))} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]" /></label>
                     <label className="text-xs text-slate-300">Ancho<select value={gifWidth} onChange={(e) => setGifWidth(Number(e.target.value))} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]">{[240,320,480,640].map((width) => <option key={width} value={width}>{width} px</option>)}</select></label>
                     <label className="text-xs text-slate-300">Fotogramas/segundo<select value={gifFps} onChange={(e) => setGifFps(Number(e.target.value))} className="mt-1 w-full p-2 rounded-lg bg-[#08090D] border border-white/[0.08]">{[10,15,20,24].map((fps) => <option key={fps} value={fps}>{fps} FPS</option>)}</select></label>
                   </div>}
@@ -1072,11 +1065,11 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
               )}
 
               {/* Action Button */}
-              {creditEstimate && <div className={`rounded-xl border p-3 text-xs ${creditEstimate.balanceAfter < 0 ? 'border-rose-500/30 text-rose-300' : 'border-indigo-500/20 text-slate-300'}`}><div className="grid gap-1 sm:grid-cols-3"><span>Costo estimado: <strong>{creditEstimate.estimatedCredits}</strong></span><span>Saldo actual: <strong>{creditEstimate.currentBalance}</strong></span><span>Saldo después: <strong>{creditEstimate.balanceAfter}</strong></span></div>{creditEstimate.balanceAfter < 0 && <p className="mt-2">Saldo insuficiente para iniciar.</p>}</div>}
+              {creditEstimate && <div className={`rounded-xl border p-3 text-xs ${user?.role !== 'ADMIN' && creditEstimate.balanceAfter < 0 ? 'border-rose-500/30 text-rose-300' : 'border-indigo-500/20 text-slate-300'}`}>{user?.role==='ADMIN'?<p><strong>ADMIN_TEST</strong> · costo de referencia {creditEstimate.estimatedCredits}; no se descontará saldo.</p>:<><div className="grid gap-1 sm:grid-cols-3"><span>Costo estimado: <strong>{creditEstimate.estimatedCredits}</strong></span><span>Saldo actual: <strong>{creditEstimate.currentBalance}</strong></span><span>Saldo después: <strong>{creditEstimate.balanceAfter}</strong></span></div>{creditEstimate.balanceAfter < 0 && <p className="mt-2">Saldo insuficiente. Usa “Obtener créditos” en el indicador superior.</p>}</>}</div>}
               <div className="flex justify-end pt-2">
                 <button
                   onClick={handleExecute}
-                  disabled={!selectedFile || Boolean(creditEstimate && creditEstimate.balanceAfter < 0)}
+                  disabled={!selectedFile || Boolean(user?.role !== 'ADMIN' && creditEstimate && creditEstimate.balanceAfter < 0)}
                   className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
                 >
                   <Sparkles className="w-4 h-4" />
@@ -1365,6 +1358,8 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
 
                       {tool.id === "hash-generator" && (
                         <>
+                          <p className="w-full text-xs text-slate-400">Un hash es una huella unidireccional para verificar integridad; no cifra ni puede revertirse.</p>
+                          <label className="w-full cursor-pointer rounded-xl border border-dashed border-white/10 p-3 text-xs text-slate-300">{selectedFile ? `${selectedFile.name} · ${formatFileSize(selectedFile.size)} · procesamiento 100% local` : 'Seleccionar archivo (opcional; no se sube al backend)'}<input type="file" className="hidden" onChange={(e)=>setSelectedFile(e.target.files?.[0]||null)}/></label>
                           <button
                             onClick={() => handleGenerateHash("SHA-256")}
                             className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
@@ -1372,17 +1367,18 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
                             SHA-256
                           </button>
                           <button
+                            onClick={() => handleGenerateHash("SHA-384")}
+                            className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
+                          >
+                            SHA-384
+                          </button>
+                          <button
                             onClick={() => handleGenerateHash("SHA-512")}
                             className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
                           >
                             SHA-512
                           </button>
-                          <button
-                            onClick={() => handleGenerateHash("SHA-1")}
-                            className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
-                          >
-                            SHA-1
-                          </button>
+                          {textOutput && <div className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-xs"><p><strong>Origen:</strong> {selectedFile ? `${selectedFile.name} (${formatFileSize(selectedFile.size)})` : 'Texto'}</p><p><strong>Algoritmo:</strong> {hashAlgorithm}</p><p className="mt-2 break-all font-mono text-indigo-200">{textOutput}</p><button onClick={()=>copyToClipboard(textOutput)} className="mt-3 min-h-10 rounded-lg border border-white/10 px-3">Copiar hash</button></div>}
                         </>
                       )}
 
