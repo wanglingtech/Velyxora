@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   DownloadCloud,
   ArrowRight,
+  ArrowLeft,
   Shield,
   AlertTriangle,
   Play,
@@ -112,6 +113,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
+      {onBack && <button onClick={onBack} className="min-h-11 px-3 rounded-xl border border-white/10 text-sm text-slate-300 flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-indigo-400"><ArrowLeft className="w-4 h-4" />Regresar</button>}
       {/* Header */}
       <div className="text-center space-y-2 pb-4">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold">

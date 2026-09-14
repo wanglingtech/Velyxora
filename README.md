@@ -160,3 +160,8 @@ npm start
 Vite is configured only in the root `vite.config.ts`; its root is `frontend/` and its output is `dist/`. There is no second frontend Vite configuration.
 
 The current baseline includes real client PDF generation through `frontend/src/services/pdfEngine.ts`, API/media validation, and backend security/API tests. FFmpeg, LibreOffice and direct media extraction remain dependent on host binaries and are not treated as verified merely because their adapters exist.
+# Documentos Office, historial y preferencias
+
+Las conversiones `DOCX`, `XLSX`, `PPTX`, `ODT`, `ODS` y `ODP` a PDF usan un proceso real de LibreOffice headless. Configure `LIBREOFFICE_PATH` (en Windows, por ejemplo `C:\Program Files\LibreOffice\program\soffice.exe`) y opcionalmente `LIBREOFFICE_TIMEOUT_MS` (por defecto 600000). Cada job usa un perfil temporal aislado; la salida debe existir, no estar vacía y tener estructura PDF válida antes de publicarse.
+
+El historial previo a cuentas/DB es local, versionado y guarda solo metadatos. Puede desactivarse sin eliminar entradas existentes. Las preferencias y la reducción de movimiento también se guardan localmente.

@@ -1,4 +1,5 @@
 import { ProcessingJob, ProcessingStatus } from "../types";
+import { historyService } from "./historyService";
 
 type Listener = (job: ProcessingJob) => void;
 const listeners = new Set<Listener>();
@@ -7,6 +8,16 @@ const jobs = new Map<string, ProcessingJob>();
 const publish = (job: ProcessingJob): void => {
   jobs.set(job.id, job);
   listeners.forEach((listener) => listener(job));
+  if (["COMPLETED", "FAILED", "CANCELLED"].includes(job.status)) {
+    historyService.addItem({
+      id: job.id, toolId: job.toolId, toolName: job.toolName || job.toolId,
+      category: String(job.metadata?.category || "other"), status: job.status as "COMPLETED" | "FAILED" | "CANCELLED",
+      inputName: job.input?.name || "Tarea sin archivo", inputSize: job.input?.size,
+      outputName: job.output?.filename, outputSize: job.output?.size, completedAt: job.finishedAt,
+      processingLocation: job.output?.fileId || job.output?.downloadUrl ? "server" : "local",
+      outputFileId: typeof job.output?.fileId === "string" ? job.output.fileId : undefined,
+    });
+  }
 };
 
 export const jobService = {

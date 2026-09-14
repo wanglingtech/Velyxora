@@ -33,6 +33,7 @@ export async function getHealth(req: Request, res: Response): Promise<void> {
       ffmpeg: ffmpegReady,
       ffprobe: ffprobeReady,
       libreoffice: libreofficeReady,
+      libreOffice: libreofficeReady,
       storage: storageReady,
       ytDlp: ytDlpReady,
     },

@@ -33,6 +33,7 @@ export const ENV = {
   YT_DLP_PATH: process.env.YT_DLP_PATH || "yt-dlp",
   YT_DLP_TIMEOUT_MS: Number(process.env.YT_DLP_TIMEOUT_MS || 10 * 60 * 1000),
   LIBREOFFICE_PATH: process.env.LIBREOFFICE_PATH || "soffice",
+  LIBREOFFICE_TIMEOUT_MS: Number(process.env.LIBREOFFICE_TIMEOUT_MS || 10 * 60 * 1000),
   RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: 1000,
 };

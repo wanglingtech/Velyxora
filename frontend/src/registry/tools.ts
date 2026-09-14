@@ -817,10 +817,24 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     processingMode: 'SERVER_SIDE',
     engine: 'server-libreoffice',
     requiresServer: true,
-    serverEngineNotice: 'Requiere LibreOffice headless en el contenedor backend.',
+    serverEngineNotice: 'Requiere LibreOffice headless en el backend.',
     keywords: ['word', 'docx', 'pdf', 'libreoffice', 'convertir documento'],
     popular: true,
-    isClientReady: false
+    isClientReady: true
+  },
+  {
+    id: 'xlsx-to-pdf', slug: 'xlsx-to-pdf', name: 'Excel (XLSX) a PDF',
+    description: 'Convierte hojas de cálculo XLSX a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Sheet',
+    inputTypes: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'], outputTypes: ['application/pdf'],
+    processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true,
+    serverEngineNotice: 'Requiere LibreOffice headless en el backend.', keywords: ['excel', 'xlsx', 'pdf', 'libreoffice'], popular: true, isClientReady: true
+  },
+  {
+    id: 'pptx-to-pdf', slug: 'pptx-to-pdf', name: 'PowerPoint (PPTX) a PDF',
+    description: 'Convierte presentaciones PPTX a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Presentation',
+    inputTypes: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'], outputTypes: ['application/pdf'],
+    processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true,
+    serverEngineNotice: 'Requiere LibreOffice headless en el backend.', keywords: ['powerpoint', 'pptx', 'pdf', 'libreoffice'], popular: true, isClientReady: true
   },
 
   // ==================== UTILITIES ====================

@@ -170,10 +170,10 @@ export default function App() {
           )}
 
           {activeView === 'history' && (
-            <HistoryView onSelectTool={handleSelectTool} />
+            <HistoryView onSelectTool={handleSelectTool} onBack={() => handleNavigate('home')} />
           )}
 
-          {activeView === 'settings' && <SettingsView />}
+          {activeView === 'settings' && <SettingsView onBack={() => handleNavigate('home')} />}
 
           {(activeView === 'about' || activeView === 'privacy' || activeView === 'terms') && (
             <LegalView page={activeView as any} />

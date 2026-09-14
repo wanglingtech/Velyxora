@@ -1,5 +1,15 @@
 # VELYXORA — Actionable Roadmap & Engineering Next Steps
 
+## Pendientes de la fase LibreOffice + UX
+
+- [x] Validar DOCX → PDF con LibreOffice real y comprobar estructura PDF.
+- [x] Aislar perfil de LibreOffice por job e integrar AbortSignal, timeout y cleanup.
+- [x] Registrar estados terminales reales en un repositorio de historial local versionado.
+- [x] Hacer funcionales `saveHistory`, confirmación y reducción de movimiento.
+- [ ] Añadir fixtures automatizados XLSX y PPTX y ejecutar su E2E real.
+- [ ] Migrar a `ApiHistoryRepository` cuando existan autenticación y base de datos.
+- [ ] Completar una pasada manual/controlada en todos los breakpoints y rutas legales.
+
 ## FFmpeg closure
 
 - [x] Expose existing FFmpeg capabilities as public video/audio tools with typed controls.

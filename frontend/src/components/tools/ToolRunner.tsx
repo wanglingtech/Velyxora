@@ -639,10 +639,11 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="p-2 rounded-xl bg-[#101218] border border-white/[0.08] hover:bg-[#161922] text-slate-300 hover:text-white transition-colors"
-            title="Volver"
+            className="min-h-11 px-3 rounded-xl bg-[#101218] border border-white/[0.08] hover:bg-[#161922] text-slate-300 hover:text-white transition-colors flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-indigo-400"
+            aria-label="Regresar a la pantalla anterior"
           >
             <ArrowLeft className="w-4 h-4" />
+            <span className="text-xs">Regresar</span>
           </button>
           <div>
             <div className="flex items-center gap-2">

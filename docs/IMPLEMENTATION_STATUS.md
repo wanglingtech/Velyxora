@@ -1,5 +1,18 @@
 # VELYXORA — Tool Implementation Status Matrix
 
+## Fase LibreOffice + UX funcional (2026-09-13)
+
+| Área | Estado | Evidencia/limitación |
+| :-- | :-- | :-- |
+| DOCX → PDF | `COMPLETE` | LibreOffice 26.8.0.3, prueba real y validación PDF |
+| XLSX/PPTX → PDF | `PARTIAL` | rutas públicas y motor real; falta fixture E2E automatizado |
+| ODT/ODS/ODP → PDF | `PARTIAL` | motor acepta estos formatos; sin herramientas públicas dedicadas |
+| Cancelación/timeout/cleanup | `COMPLETE` | AbortSignal, límite configurable, perfil aislado por job y limpieza final |
+| Historial local | `COMPLETE` | repositorio versionado, ciclo terminal central, filtros y borrado |
+| Preferencias locales | `COMPLETE` | validación, update/reset, saveHistory, confirmación y movimiento reducido |
+| Persistencia en cuenta/DB | `NOT_IMPLEMENTED` | fuera de alcance hasta autenticación |
+
+
 ## FFmpeg closure status
 
 This section supersedes older FFmpeg rows below. Every `COMPLETE` row is visible in the registry and has a real HTTP integration path covering upload, job, FFmpeg, FFprobe, completed output, attachment download and cleanup.

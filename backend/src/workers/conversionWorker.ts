@@ -98,7 +98,15 @@ conversionQueue.process(async (jobId: string, data: any) => {
       logger.info(`Job [${jobId}] FFmpeg process cancelled and cleaned up.`);
     } else {
       logger.error(`Job [${jobId}] failed during execution: ${err.message}`);
-      jobManager.setStatus(jobId, 'FAILED', err.message);
+      const publicMessages: Record<string, string> = {
+        LIBREOFFICE_UNAVAILABLE: 'El motor de documentos no está disponible.',
+        LIBREOFFICE_TIMEOUT: 'El procesamiento tardó demasiado y fue cancelado.',
+        DOCUMENT_INVALID: 'El archivo parece estar dañado o no es compatible.',
+        DOCUMENT_FORMAT_UNSUPPORTED: 'El formato del documento no es compatible.',
+        DOCUMENT_CONVERSION_FAILED: 'El documento no pudo convertirse.',
+        PDF_VALIDATION_FAILED: 'El documento no pudo convertirse en un PDF válido.',
+      };
+      jobManager.setStatus(jobId, 'FAILED', publicMessages[err.message] || 'El archivo no pudo procesarse.');
     }
   } finally {
     if (job.input.fileId) storageService.deleteFile(job.input.fileId);

@@ -88,10 +88,17 @@ export interface HistoryItem {
   inputSize?: number;
   outputSize?: number;
   timestamp: number;
+  category?: string;
+  status: "COMPLETED" | "FAILED" | "CANCELLED";
+  outputName?: string;
+  completedAt?: number;
+  processingLocation: "local" | "server";
+  outputFileId?: string;
   [key: string]: unknown;
 }
 
 export interface UserSettings {
+  version: 2;
   language: "es" | "en";
   theme: "dark" | "light" | "system";
   imageQuality: number;
@@ -99,4 +106,6 @@ export interface UserSettings {
   videoQuality: "original" | "1080p" | "720p";
   preferLocalProcessing: boolean;
   reducedMotion: boolean;
+  saveHistory: boolean;
+  confirmBeforeClearHistory: boolean;
 }
