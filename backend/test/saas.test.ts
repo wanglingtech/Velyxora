@@ -12,6 +12,7 @@ import { normalizePeruPhone, paymentService } from '../src/services/paymentServi
 import { prisma } from '../src/db/prisma';
 import { authService, identityHash, SESSION_COOKIE } from '../src/services/authService';
 import { randomUUID } from 'node:crypto';
+import { seedInitialData } from '../src/services/seedService';
 
 test('anon en endpoint USER protegido recibe 401', async () => {
   const response = await request(createBackendApp()).get('/api/auth/me');
@@ -28,6 +29,41 @@ test('autorización USER→ADMIN 403 y ADMIN permitido', () => {
 test('password usa scrypt con salt y valida sin texto plano', async () => {
   const a = await hashPassword('Una-clave-segura-123'); const b = await hashPassword('Una-clave-segura-123');
   assert.notEqual(a, b); assert.equal(a.includes('Una-clave'), false); assert.equal(await verifyPassword('Una-clave-segura-123', a), true); assert.equal(await verifyPassword('incorrecta', a), false);
+});
+
+test('seed admin crea, diagnostica mismatch y solo rota password con opt-in explícito', async () => {
+  const suffix = randomUUID();
+  const email = `seed-admin-${suffix}@example.invalid`;
+  const initialPassword = 'Admin-inicial-seguro-123';
+  const replacementPassword = 'Admin-reemplazo-seguro-456';
+  try {
+    const created = await seedInitialData(prisma, { email, password: initialPassword });
+    assert.equal(created.action, 'CREATED');
+    assert.equal(created.role, 'ADMIN');
+    assert.equal(created.status, 'ACTIVE');
+    assert.equal(created.passwordMatches, true);
+
+    const before = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const mismatch = await seedInitialData(prisma, { email, password: replacementPassword });
+    const unchanged = await prisma.user.findUniqueOrThrow({ where: { email } });
+    assert.equal(mismatch.action, 'EXISTING');
+    assert.equal(mismatch.passwordMatches, false);
+    assert.equal(unchanged.passwordHash, before.passwordHash);
+    assert.equal(await verifyPassword(initialPassword, unchanged.passwordHash), true);
+
+    const updated = await seedInitialData(prisma, { email, password: replacementPassword, updateExistingPassword: true });
+    const after = await prisma.user.findUniqueOrThrow({ where: { email } });
+    assert.equal(updated.action, 'PASSWORD_UPDATED_EXPLICITLY');
+    assert.equal(updated.passwordMatches, true);
+    assert.notEqual(after.passwordHash, before.passwordHash);
+    assert.equal(await verifyPassword(replacementPassword, after.passwordHash), true);
+  } finally {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user) {
+      await prisma.userPlan.deleteMany({ where: { userId: user.id } });
+      await prisma.user.delete({ where: { id: user.id } });
+    }
+  }
 });
 
 test('referencia Yape Perú acepta solo nueve dígitos y normaliza bordes', () => {

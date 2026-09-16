@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { prisma } from '../db/prisma';
 import { hashPassword, verifyPassword } from '../security/password';
+import { logger } from '../utils/logger';
 
 export const SESSION_COOKIE = 'velyxora_session';
 const hashToken = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -28,8 +29,19 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const user = await prisma.user.findUnique({ where: { email: normalizeEmail(email) } });
-    if (!user || !(await verifyPassword(password, user.passwordHash))) throw new Error('Credenciales inválidas.');
-    if (user.status !== 'ACTIVE') throw new Error('Cuenta suspendida.');
+    if (!user) {
+      logger.warn('AUTH_LOGIN_REJECTED', { reason: 'USER_NOT_FOUND' });
+      throw new Error('Credenciales inválidas.');
+    }
+    const passwordMatches = await verifyPassword(password, user.passwordHash).catch(() => false);
+    if (!passwordMatches) {
+      logger.warn('AUTH_LOGIN_REJECTED', { reason: 'PASSWORD_MISMATCH', role: user.role, status: user.status });
+      throw new Error('Credenciales inválidas.');
+    }
+    if (user.status !== 'ACTIVE') {
+      logger.warn('AUTH_LOGIN_REJECTED', { reason: 'STATUS_NOT_ACTIVE', role: user.role, status: user.status });
+      throw new Error('Cuenta suspendida.');
+    }
     return this.createSession(user.id);
   }
 
