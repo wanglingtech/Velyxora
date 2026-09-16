@@ -1,5 +1,8 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY prisma ./prisma
@@ -18,7 +21,7 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci --omit=dev && npx prisma generate && npm cache clean --force
 COPY --from=build /app/backend/dist ./backend/dist
-RUN mkdir -p /tmp/velyxora/uploads /tmp/velyxora/results && chown -R node:node /app /tmp/velyxora
+RUN mkdir -p /tmp/velyxora/uploads /tmp/velyxora/results && chown -R node:node /tmp/velyxora
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
