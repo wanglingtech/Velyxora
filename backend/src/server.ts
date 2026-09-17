@@ -2,6 +2,7 @@ import { backendApp } from "./app";
 import { ENV } from "./config/env";
 import { logger } from "./utils/logger";
 import { prisma } from "./db/prisma";
+import { ytDlpService } from "./services/ytDlpService";
 
 const PORT = ENV.PORT;
 
@@ -11,6 +12,7 @@ const server = backendApp.listen(PORT, "0.0.0.0", () => {
   logger.info(`FFmpeg path: ${ENV.FFMPEG_PATH}`);
   logger.info(`FFprobe path: ${ENV.FFPROBE_PATH}`);
   logger.info(`Storage dir: ${ENV.STORAGE_DIR}`);
+  void ytDlpService.getVersion().then((version) => logger.info('YT_DLP_DIAGNOSTIC', { version: version || 'unavailable' }));
 });
 
 let shuttingDown = false;

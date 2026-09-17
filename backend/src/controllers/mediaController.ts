@@ -3,6 +3,7 @@ import { mediaService } from '../services/mediaService';
 import { HTTP_STATUS } from '../config/constants';
 import { mediaDownloadService } from '../services/mediaDownloadService';
 import { providerPolicyService } from '../services/providerPolicyService';
+import { YtDlpError } from '../services/ytDlpService';
 
 export async function analyzeMedia(req: Request, res: Response): Promise<void> {
   const { url } = req.body;
@@ -41,7 +42,7 @@ export async function analyzeMedia(req: Request, res: Response): Promise<void> {
     res.status(HTTP_STATUS.UNPROCESSABLE_ENTITY).json({
       success: false,
       error: {
-        code: 'ANALYSIS_FAILED',
+        code: err instanceof YtDlpError ? err.code : 'ANALYSIS_FAILED',
         message: err.message,
       },
       timestamp: new Date().toISOString(),

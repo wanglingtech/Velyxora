@@ -9,11 +9,11 @@ import { ytDlpService } from '../services/ytDlpService';
 import { prisma } from '../db/prisma';
 
 export async function getHealth(req: Request, res: Response): Promise<void> {
-  const [ffmpegReady, ffprobeReady, libreofficeReady, ytDlpReady, databaseReady] = await Promise.all([
+  const [ffmpegReady, ffprobeReady, libreofficeReady, ytDlpVersion, databaseReady] = await Promise.all([
     serverFFmpegEngine.isAvailable(),
     isFfprobeAvailable(),
     libreOfficeEngine.isAvailable(),
-    ytDlpService.isAvailable(),
+    ytDlpService.getVersion(),
     prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
   ]);
 
@@ -37,9 +37,10 @@ export async function getHealth(req: Request, res: Response): Promise<void> {
       ffprobe: ffprobeReady,
       libreOffice: libreofficeReady,
       storage: storageReady,
-      ytDlp: ytDlpReady,
+      ytDlp: Boolean(ytDlpVersion),
       database: databaseReady,
     },
+    diagnostics: { ytDlpVersion },
     timestamp: new Date().toISOString(),
   });
 }

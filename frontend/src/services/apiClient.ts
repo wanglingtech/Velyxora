@@ -10,6 +10,9 @@ export interface BackendHealth {
     ytDlp: boolean;
     database: boolean;
   };
+  diagnostics?: {
+    ytDlpVersion: string | null;
+  };
 }
 
 export interface UploadResponse {

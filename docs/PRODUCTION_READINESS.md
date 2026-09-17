@@ -31,6 +31,10 @@ The beta file flow is `upload -> processing -> result -> download -> TTL cleanup
 
 Provider targets can change, so copy the values displayed by Vercel and Railway rather than hardcoding example records.
 
+## yt-dlp maintenance
+
+The Docker image installs the official `yt-dlp` release pinned by `YT_DLP_VERSION` and `YT_DLP_SHA256` build arguments. The build verifies both checksum and reported version; runtime self-updates (`yt-dlp -U`) are intentionally disabled. When an extractor update is required, update the version and checksum together from the official release assets, rebuild the image, verify `/api/health` reports the expected `diagnostics.ytDlpVersion`, and test each affected allowlisted provider independently.
+
 ## Release checks
 
 Run `npm run typecheck`, `npm run lint`, `npm test`, `npm run build:frontend`, `npm run build:backend`, `npx prisma validate`, `npx prisma generate`, `npx prisma migrate status`, and `git diff --check`. When Docker is available, build the image and test `/api/health` plus PostgreSQL, FFmpeg, FFprobe, LibreOffice, yt-dlp, media conversion, and Office conversion inside the container.

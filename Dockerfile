@@ -34,6 +34,9 @@ RUN npx esbuild prisma/seed.ts \
 
 FROM node:22-bookworm-slim AS runtime
 
+ARG YT_DLP_VERSION=2026.08.19
+ARG YT_DLP_SHA256=1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6
+
 ENV NODE_ENV=production \
     PORT=3000 \
     TEMP_DIR=/tmp/velyxora/uploads \
@@ -50,8 +53,16 @@ RUN apt-get update \
         libreoffice-writer \
         libreoffice-calc \
         libreoffice-impress \
-        yt-dlp \
+        ca-certificates \
+        curl \
+        python3 \
         fonts-dejavu-core \
+    && curl --fail --show-error --silent --location \
+        "https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/yt-dlp" \
+        --output /usr/local/bin/yt-dlp \
+    && echo "${YT_DLP_SHA256}  /usr/local/bin/yt-dlp" | sha256sum --check --strict \
+    && chmod 0755 /usr/local/bin/yt-dlp \
+    && test "$(/usr/local/bin/yt-dlp --version)" = "${YT_DLP_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
