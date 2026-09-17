@@ -13,7 +13,9 @@ import { prisma } from '../src/db/prisma';
 import { authService, identityHash, SESSION_COOKIE } from '../src/services/authService';
 import { randomUUID } from 'node:crypto';
 import { seedInitialData } from '../src/services/seedService';
-import { isSafeRedirectTarget } from '../src/services/shortLinkService';
+import { isSafeRedirectTarget, validateShortLinkTarget } from '../src/services/shortLinkService';
+import { validateUploadMetadata } from '../src/security/uploadPolicy';
+import { effectiveUploadLimit } from '../src/middleware/uploadHandler';
 
 test('anon en endpoint USER protegido recibe 401', async () => {
   const response = await request(createBackendApp()).get('/api/auth/me');
@@ -84,6 +86,7 @@ test('shortener distingue resolución, expiración y conserva destinos completos
     const created = await request(app).post('/api/links').send({ url: targetUrl, expiresInDays: 365 });
     assert.equal(created.status, 201);
     activeSlug = created.body.data.slug;
+    assert.ok(activeSlug.length >= 16, 'los slugs nuevos deben contener al menos 96 bits base64url');
     assert.equal(created.body.data.targetUrl, targetUrl);
     const expiresAt = new Date(created.body.data.expiresAt).getTime();
     assert.ok(expiresAt >= before + 365 * 86400000 - 2000 && expiresAt <= Date.now() + 365 * 86400000 + 2000);
@@ -105,6 +108,40 @@ test('shortener rechaza esquemas peligrosos sin solicitar el destino', () => {
   assert.equal(isSafeRedirectTarget('https://example.com/path?a=1&b=2#ok'), true);
   assert.equal(isSafeRedirectTarget('http://example.com'), true);
   for (const target of ['javascript:alert(1)', 'data:text/html,x', 'file:///etc/passwd', 'ftp://example.com/x', 'vbscript:msgbox(1)']) assert.equal(isSafeRedirectTarget(target), false);
+});
+
+test('shortener universal valida solo sintaxis/protocolo sin DNS ni allowlist temática', () => {
+  assert.equal(validateShortLinkTarget('https://dominio-desconocido.invalid/ruta?x=1#fragmento').valid, true);
+  assert.equal(validateShortLinkTarget('https://adult.example/contenido').valid, true);
+  assert.equal(validateShortLinkTarget(`https://example.com/${'a'.repeat(5000)}`).valid, false);
+  assert.equal(validateShortLinkTarget('https://example.com/ok\u0000no').valid, false);
+});
+
+test('shortener distingue enlace deshabilitado y reportes no lo deshabilitan automáticamente', async () => {
+  const slug = `d${randomUUID().replace(/-/g, '').slice(0, 15)}`;
+  const link = await prisma.shortLink.create({ data: { slug, targetUrl: 'https://example.invalid/' } });
+  try {
+    const app = createBackendApp();
+    const report = await request(app).post(`/api/links/${slug}/reports`).send({ category: 'PHISHING', detail: 'Reporte controlado de prueba' });
+    assert.equal(report.status, 201);
+    assert.equal((await prisma.shortLink.findUniqueOrThrow({ where: { slug } })).status, 'ACTIVE');
+    await prisma.shortLink.update({ where: { id: link.id }, data: { status: 'DISABLED', disabledAt: new Date(), disabledReason: 'Moderación de prueba' } });
+    const resolved = await request(app).get(`/api/links/${slug}`);
+    assert.equal(resolved.status, 410);
+    assert.equal(resolved.body.error.code, 'SHORT_LINK_DISABLED');
+  } finally { await prisma.shortLinkReport.deleteMany({ where: { shortLinkId: link.id } }); await prisma.shortLink.delete({ where: { id: link.id } }); }
+});
+
+test('CSRF de sesión permanece estable entre pestañas', async () => {
+  const email = `csrf-${randomUUID()}@example.invalid`;
+  const user = await prisma.user.create({ data: { email, passwordHash: 'test-only', displayName: 'CSRF Test' } });
+  const session = await authService.createSession(user.id);
+  try {
+    const first = await authService.getOrCreateCsrf((await authService.resolve(session.token))!.id, session.csrf);
+    const second = await authService.getOrCreateCsrf((await authService.resolve(session.token))!.id, (await authService.resolve(session.token))!.csrfToken);
+    assert.equal(first, second);
+    assert.equal(authService.verifyCsrf((await authService.resolve(session.token))!, first), true);
+  } finally { await prisma.session.deleteMany({ where: { userId: user.id } }); await prisma.user.delete({ where: { id: user.id } }); }
 });
 
 test('API del shortener rechaza protocolos peligrosos', async () => {
@@ -151,6 +188,33 @@ test('planes y costos: FREE existe, LOCAL cero y SERVER escala por tamaño', () 
   assert.equal(creditCostService.estimate('json-formatter', 10).estimatedCredits, 0);
   assert.equal(creditCostService.estimate('video-to-mp3', 1).estimatedCredits, 2);
   assert.equal(creditCostService.estimate('video-to-mp3', 60 * 1024 * 1024).estimatedCredits, 4);
+});
+
+test('límites efectivos separan ADMIN local de ADMIN producción sin alterar planes', () => {
+  const productionHardLimit = 100 * 1024 * 1024;
+  const localAdminHardLimit = 1024 * 1024 * 1024;
+  assert.equal(PLAN_CONFIG.FREE.monthlyCredits, 25);
+  assert.equal(PLAN_CONFIG.PLUS.monthlyCredits, 300);
+  assert.equal(PLAN_CONFIG.PRO.monthlyCredits, 1200);
+  assert.equal(effectiveUploadLimit(PLAN_CONFIG.FREE.maxUploadSize, false, productionHardLimit, 'development', localAdminHardLimit), PLAN_CONFIG.FREE.maxUploadSize);
+  assert.equal(effectiveUploadLimit(PLAN_CONFIG.PRO.maxUploadSize, false, productionHardLimit, 'development', localAdminHardLimit), productionHardLimit);
+  assert.equal(effectiveUploadLimit(PLAN_CONFIG.FREE.maxUploadSize, true, productionHardLimit, 'development', localAdminHardLimit), localAdminHardLimit);
+  assert.equal(effectiveUploadLimit(PLAN_CONFIG.FREE.maxUploadSize, true, productionHardLimit, 'production', localAdminHardLimit), productionHardLimit);
+});
+
+test('política backend vincula formato a herramienta sin depender de accept', () => {
+  assert.equal(validateUploadMetadata('word-to-pdf', 'document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document').valid, true);
+  assert.equal(validateUploadMetadata('word-to-pdf', 'video.mp4', 'video/mp4').valid, false);
+  assert.equal(validateUploadMetadata('video-to-mp3', 'document.pdf', 'application/pdf').valid, false);
+  assert.equal(validateUploadMetadata('mp4-to-webm', 'video.webm', 'video/webm').valid, false);
+});
+
+test('bypass comercial ADMIN no altera la validación de seguridad por herramienta', () => {
+  assert.equal(validateUploadMetadata('word-to-pdf', 'video.mp4', 'video/mp4').valid, false);
+  assert.equal(validateUploadMetadata('word-to-pdf', 'document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document').valid, true);
+  assert.equal(validateUploadMetadata('video-to-mp3', 'document.pdf', 'application/pdf').valid, false);
+  assert.equal(validateUploadMetadata('audio-normalize', 'payload.exe', 'application/octet-stream').valid, false);
+  assert.equal(validateUploadMetadata('audio-normalize', 'recording.mp3', 'audio/mpeg').valid, true);
 });
 
 test('policy permite allowlist y bloquea adulto, desconocido y subdominio engañoso', () => {

@@ -3,7 +3,7 @@ import { ExternalLink, Link2Off } from 'lucide-react';
 import { ApiError, apiClient } from '../../services/apiClient';
 
 export function ShortLinkView({ slug, onHome }: { slug: string; onHome: () => void }) {
-  const [state, setState] = useState<'loading' | 'missing' | 'expired' | 'unsafe' | 'error'>('loading');
+  const [state, setState] = useState<'loading' | 'missing' | 'expired' | 'disabled' | 'unsafe' | 'error'>('loading');
 
   useEffect(() => {
     let active = true;
@@ -16,6 +16,7 @@ export function ShortLinkView({ slug, onHome }: { slug: string; onHome: () => vo
       if (!active) return;
       if (error instanceof ApiError && error.code === 'SHORT_LINK_NOT_FOUND') setState('missing');
       else if (error instanceof ApiError && error.code === 'SHORT_LINK_EXPIRED') setState('expired');
+      else if (error instanceof ApiError && error.code === 'SHORT_LINK_DISABLED') setState('disabled');
       else if (error instanceof ApiError && error.code === 'SHORT_LINK_UNSAFE') setState('unsafe');
       else setState('error');
     });
@@ -24,6 +25,8 @@ export function ShortLinkView({ slug, onHome }: { slug: string; onHome: () => vo
 
   const copy = state === 'expired'
     ? ['Este enlace expiró', 'La fecha de vigencia terminó y el destino ya no está disponible.']
+    : state === 'disabled'
+      ? ['Enlace deshabilitado', 'Este enlace ha sido deshabilitado.']
     : state === 'missing'
       ? ['Enlace no encontrado', 'El código no existe o fue escrito incorrectamente.']
       : state === 'unsafe'

@@ -384,6 +384,17 @@ export function AccountView({ onBack }: { onBack: () => void }) {
             />
           </div>
           <p className="break-all text-sm text-slate-400">{data.email}</p>
+          {data.capabilities?.localAdminMode && <p className="rounded-xl border border-indigo-400/20 bg-indigo-400/5 p-3 text-sm text-indigo-200">Modo administrador local: los límites comerciales y el consumo de créditos están desactivados; las protecciones técnicas y de formato permanecen activas.</p>}
+          {data.plan && <details className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
+            <summary className="cursor-pointer font-semibold text-white">Ver beneficios y límites del plan {data.plan.code}</summary>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <span>✓ {data.capabilities?.localAdminMode ? 'Sin consumo comercial de créditos' : `${data.plan.monthlyCredits} créditos mensuales`}</span>
+              <span>✓ Hasta {data.plan.maxConcurrentJobs} {data.plan.maxConcurrentJobs === 1 ? 'proceso' : 'procesos'} simultáneos</span>
+              <span>✓ Tamaño máximo actual: {formatBytes(data.capabilities?.effectiveMaxUploadSize ?? data.plan.maxUploadSize)}</span>
+              <span>✓ Historial: {data.plan.historyRetention == null ? 'sin vencimiento configurado' : `${data.plan.historyRetention} días`}</span>
+            </div>
+            {!data.capabilities?.localAdminMode && data.plan.maxUploadSize > (data.capabilities?.effectiveMaxUploadSize ?? data.plan.maxUploadSize) && <p className="mt-3 text-xs text-amber-300">La capacidad del plan es {formatBytes(data.plan.maxUploadSize)}; el tamaño máximo disponible actualmente es {formatBytes(data.capabilities?.effectiveMaxUploadSize)}.</p>}
+          </details>}
           <AccountList
             title="Ledger reciente"
             empty="No hay movimientos de créditos."
@@ -675,6 +686,7 @@ export function AdminView({ onBack }: { onBack: () => void }) {
   const [payments, setPayments] = useState<any[]>([]);
   const [complaints, setComplaints] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [shortLinkReports, setShortLinkReports] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [query, setQuery] = useState("");
@@ -688,12 +700,14 @@ export function AdminView({ onBack }: { onBack: () => void }) {
       apiClient.auth.adminPayments(),
       apiClient.auth.adminComplaints(),
       apiClient.auth.adminSuggestions(),
-    ]).then(([d, u, p, c, s]) => {
+      apiClient.auth.adminShortLinkReports(),
+    ]).then(([d, u, p, c, s, reports]) => {
       setDashboard(d);
       setUsers(u);
       setPayments(p);
       setComplaints(c);
       setSuggestions(s);
+      setShortLinkReports(reports);
       setError("");
     });
   const refresh = async () => {
@@ -785,6 +799,13 @@ export function AdminView({ onBack }: { onBack: () => void }) {
     } finally {
       setBusy("");
     }
+  };
+  const moderateLink = async (item: any, action: 'DISABLE' | 'ENABLE') => {
+    const reason = window.prompt(action === 'DISABLE' ? 'Motivo para deshabilitar el enlace' : 'Motivo para reactivar el enlace');
+    if (!reason || busy) return;
+    setBusy(item.id);
+    try { await apiClient.auth.moderateShortLink(item.shortLink.slug, action, reason); await apiClient.auth.reviewShortLinkReport(item.id, 'REVIEWED'); await load(); }
+    catch (e: any) { setError(e.message); } finally { setBusy(''); }
   };
   const filteredUsers = useMemo(
     () =>
@@ -1026,6 +1047,15 @@ export function AdminView({ onBack }: { onBack: () => void }) {
             {dashboard?.pendingComplaints ?? 0}
           </span>
         </h2>
+        <h2 className="mt-10 font-semibold">Reportes de enlaces cortos</h2>
+        <div className="mt-3 grid gap-3">
+          {shortLinkReports.filter((item) => item.status === 'PENDING').map((item) => <article key={item.id} className="rounded-xl border border-white/5 bg-black/20 p-4 text-sm">
+            <p><strong>{item.category}</strong> · /s/{item.shortLink.slug}</p>
+            {item.detail && <p className="mt-1 text-slate-400">{item.detail}</p>}
+            <div className="mt-3 flex gap-2"><button disabled={Boolean(busy)} onClick={() => moderateLink(item, 'DISABLE')} className="min-h-10 rounded-lg border border-rose-500/30 px-3 text-xs text-rose-300">Deshabilitar</button><button disabled={Boolean(busy)} onClick={async () => { setBusy(item.id); try { await apiClient.auth.reviewShortLinkReport(item.id, 'DISMISSED'); await load(); } catch (e: any) { setError(e.message); } finally { setBusy(''); } }} className="min-h-10 rounded-lg border border-white/15 px-3 text-xs">Descartar reporte</button></div>
+          </article>)}
+          {!shortLinkReports.some((item) => item.status === 'PENDING') && <p className="rounded-xl bg-black/20 p-4 text-sm text-slate-400">No hay reportes pendientes.</p>}
+        </div>
         <div className="mt-3 grid gap-3">
           {complaints.map((item) => (
             <article

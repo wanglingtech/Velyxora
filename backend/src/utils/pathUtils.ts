@@ -9,7 +9,7 @@ export function assertSafePath(baseDir: string, targetPath: string): string {
   const resolvedBase = path.resolve(baseDir);
   const resolvedTarget = path.resolve(targetPath);
 
-  if (!resolvedTarget.startsWith(resolvedBase)) {
+  if (resolvedTarget !== resolvedBase && !resolvedTarget.startsWith(`${resolvedBase}${path.sep}`)) {
     throw new Error(`Security Exception: Access denied to path outside boundary: ${targetPath}`);
   }
 

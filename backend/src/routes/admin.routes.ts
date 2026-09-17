@@ -5,8 +5,10 @@ import { creditLedgerService } from "../services/creditLedgerService";
 import { paymentService } from "../services/paymentService";
 import { randomUUID } from "node:crypto";
 import { identityHash } from "../services/authService";
+import { adminMutationLimit } from '../security/routeLimits';
 const router = Router();
 router.use(requireAuth, requireRole("ADMIN"));
+router.use((req, res, next) => ['POST','PUT','PATCH','DELETE'].includes(req.method) ? adminMutationLimit(req, res, next) : next());
 const hasMarkup = (value: string) => /<[^>]*>|javascript:/i.test(value);
 
 router.get("/dashboard", async (_req, res) => {
@@ -384,4 +386,32 @@ router.get("/audit", async (_req, res) =>
     }),
   }),
 );
+
+router.get('/short-links/reports', async (req, res) => {
+  const take = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+  const reports = await prisma.shortLinkReport.findMany({ orderBy: { createdAt: 'desc' }, take, include: { shortLink: { select: { slug: true, status: true, createdAt: true } } } });
+  res.json({ success: true, data: reports });
+});
+
+router.patch('/short-links/:slug/moderation', async (req, res) => {
+  const action = String(req.body?.action || '');
+  const reason = String(req.body?.reason || '').trim();
+  if (!['DISABLE','ENABLE'].includes(action) || reason.length < 3 || reason.length > 500) { res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Acción y razón válidas requeridas.' } }); return; }
+  const link = await prisma.shortLink.findUnique({ where: { slug: req.params.slug } });
+  if (!link) { res.status(404).json({ success: false, error: { code: 'SHORT_LINK_NOT_FOUND', message: 'Enlace no encontrado.' } }); return; }
+  const updated = await prisma.$transaction(async (tx) => {
+    const value = await tx.shortLink.update({ where: { id: link.id }, data: action === 'DISABLE' ? { status: 'DISABLED', disabledAt: new Date(), disabledReason: reason } : { status: 'ACTIVE', disabledAt: null, disabledReason: null } });
+    await tx.adminAuditLog.create({ data: { adminId: req.auth!.userId, targetUserId: link.userId, action: `SHORT_LINK_${action}D`, reason, metadata: { slug: link.slug } } });
+    return value;
+  });
+  res.json({ success: true, data: { slug: updated.slug, status: updated.status } });
+});
+
+router.patch('/short-links/reports/:id', async (req, res) => {
+  const status = String(req.body?.status || '');
+  if (!['REVIEWED','DISMISSED'].includes(status)) { res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Estado de reporte inválido.' } }); return; }
+  const report = await prisma.shortLinkReport.update({ where: { id: req.params.id }, data: { status: status as any, reviewedBy: req.auth!.userId, reviewedAt: new Date() } });
+  await prisma.adminAuditLog.create({ data: { adminId: req.auth!.userId, action: 'SHORT_LINK_REPORT_REVIEWED', reason: `Reporte ${status}`, metadata: { reportId: report.id, shortLinkId: report.shortLinkId } } });
+  res.json({ success: true, data: report });
+});
 export default router;

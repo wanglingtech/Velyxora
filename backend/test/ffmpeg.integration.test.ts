@@ -20,7 +20,7 @@ const run = (binary: string, args: string[]) => new Promise<void>((resolve, reje
 });
 
 async function e2eConvert(inputPath: string, inputName: string, mime: string, toolId: string, targetFormat: string, options: Record<string, unknown>, expectedMime: RegExp) {
-  const upload = await request(backendApp).post("/api/uploads").attach("file", inputPath, { filename: inputName, contentType: mime });
+  const upload = await request(backendApp).post(`/api/uploads?toolId=${encodeURIComponent(toolId)}`).attach("file", inputPath, { filename: inputName, contentType: mime });
   assert.equal(upload.status, 201);
   const started = await request(backendApp).post("/api/conversions").send({ fileId: upload.body.data.fileId, toolId, targetFormat, options });
   assert.equal(started.status, 202, started.body?.error?.message);
@@ -127,7 +127,7 @@ test("real FFmpeg/FFprobe conversions, cancellation, timeout and HTTP download",
     assert.match((await e2eConvert(video, "video.mp4", "video/mp4", "mp4-to-webm", "webm", {}, /video\/webm/)).format, /webm/);
     assert.match((await e2eConvert(webm, "video.webm", "video/webm", "webm-to-mp4", "mp4", {}, /video\/mp4/)).format, /mp4/);
 
-    const cancelUpload = await request(backendApp).post("/api/uploads").attach("file", video, { filename: "cancel-video.mp4", contentType: "video/mp4" });
+    const cancelUpload = await request(backendApp).post("/api/uploads?toolId=video-compressor").attach("file", video, { filename: "cancel-video.mp4", contentType: "video/mp4" });
     const cancelFileId = cancelUpload.body.data.fileId;
     const cancelStarted = await request(backendApp).post("/api/conversions").send({ fileId: cancelFileId, toolId: "video-compressor", targetFormat: "mp4", options: { quality: 100 } });
     const cancelledResponse = await request(backendApp).delete(`/api/conversions/${cancelStarted.body.data.id}`);

@@ -33,6 +33,27 @@ test("GET /api/health returns valid health schema and dynamic service status", a
   assert.strictEqual(body.services.storage, true);
 });
 
+test('security headers y cache privado se aplican sin exponer datos', async () => {
+  const health = await request(backendApp).get('/api/health');
+  assert.strictEqual(health.headers['x-content-type-options'], 'nosniff');
+  assert.match(health.headers['content-security-policy'], /frame-ancestors 'none'/);
+  const privateResponse = await request(backendApp).get('/api/auth/me');
+  assert.match(privateResponse.headers['cache-control'], /no-store/);
+});
+
+test('login de producción exige JSON y origen configurado', async () => {
+  const previous = ENV.NODE_ENV;
+  (ENV as any).NODE_ENV = 'production';
+  try {
+    const missingOrigin = await request(backendApp).post('/api/auth/login').set('Content-Type', 'application/json').send({ email: 'nobody@example.invalid', password: 'not-a-password' });
+    assert.strictEqual(missingOrigin.status, 403);
+    assert.strictEqual(missingOrigin.body.error.code, 'ORIGIN_FORBIDDEN');
+    const form = await request(backendApp).post('/api/auth/login').set('Origin', ENV.CORS_ORIGINS[0]).type('form').send({ email: 'x', password: 'x' });
+    assert.strictEqual(form.status, 415);
+    assert.strictEqual(form.body.error.code, 'CONTENT_TYPE_REQUIRED');
+  } finally { (ENV as any).NODE_ENV = previous; }
+});
+
 test("CORS permits the local frontend on health and auth preflight", async () => {
   const origin = "http://localhost:5173";
   const health = await request(backendApp).get("/api/health").set("Origin", origin);
@@ -96,36 +117,26 @@ test("POST /api/media/analyze validates malformed input", async () => {
   assert.strictEqual(res.body.success, false);
 });
 
-test("upload stores a real fixture and rejects a conversion with an unsupported route", async () => {
+test("upload rejects a file not allowed by the selected tool", async () => {
   const fixture = Buffer.from("real fixture bytes");
   const upload = await request(backendApp)
-    .post("/api/uploads")
+    .post("/api/uploads?toolId=word-to-pdf")
     .attach("file", fixture, { filename: "fixture.txt", contentType: "text/plain" });
-  assert.strictEqual(upload.status, 201);
-  assert.ok(upload.body.data.fileId);
-  try {
-    const conversion = await request(backendApp).post("/api/conversions").send({
-      fileId: upload.body.data.fileId,
-      toolId: "unsupported-test",
-      targetFormat: "mp3",
-    });
-    assert.strictEqual(conversion.status, 422);
-    assert.strictEqual(conversion.body.success, false);
-  } finally {
-    storageService.deleteFile(upload.body.data.fileId);
-  }
+  assert.strictEqual(upload.status, 415);
+  assert.strictEqual(upload.body.error.code, 'INVALID_FORMAT');
 });
 
 test("upload returns a schema-safe opaque fileId for complex filenames", async () => {
   const upload = await request(backendApp)
-    .post("/api/uploads")
-    .attach("file", Buffer.from("video bytes"), {
+    .post("/api/uploads?toolId=video-compressor")
+    .attach("file", Buffer.from([0,0,0,0,0x66,0x74,0x79,0x70,0,0,0,0]), {
       filename: "recording final.v2.mp4",
       contentType: "video/mp4",
     });
 
   assert.strictEqual(upload.status, 201);
   assert.match(upload.body.data.fileId, /^[a-zA-Z0-9_-]+$/);
+  assert.match(upload.body.data.filename, /^[0-9a-f-]{36}-recording final\.v2\.mp4$/i);
   assert.strictEqual(upload.body.data.originalName, "recording final.v2.mp4");
   storageService.deleteFile(upload.body.data.fileId);
 });

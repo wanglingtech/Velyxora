@@ -61,6 +61,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   );
   const [activeJob, setActiveJob] = useState<ProcessingJob | null>(null);
   const [creditEstimate, setCreditEstimate] = useState<{ estimatedCredits: number; currentBalance: number; balanceAfter: number } | null>(null);
+  const [uploadCapability, setUploadCapability] = useState<{ effectiveMaxUploadSize: number; commercialBypass: boolean; localAdminMode?: boolean } | null>(null);
   const backendJobIdRef = useRef<string | null>(null);
   const pollingCancelledRef = useRef(false);
   const submittingRef = useRef(false);
@@ -137,6 +138,21 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
     apiClient.estimateCredits(tool.id, selectedFile.size).then((value) => { if (active) setCreditEstimate(value); }).catch(() => { if (active) setCreditEstimate(null); });
     return () => { active = false; };
   }, [selectedFile, tool.id, tool.requiresServer]);
+
+  useEffect(() => {
+    if (!user || !tool.requiresServer) { setUploadCapability(null); return; }
+    let active = true;
+    apiClient.auth.account().then((account) => { if (active) setUploadCapability(account.capabilities || null); }).catch(() => { if (active) setUploadCapability(null); });
+    return () => { active = false; };
+  }, [user, tool.requiresServer]);
+
+  const selectFile = (file: File) => {
+    if (uploadCapability && file.size > uploadCapability.effectiveMaxUploadSize) {
+      toast.error('El archivo supera el tamaño permitido para tu plan.', `Tu archivo pesa ${formatFileSize(file.size)} y el límite actual es ${formatFileSize(uploadCapability.effectiveMaxUploadSize)}.`);
+      return;
+    }
+    setSelectedFile(file);
+  };
 
   // Load preview and natural dimensions for file
   useEffect(() => {
@@ -239,6 +255,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   // ==================== REAL PROCESSING EXECUTION ====================
   const handleExecute = async () => {
     if (submittingRef.current) return;
+    if (selectedFile && uploadCapability && selectedFile.size > uploadCapability.effectiveMaxUploadSize) { toast.error('El archivo supera el tamaño permitido para tu plan.'); return; }
     if (user?.role !== 'ADMIN' && creditEstimate && creditEstimate.balanceAfter < 0) { toast.error("Créditos insuficientes", "Necesitas obtener créditos antes de procesar."); return; }
     if (["video-trimmer", "video-to-gif"].includes(tool.id) && (serverTrimStart < 0 || serverTrimEnd <= serverTrimStart || (videoDuration > 0 && serverTrimEnd > videoDuration))) {
       toast.error("Intervalo inválido", "El final debe ser posterior al inicio y no superar la duración del video.");
@@ -752,7 +769,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
                     accept={getToolAcceptAttribute(tool)}
                     onChange={(e) => {
                       if (e.target.files?.[0])
-                        setSelectedFile(e.target.files[0]);
+                        selectFile(e.target.files[0]);
                     }}
                   />
                   <label
@@ -764,6 +781,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
                   <p className="text-xs text-slate-500 mt-2">
                     Formatos admitidos: {getHumanFileFormats(tool).join(', ')} · o arrastra el archivo aquí
                   </p>
+                  {tool.requiresServer && uploadCapability && <p className="mt-1 text-xs text-slate-500">{uploadCapability.localAdminMode ? 'Modo administrador local · Tamaño máximo de prueba' : 'Tamaño máximo actual'}: {formatFileSize(uploadCapability.effectiveMaxUploadSize)}</p>}
                 </div>
               ) : (
                 <div className="p-4 rounded-xl bg-[#101218] border border-white/[0.08] flex items-center justify-between">

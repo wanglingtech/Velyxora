@@ -90,7 +90,7 @@ export async function streamDownload(req: Request, res: Response): Promise<void>
       success: false,
       error: {
         code: 'DOWNLOAD_ERROR',
-        message: err.message,
+        message: 'No se pudo preparar la descarga. Inténtalo nuevamente.',
       },
       timestamp: new Date().toISOString(),
     });

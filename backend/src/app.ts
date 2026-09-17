@@ -13,6 +13,16 @@ export function createBackendApp(): Express {
 
   app.set('trust proxy', ENV.TRUST_PROXY);
   app.disable('x-powered-by');
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+    res.setHeader('X-Frame-Options', 'DENY');
+    if (ENV.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    if (/^\/api\/(auth|account|admin|payments|credits|history|jobs|download|conversions|media)(\/|$)/.test(req.path)) res.setHeader('Cache-Control', 'no-store, private');
+    next();
+  });
 
   // Security & Middleware
   app.use(cors({
@@ -28,8 +38,8 @@ export function createBackendApp(): Express {
   app.use(rateLimiter);
   app.use(requestLogger);
 
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  app.use(express.json({ limit: '1mb', type: 'application/json' }));
+  app.use(express.urlencoded({ extended: false, limit: '100kb' }));
   app.use(cookieParser());
 
   // API Routes

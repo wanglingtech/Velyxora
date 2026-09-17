@@ -105,6 +105,7 @@ export class ApiClient {
     path: string,
     init: RequestInit = {},
     timeoutMs = 8000,
+    csrfRetry = true,
   ): Promise<T> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -137,7 +138,13 @@ export class ApiClient {
           413: "El archivo supera el tamaño permitido.", 429: "Hay demasiadas solicitudes. Espera un momento e inténtalo de nuevo.",
           500: "Ocurrió un problema en el servidor. Inténtalo de nuevo más tarde.", 503: "El servicio está temporalmente no disponible.",
         };
-        throw new ApiError(payload.error?.message || friendly[response.status] || "No se pudo completar la solicitud.", response.status, payload.error?.code, payload.error?.retryAfter);
+        if (response.status === 403 && payload.error?.code === 'CSRF_INVALID' && csrfRetry && path !== '/auth/me') {
+          this.csrf = '';
+          await this.request<any>('/auth/me', {}, timeoutMs, false);
+          return this.request<T>(path, init, timeoutMs, false);
+        }
+        const message = payload.error?.code === 'CSRF_INVALID' ? 'Tu sesión de seguridad necesita actualizarse. Inténtalo nuevamente.' : payload.error?.message;
+        throw new ApiError(message || friendly[response.status] || "No se pudo completar la solicitud.", response.status, payload.error?.code, payload.error?.retryAfter);
       }
       if (payload.data && typeof payload.data === 'object' && 'csrf' in payload.data) {
         this.csrf = String((payload.data as { csrf?: string }).csrf || '');
@@ -183,6 +190,9 @@ export class ApiClient {
     adminPayments: () => this.deduped('admin:payments', () => this.request<any[]>('/admin/payments')),
     adminComplaints: () => this.request<any[]>('/admin/complaints'),
     adminSuggestions: () => this.request<any[]>('/admin/suggestions'),
+    adminShortLinkReports: () => this.request<any[]>('/admin/short-links/reports'),
+    moderateShortLink: (slug: string, action: 'DISABLE' | 'ENABLE', reason: string) => this.request<any>(`/admin/short-links/${encodeURIComponent(slug)}/moderation`, { method: 'PATCH', body: JSON.stringify({ action, reason }) }),
+    reviewShortLinkReport: (id: string, status: 'REVIEWED' | 'DISMISSED') => this.request<any>(`/admin/short-links/reports/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
     moderateUser: (userId: string, action: string, reason: string) => this.request<any>(`/admin/users/${encodeURIComponent(userId)}/moderate`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
     updateComplaint: (id: string, status: string, response: string) => this.request<any>(`/admin/complaints/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status, response }) }),
     updateSuggestion: (id: string, status: string, response: string, reaction: string) => this.request<any>(`/admin/suggestions/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status, response, reaction }) }),
@@ -212,6 +222,7 @@ export class ApiClient {
   links = {
     create: (url: string, expiresInDays: number) => this.request<{ slug: string; shortPath: string; targetUrl: string; expiresAt: string }>('/links', { method: 'POST', body: JSON.stringify({ url, expiresInDays }) }),
     resolve: (slug: string) => this.deduped(`links:resolve:${slug}`, () => this.request<{ targetUrl: string; expiresAt: string | null }>(`/links/${encodeURIComponent(slug)}`)),
+    report: (slug: string, category: string, detail: string) => this.request<{ id: string; status: string }>(`/links/${encodeURIComponent(slug)}/reports`, { method: 'POST', body: JSON.stringify({ category, detail }) }),
   };
 
   probeMedia(fileId: string) {
@@ -268,6 +279,7 @@ export class ApiClient {
    */
   async uploadFile(
     file: File,
+    toolId: string,
     onProgress?: (percent: number) => void,
   ): Promise<UploadResponse> {
     const formData = new FormData();
@@ -317,7 +329,7 @@ export class ApiClient {
         reject(new Error("File upload was cancelled")),
       );
 
-      xhr.open("POST", `${this.baseUrl}/uploads`);
+      xhr.open("POST", `${this.baseUrl}/uploads?toolId=${encodeURIComponent(toolId)}`);
       xhr.withCredentials = true;
       const csrf = this.csrfToken();
       if (csrf) xhr.setRequestHeader('X-CSRF-Token', csrf);

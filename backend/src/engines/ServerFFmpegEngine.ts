@@ -182,7 +182,7 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
 
     args.push(outputPath);
 
-    logger.info(`Spawning FFmpeg: ${ENV.FFMPEG_PATH} ${args.join(" ")}`);
+    logger.info('FFMPEG_STARTED', { operation: 'convert', argumentCount: args.length, outputType: targetExt });
 
     return new Promise<ConversionResult>((resolve, reject) => {
       const proc = spawn(ENV.FFMPEG_PATH, args, { windowsHide: true });
@@ -201,11 +201,8 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
       if (signal?.aborted) abortHandler();
       const timeout = setTimeout(() => terminate("timeout"), ENV.FFMPEG_TIMEOUT_MS);
 
-      let stderrLog = "";
-
       proc.stderr.on("data", (data) => {
         const text = data.toString();
-        stderrLog += text;
 
         // Parse duration and time progress from FFmpeg stderr
         const timeMatch = text.match(/time=(\d{2}):(\d{2}):(\d{2}\.\d{2})/);
@@ -238,9 +235,8 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
           return reject(new Error(terminationReason === "timeout" ? "FFMPEG_TIMEOUT" : "FFMPEG_CANCELLED"));
         }
         if (code !== 0) {
-          const errMsg = `FFmpeg exited with code ${code}. Error log: ${stderrLog.slice(-500)}`;
-          logger.error(errMsg);
-          return reject(new Error(errMsg));
+          logger.error('FFMPEG_FAILED', { exitCode: code });
+          return reject(new Error('FFMPEG_PROCESSING_FAILED'));
         }
 
         if (!fs.existsSync(outputPath)) {

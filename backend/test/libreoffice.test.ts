@@ -113,7 +113,7 @@ test("API E2E DOCX/XLSX/PPTX convierte, completa y descarga PDFs reales", async 
     { filename: 'slides.pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', toolId: 'pptx-to-pdf', body: await makePptx() },
   ];
   for (const fixture of fixtures) {
-    const upload = await request(backendApp).post('/api/uploads').attach('file', fixture.body, { filename: fixture.filename, contentType: fixture.mime });
+    const upload = await request(backendApp).post(`/api/uploads?toolId=${fixture.toolId}`).attach('file', fixture.body, { filename: fixture.filename, contentType: fixture.mime });
     assert.equal(upload.status, 201);
     const started = await request(backendApp).post('/api/conversions').send({ fileId: upload.body.data.fileId, toolId: fixture.toolId, targetFormat: 'pdf' });
     assert.equal(started.status, 202);

@@ -1,5 +1,6 @@
 import { prisma } from '../db/prisma';
 import { creditCostService } from './creditCostService';
+import { PLAN_CONFIG } from '../config/plans';
 
 export class CreditLedgerService {
   async balance(userId: string, tx: any = prisma) {
@@ -21,8 +22,10 @@ export class CreditLedgerService {
       const userPlan = await tx.userPlan.findFirst({ where: { userId, active: true }, include: { plan: true } });
       if (!userPlan) throw new Error('El usuario no tiene un plan activo.');
       if (inputBytes > userPlan.plan.maxUploadSize) throw new Error('El archivo excede el límite del plan.');
-      const concurrent = await tx.processingUsage.count({ where: { userId, status: 'RESERVED' } });
-      if (concurrent >= userPlan.plan.maxConcurrentJobs) throw new Error('Se alcanzó el límite de trabajos concurrentes del plan.');
+      const concurrent = await tx.processingUsage.count({ where: { userId, status: { in: ['RESERVED', 'ADMIN_TEST'] } } });
+      const technicalMax = Math.max(...Object.values(PLAN_CONFIG).map((plan) => plan.maxConcurrentJobs));
+      const concurrentLimit = isAdmin ? technicalMax : userPlan.plan.maxConcurrentJobs;
+      if (concurrent >= concurrentLimit) throw new Error('Ya tienes varios procesos en curso. Espera a que termine uno.');
       const balance = await this.balance(userId, tx);
       if (!isAdmin && balance < cost.estimatedCredits) throw new Error('Créditos insuficientes.');
       if (isAdmin) {
@@ -37,6 +40,7 @@ export class CreditLedgerService {
   async settle(jobId: string, outcome: 'COMPLETED' | 'FAILED' | 'CANCELLED') {
     return prisma.$transaction(async (tx) => {
       const usage = await tx.processingUsage.findUniqueOrThrow({ where: { jobId } });
+      if (usage.status === 'ADMIN_TEST') return tx.processingUsage.update({ where: { jobId }, data: { status: outcome === 'COMPLETED' ? 'COMPLETED' : outcome } });
       if (usage.status !== 'RESERVED') return usage;
       if (outcome === 'COMPLETED') {
         if (usage.reservedCredits > 0) await tx.creditLedger.create({ data: { userId: usage.userId, amount: 0, type: 'CONSUMPTION', reason: 'Reserva confirmada como consumo', toolId: usage.toolId, jobId, idempotencyKey: `consume:${jobId}` } });

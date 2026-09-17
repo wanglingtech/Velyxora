@@ -33,6 +33,14 @@ export const resolveSessionCookieSameSite = (
 
 const nodeEnv = process.env.NODE_ENV || "development";
 
+const parseBoundedMegabytes = (name: string, value: string | undefined, fallback: number): number => {
+  const megabytes = value === undefined || value.trim() === "" ? fallback : Number(value);
+  if (!Number.isFinite(megabytes) || megabytes < 1 || megabytes > 16_384) {
+    throw new Error(`${name} debe ser un número entre 1 y 16384.`);
+  }
+  return megabytes * 1024 * 1024;
+};
+
 export const ENV = {
   NODE_ENV: nodeEnv,
   PORT: Number(process.env.PORT) || 3000,
@@ -40,8 +48,12 @@ export const ENV = {
     .split(",")
     .map((origin) => origin.trim().replace(/\/$/, ""))
     .filter(Boolean),
-  MAX_UPLOAD_SIZE_BYTES:
-    Number(process.env.MAX_UPLOAD_SIZE_MB || 100) * 1024 * 1024, // 100MB default
+  MAX_UPLOAD_SIZE_BYTES: parseBoundedMegabytes("MAX_UPLOAD_SIZE_MB", process.env.MAX_UPLOAD_SIZE_MB, 100),
+  LOCAL_ADMIN_MAX_UPLOAD_SIZE_BYTES: parseBoundedMegabytes(
+    "LOCAL_ADMIN_MAX_UPLOAD_SIZE_MB",
+    process.env.LOCAL_ADMIN_MAX_UPLOAD_SIZE_MB,
+    1024,
+  ),
   STORAGE_DIR: resolveBackendPath(process.env.STORAGE_DIR, "storage"),
   TEMP_DIR: resolveBackendPath(process.env.TEMP_DIR, "temp"),
   TEMP_FILE_TTL_MS: Number(process.env.TEMP_FILE_TTL_MINUTES || 30) * 60 * 1000, // 30 minutes

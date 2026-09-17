@@ -31,7 +31,7 @@ export async function createConversion(req: Request, res: Response): Promise<voi
       success: false,
       error: {
         code: 'CONVERSION_REJECTED',
-        message: err.message,
+        message: err.message === 'Ya tienes varios procesos en curso. Espera a que termine uno.' ? err.message : 'La conversión no pudo iniciarse con los datos proporcionados.',
       },
       timestamp: new Date().toISOString(),
     });

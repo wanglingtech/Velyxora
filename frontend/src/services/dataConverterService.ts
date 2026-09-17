@@ -141,6 +141,8 @@ export function markdownToHtml(md: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
 
     // Headers
     .replace(
@@ -177,10 +179,10 @@ export function markdownToHtml(md: string): string {
     )
 
     // Links
-    .replace(
-      /\[(.*?)\]\((.*?)\)/gim,
-      '<a href="$2" target="_blank" rel="noopener" class="text-indigo-400 underline hover:text-indigo-300">$1</a>',
-    )
+    .replace(/\[(.*?)\]\((.*?)\)/gim, (_match, label, href) => {
+      const safe = /^(https?:\/\/|mailto:)/i.test(String(href).trim()) ? String(href).trim() : '#';
+      return `<a href="${safe}" target="_blank" rel="noopener noreferrer" class="text-indigo-400 underline hover:text-indigo-300">${label}</a>`;
+    })
 
     // Horizontal rules
     .replace(/^---$/gim, '<hr class="border-white/10 my-4" />')

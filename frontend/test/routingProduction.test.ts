@@ -15,8 +15,9 @@ test('rutas SPA directas resuelven vistas y short links', () => {
 
 test('Vercel sirve archivos existentes antes del fallback SPA', async () => {
   const config = JSON.parse(await readFile('frontend/vercel.json', 'utf8'));
-  assert.deepEqual(config.routes[0], { handle: 'filesystem' });
-  assert.deepEqual(config.routes[1], { src: '/.*', dest: '/index.html' });
+  assert.equal(config.routes[0].continue, true);
+  assert.deepEqual(config.routes[1], { handle: 'filesystem' });
+  assert.deepEqual(config.routes[2], { src: '/.*', dest: '/index.html' });
 });
 
 test('refrescos de cuenta y admin usan API sin recargar la SPA', async () => {

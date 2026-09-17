@@ -20,6 +20,8 @@ test('markdown, color y diff cubren resultado válido y entrada inválida', () =
   const html = markdownToHtml('# Título\n\n<script>alert(1)</script>');
   assert.match(html, /<h1/);
   assert.doesNotMatch(html, /<script>/);
+  assert.doesNotMatch(markdownToHtml('[x](javascript:alert(1))'), /href="javascript:/i);
+  assert.doesNotMatch(markdownToHtml('[x](" onmouseover="alert(1))'), /onmouseover=/i);
   assert.equal(parseColorToAll('#ff0000')?.hex, '#FF0000');
   assert.equal(parseColorToAll('no-es-un-color'), null);
   assert.deepEqual(computeTextDiff('a\nb', 'a\nc').map((line) => line.type), ['unchanged', 'removed', 'added']);

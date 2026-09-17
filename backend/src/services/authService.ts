@@ -49,7 +49,7 @@ export class AuthService {
     const token = randomBytes(32).toString('base64url');
     const csrf = randomBytes(24).toString('base64url');
     const expiresAt = new Date(Date.now() + Number(process.env.SESSION_TTL_HOURS || 168) * 3600_000);
-    const session = await prisma.session.create({ data: { userId, tokenHash: hashToken(token), csrfHash: hashToken(csrf), expiresAt }, include: { user: true } });
+    const session = await prisma.session.create({ data: { userId, tokenHash: hashToken(token), csrfHash: hashToken(csrf), csrfToken: csrf, expiresAt }, include: { user: true } });
     return { token, csrf, expiresAt, user: session.user };
   }
 
@@ -61,10 +61,14 @@ export class AuthService {
   }
 
   verifyCsrf(session: { csrfHash: string }, csrf?: string) { return Boolean(csrf && hashToken(csrf) === session.csrfHash); }
-  async rotateCsrf(sessionId: string) {
+  async getOrCreateCsrf(sessionId: string, existing?: string | null) {
+    if (existing) return existing;
     const csrf = randomBytes(24).toString('base64url');
-    await prisma.session.update({ where: { id: sessionId }, data: { csrfHash: hashToken(csrf) } });
-    return csrf;
+    const claimed = await prisma.session.updateMany({ where: { id: sessionId, csrfToken: null }, data: { csrfHash: hashToken(csrf), csrfToken: csrf } });
+    if (claimed.count === 1) return csrf;
+    const session = await prisma.session.findUniqueOrThrow({ where: { id: sessionId }, select: { csrfToken: true } });
+    if (!session.csrfToken) throw new Error('CSRF_SESSION_UNAVAILABLE');
+    return session.csrfToken;
   }
   async logout(token?: string) { if (token) await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } }); }
 }

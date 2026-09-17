@@ -11,7 +11,7 @@ export interface StartBackendConversionParams {
 }
 
 interface BackendConversionApi {
-  uploadFile(file: File, onProgress?: (percent: number) => void): Promise<UploadResponse>;
+  uploadFile(file: File, toolId: string, onProgress?: (percent: number) => void): Promise<UploadResponse>;
   startConversion(params: {
     fileId: string;
     toolId: string;
@@ -26,7 +26,7 @@ export async function uploadAndStartConversion(
   onProgress?: (percent: number) => void,
   client: BackendConversionApi = apiClient,
 ): Promise<ConversionJobResponse> {
-  const upload = await client.uploadFile(file, onProgress);
+  const upload = await client.uploadFile(file, params.toolId, onProgress);
   const fileId = upload?.fileId?.trim();
 
   if (!fileId) {

@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { storageService } from '../services/storageService';
 import { HTTP_STATUS } from '../config/constants';
 import { ENV } from '../config/env';
+import fs from 'node:fs';
+import { hasExpectedSignature } from '../security/uploadPolicy';
 
 export async function uploadFile(req: Request, res: Response): Promise<void> {
   if (!req.file) {
@@ -16,7 +18,12 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const stored = storageService.registerFile(req.file, req.auth?.userId);
+  if (!hasExpectedSignature(req.uploadContext!.toolId, req.file.path)) {
+    try { fs.unlinkSync(req.file.path); } catch { /* best effort */ }
+    res.status(415).json({ success: false, error: { code: 'INVALID_FORMAT', message: 'El contenido del archivo no coincide con el formato esperado para esta herramienta.' } }); return;
+  }
+
+  const stored = storageService.registerFile(req.file, req.auth?.userId, req.uploadContext?.toolId);
 
   res.status(HTTP_STATUS.CREATED).json({
     success: true,

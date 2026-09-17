@@ -43,7 +43,7 @@ export async function analyzeMedia(req: Request, res: Response): Promise<void> {
       success: false,
       error: {
         code: err instanceof YtDlpError ? err.code : 'ANALYSIS_FAILED',
-        message: err.message,
+        message: err instanceof YtDlpError ? err.message : 'No se pudo analizar este recurso público.',
       },
       timestamp: new Date().toISOString(),
     });
@@ -61,6 +61,7 @@ export async function processMedia(req: Request, res: Response): Promise<void> {
     const job = await mediaDownloadService.start(url, formatId, container, type, typeof title === 'string' ? title : 'Contenido multimedia', process.env.NODE_ENV === 'test' ? undefined : { userId: req.auth!.userId, isAdmin: req.auth!.role === 'ADMIN' });
     res.status(HTTP_STATUS.ACCEPTED).json({ success: true, data: job, timestamp: new Date().toISOString() });
   } catch (error: any) {
-    res.status(HTTP_STATUS.UNPROCESSABLE_ENTITY).json({ success: false, error: { code: 'DOWNLOAD_REJECTED', message: error.message }, timestamp: new Date().toISOString() });
+    const message = error?.message === 'Ya tienes varios procesos en curso. Espera a que termine uno.' ? error.message : error instanceof YtDlpError ? error.message : 'No se pudo iniciar el procesamiento del recurso.';
+    res.status(HTTP_STATUS.UNPROCESSABLE_ENTITY).json({ success: false, error: { code: 'DOWNLOAD_REJECTED', message }, timestamp: new Date().toISOString() });
   }
 }

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { HTTP_STATUS } from '../config/constants';
 import { logger } from '../utils/logger';
+import multer from 'multer';
 
 export class AppError extends Error {
   constructor(
@@ -24,17 +25,20 @@ export function errorHandler(
   const statusCode = (err as AppError).statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
   const code = (err as AppError).code || 'INTERNAL_SERVER_ERROR';
 
-  logger.error(`Unhandled error on ${req.method} ${req.url}:`, {
-    message: err.message,
+  const uploadError = err instanceof multer.MulterError || req.path.startsWith('/api/uploads');
+  const safeStatus = uploadError ? (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE' ? 413 : 415) : statusCode;
+  const safeCode = uploadError ? (safeStatus === 413 ? 'FILE_TOO_LARGE' : 'INVALID_FORMAT') : code;
+  logger.error('HTTP_ERROR', {
+    method: req.method, path: req.path, code: safeCode,
     stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
   });
 
   const isOperational = err instanceof AppError;
-  res.status(statusCode).json({
+  res.status(safeStatus).json({
     success: false,
     error: {
-      code,
-      message: isOperational ? err.message : 'Ocurrió un problema interno. Inténtalo de nuevo más tarde.',
+      code: safeCode,
+      message: uploadError ? (safeStatus === 413 ? 'El archivo supera el tamaño permitido para tu plan.' : 'Este formato no es compatible con esta herramienta.') : isOperational ? err.message : 'Ocurrió un problema temporal. Inténtalo nuevamente.',
       ...(isOperational && process.env.NODE_ENV !== 'production' && (err as AppError).details ? { details: (err as AppError).details } : {}),
     },
     timestamp: new Date().toISOString(),

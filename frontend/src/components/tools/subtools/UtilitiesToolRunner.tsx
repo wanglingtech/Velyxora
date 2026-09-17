@@ -101,7 +101,7 @@ export const UtilitiesToolRunner: React.FC<UtilitiesToolRunnerProps> = ({
         .then(setVideoMeta)
         .catch((err) => toast.error(err.message || 'Error al inspeccionar video'));
       setServerMeta(null); setServerProbeStatus('loading');
-      apiClient.uploadFile(selectedFile).then(({ fileId }) => apiClient.probeMedia(fileId)).then((data) => { setServerMeta(data); setServerProbeStatus('ready'); }).catch(() => setServerProbeStatus('unavailable'));
+      apiClient.uploadFile(selectedFile, 'video-metadata-inspector').then(({ fileId }) => apiClient.probeMedia(fileId)).then((data) => { setServerMeta(data); setServerProbeStatus('ready'); }).catch(() => setServerProbeStatus('unavailable'));
     }
   }, [tool.id, selectedFile]);
 

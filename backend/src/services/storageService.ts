@@ -14,6 +14,7 @@ export interface StoredFileInfo {
   mimeType: string;
   createdAt: number;
   ownerId?: string;
+  toolId?: string;
 }
 
 class StorageService {
@@ -33,7 +34,7 @@ class StorageService {
     }
   }
 
-  public registerFile(file: Express.Multer.File, ownerId?: string): StoredFileInfo {
+  public registerFile(file: Express.Multer.File, ownerId?: string, toolId?: string): StoredFileInfo {
     // IDs are API identifiers, not filenames. Keeping them independent avoids
     // otherwise-safe characters in user filenames (dots, spaces, Unicode)
     // being rejected by the conversion request schema.
@@ -47,6 +48,7 @@ class StorageService {
       mimeType: file.mimetype,
       createdAt: Date.now(),
       ownerId,
+      toolId,
     };
 
     this.files.set(fileId, record);
@@ -81,6 +83,10 @@ class StorageService {
     return record;
   }
 
+  public countFilesForOwner(ownerId: string): number {
+    return [...this.files.values()].filter((record) => record.ownerId === ownerId && record.toolId && fs.existsSync(record.path)).length;
+  }
+
   public deleteFile(fileId: string): boolean {
     const record = this.files.get(fileId);
     if (!record) return false;
@@ -93,7 +99,7 @@ class StorageService {
         fs.unlinkSync(record.path);
       }
     } catch (err: any) {
-      logger.warn(`Failed to unlink file ${record.path}: ${err.message}`);
+      logger.warn('STORAGE_DELETE_FAILED', { fileId });
     }
 
     this.files.delete(fileId);
@@ -111,7 +117,7 @@ class StorageService {
             assertSafePath(root, filePath);
             const stat = fs.statSync(filePath);
             if (stat.isFile() && now - stat.mtimeMs > ENV.TEMP_FILE_TTL_MS) fs.unlinkSync(filePath);
-          } catch (error: any) { if (error?.code !== 'ENOENT') logger.warn(`Temporary cleanup skipped a file: ${error.message}`); }
+          } catch (error: any) { if (error?.code !== 'ENOENT') logger.warn('STORAGE_CLEANUP_SKIPPED', { category: error?.code || 'FILESYSTEM_ERROR' }); }
         }
       }
     };

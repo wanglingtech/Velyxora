@@ -84,6 +84,27 @@ enum ProcessingType {
   EXTERNAL
 }
 
+enum ShortLinkStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum ShortLinkReportCategory {
+  PHISHING
+  MALWARE
+  FRAUD
+  SPAM
+  IMPERSONATION
+  ILLEGAL_CONTENT
+  OTHER
+}
+
+enum ShortLinkReportStatus {
+  PENDING
+  REVIEWED
+  DISMISSED
+}
+
 model User {
   id           String     @id @default(uuid()) @db.Uuid
   email        String     @unique
@@ -105,6 +126,7 @@ model User {
   complaints Complaint[]
   suggestions Suggestion[]
   shortLinks ShortLink[]
+  shortLinkReports ShortLinkReport[]
 }
 
 model ShortLink {
@@ -113,11 +135,32 @@ model ShortLink {
   targetUrl   String
   userId      String?  @db.Uuid
   clicks      Int      @default(0)
+  status      ShortLinkStatus @default(ACTIVE)
+  disabledAt DateTime?
+  disabledReason String?
   expiresAt   DateTime?
   createdAt   DateTime @default(now())
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  reports ShortLinkReport[]
   @@index([userId, createdAt])
   @@index([expiresAt])
+  @@index([status, createdAt])
+}
+
+model ShortLinkReport {
+  id          String                  @id @default(uuid()) @db.Uuid
+  shortLinkId String                  @db.Uuid
+  reporterId  String?                 @db.Uuid
+  category    ShortLinkReportCategory
+  detail      String?
+  status      ShortLinkReportStatus   @default(PENDING)
+  reviewedBy  String?                 @db.Uuid
+  reviewedAt  DateTime?
+  createdAt   DateTime                @default(now())
+  shortLink ShortLink @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+  reporter User? @relation(fields: [reporterId], references: [id], onDelete: SetNull)
+  @@index([shortLinkId, status])
+  @@index([status, createdAt])
 }
 
 model DeniedIdentity {
@@ -199,6 +242,7 @@ model Session {
   userId    String   @db.Uuid
   tokenHash String   @unique
   csrfHash  String
+  csrfToken String?
   expiresAt DateTime
   createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

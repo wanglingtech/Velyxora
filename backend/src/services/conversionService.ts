@@ -27,6 +27,7 @@ class ConversionService {
       mimeType = stored.mimeType;
       size = stored.size;
       if (billing && stored.ownerId !== billing.userId) throw new Error('El archivo no pertenece al usuario autenticado.');
+      if (stored.toolId && stored.toolId !== dto.toolId) throw new Error('El archivo fue validado para una herramienta diferente.');
     }
 
     if (!sourcePath) {

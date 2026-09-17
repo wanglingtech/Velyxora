@@ -80,7 +80,7 @@ export class LibreOfficeEngine extends BaseConversionEngine {
         proc.once("error", (error) => finish(error));
         proc.once("close", (code) => {
           if (settled) return;
-          if (code !== 0) { logger.error(`LibreOffice failed (${code}): ${stderr}`); finish(new Error("DOCUMENT_CONVERSION_FAILED")); }
+          if (code !== 0) { logger.error('LIBREOFFICE_FAILED', { exitCode: code, hadDiagnosticOutput: Boolean(stderr) }); finish(new Error("DOCUMENT_CONVERSION_FAILED")); }
           else finish();
         });
       });
