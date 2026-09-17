@@ -16,7 +16,7 @@ import { ToolDefinition, ProcessingJob } from "../../types";
 import { jobService } from "../../services/jobService";
 import { historyService } from "../../services/historyService";
 import { getToolRunnerKind } from "../../registry/tools";
-import { getToolAcceptAttribute, validateFileForTool } from "../../services/fileValidation";
+import { getHumanFileFormats, getToolAcceptAttribute, validateFileForTool } from "../../services/fileValidation";
 import {
   convertImage,
   cropImage,
@@ -759,10 +759,10 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
                     htmlFor="tool-file-input"
                     className="cursor-pointer px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition-all"
                   >
-                    Seleccionar archivo ({tool.inputTypes.join(", ")})
+                    Seleccionar archivo
                   </label>
                   <p className="text-xs text-slate-500 mt-2">
-                    o arrastra el archivo aquí
+                    Formatos admitidos: {getHumanFileFormats(tool).join(', ')} · o arrastra el archivo aquí
                   </p>
                 </div>
               ) : (

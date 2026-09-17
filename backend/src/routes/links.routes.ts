@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { prisma } from '../db/prisma';
 import { authService, SESSION_COOKIE } from '../services/authService';
 import { validateSafeUrl } from '../security/ssrfValidator';
+import { resolveShortLink } from '../services/shortLinkService';
 
 const router = Router();
 
@@ -22,6 +23,14 @@ router.post('/', async (req, res) => {
   }
   if (!link) { res.status(503).json({ success: false, error: { code: 'SLUG_UNAVAILABLE', message: 'No se pudo crear el enlace. Inténtalo otra vez.' } }); return; }
   res.status(201).json({ success: true, data: { slug: link.slug, shortPath: `/s/${link.slug}`, targetUrl: link.targetUrl, expiresAt: link.expiresAt } });
+});
+
+router.get('/:slug', async (req, res) => {
+  const result = await resolveShortLink(req.params.slug);
+  if (result.status === 'NOT_FOUND') { res.status(404).json({ success: false, error: { code: 'SHORT_LINK_NOT_FOUND', message: 'Este enlace no existe.' } }); return; }
+  if (result.status === 'EXPIRED') { res.status(410).json({ success: false, error: { code: 'SHORT_LINK_EXPIRED', message: 'Este enlace expiró.' } }); return; }
+  if (result.status === 'UNSAFE') { res.status(422).json({ success: false, error: { code: 'SHORT_LINK_UNSAFE', message: 'El destino almacenado no es seguro.' } }); return; }
+  res.json({ success: true, data: { targetUrl: result.targetUrl, expiresAt: result.expiresAt } });
 });
 
 export default router;

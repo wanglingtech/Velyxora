@@ -13,6 +13,7 @@ import { prisma } from '../src/db/prisma';
 import { authService, identityHash, SESSION_COOKIE } from '../src/services/authService';
 import { randomUUID } from 'node:crypto';
 import { seedInitialData } from '../src/services/seedService';
+import { isSafeRedirectTarget } from '../src/services/shortLinkService';
 
 test('anon en endpoint USER protegido recibe 401', async () => {
   const response = await request(createBackendApp()).get('/api/auth/me');
@@ -69,6 +70,50 @@ test('seed admin crea, diagnostica mismatch y solo rota password con opt-in expl
 test('referencia Yape Perú acepta solo nueve dígitos y normaliza bordes', () => {
   assert.equal(normalizePeruPhone(' 968555200 '), '968555200');
   for (const value of ['968 555 200', '+51968555200', '96855520', '9685552000', 'abcdefghi', '<script>1']) assert.throws(() => normalizePeruPhone(value), /9 dígitos/);
+});
+
+test('shortener distingue resolución, expiración y conserva destinos completos', async () => {
+  const suffix = randomUUID().replace(/-/g, '').slice(0, 8);
+  const expiredSlug = `e${suffix}`;
+  const targetUrl = 'https://www.youtube.com/watch?v=6HJjhZ-jloI&list=RD6HJjhZ-jloI&start_radio=1#details';
+  await prisma.shortLink.create({ data: { slug: expiredSlug, targetUrl, expiresAt: new Date(Date.now() - 1000) } });
+  let activeSlug = '';
+  try {
+    const app = createBackendApp();
+    const before = Date.now();
+    const created = await request(app).post('/api/links').send({ url: targetUrl, expiresInDays: 365 });
+    assert.equal(created.status, 201);
+    activeSlug = created.body.data.slug;
+    assert.equal(created.body.data.targetUrl, targetUrl);
+    const expiresAt = new Date(created.body.data.expiresAt).getTime();
+    assert.ok(expiresAt >= before + 365 * 86400000 - 2000 && expiresAt <= Date.now() + 365 * 86400000 + 2000);
+    const resolved = await request(app).get(`/api/links/${activeSlug}`);
+    assert.equal(resolved.status, 200);
+    assert.equal(resolved.body.data.targetUrl, targetUrl);
+    assert.equal((await prisma.shortLink.findUniqueOrThrow({ where: { slug: activeSlug } })).clicks, 1);
+    assert.equal((await request(app).get(`/api/links/${expiredSlug}`)).status, 410);
+    assert.equal((await request(app).get('/api/links/unknown1')).status, 404);
+    const redirect = await request(app).get(`/s/${activeSlug}`).redirects(0);
+    assert.equal(redirect.status, 302);
+    assert.equal(redirect.headers.location, targetUrl);
+  } finally {
+    await prisma.shortLink.deleteMany({ where: { slug: { in: [activeSlug, expiredSlug].filter(Boolean) } } });
+  }
+});
+
+test('shortener rechaza esquemas peligrosos sin solicitar el destino', () => {
+  assert.equal(isSafeRedirectTarget('https://example.com/path?a=1&b=2#ok'), true);
+  assert.equal(isSafeRedirectTarget('http://example.com'), true);
+  for (const target of ['javascript:alert(1)', 'data:text/html,x', 'file:///etc/passwd', 'ftp://example.com/x', 'vbscript:msgbox(1)']) assert.equal(isSafeRedirectTarget(target), false);
+});
+
+test('API del shortener rechaza protocolos peligrosos', async () => {
+  const app = createBackendApp();
+  for (const url of ['javascript:alert(1)', 'data:text/html,x', 'file:///tmp/x', 'ftp://example.com/x', 'vbscript:msgbox(1)']) {
+    const response = await request(app).post('/api/links').send({ url, expiresInDays: 30 });
+    assert.equal(response.status, 400, url);
+    assert.equal(response.body.error.code, 'INVALID_URL');
+  }
 });
 
 test('reclamo, sugerencia, ownership, respuesta admin y ban persisten con seguridad', async () => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, History, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, History, RefreshCw, Trash2 } from "lucide-react";
 import { historyService } from "../../services/historyService";
 import { settingsService } from "../../services/settingsService";
 import { HistoryItem, ToolDefinition } from "../../types";
@@ -15,7 +15,8 @@ export const HistoryView: React.FC<Props> = ({ onSelectTool, onBack, authenticat
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   const [filter, setFilter] = useState<Filter>("ALL");
-  useEffect(() => { setLoading(true); setError(''); historyService.getSyncedHistory().then(setHistory).catch((e) => setError(e.message)).finally(() => setLoading(false)); }, [authenticated]);
+  const load = () => { setLoading(true); setError(''); return historyService.getSyncedHistory().then(setHistory).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
+  useEffect(() => { void load(); }, [authenticated]);
   const shown = filter === "ALL" ? history : history.filter((item) => item.status === filter);
   const clear = () => {
     if (settingsService.getSettings().confirmBeforeClearHistory && !window.confirm("¿Quieres limpiar todo el historial local?")) return;
@@ -27,7 +28,7 @@ export const HistoryView: React.FC<Props> = ({ onSelectTool, onBack, authenticat
     <button onClick={onBack} className="min-h-11 px-3 rounded-xl border border-white/10 text-sm text-slate-300 hover:text-white focus-visible:outline-2 focus-visible:outline-indigo-400 flex items-center gap-2"><ArrowLeft className="w-4 h-4" />Regresar</button>
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/[0.08]">
       <div><h2 className="text-xl font-bold text-white flex items-center gap-2"><History className="w-5 h-5 text-indigo-400" />Historial de procesamiento</h2><p className="text-xs text-slate-400">{authenticated ? "Sincronizado con tu cuenta; solo conserva metadatos mínimos." : "Registro local; nunca guarda el contenido de tus archivos."}</p></div>
-      {!authenticated && history.length > 0 && <button onClick={clear} className="min-h-11 px-3 rounded-lg border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2"><Trash2 className="w-4 h-4" />Limpiar historial</button>}
+      <div className="flex flex-wrap gap-2">{authenticated && <button disabled={loading} onClick={load} className="min-h-11 px-3 rounded-lg border border-white/10 text-indigo-200 text-xs flex items-center gap-2 disabled:opacity-60"><RefreshCw className={`w-4 h-4 ${loading?'animate-spin':''}`} />Recargar</button>}{!authenticated && history.length > 0 && <button onClick={clear} className="min-h-11 px-3 rounded-lg border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2"><Trash2 className="w-4 h-4" />Limpiar historial</button>}</div>
     </div>
     <div className="flex flex-wrap gap-2" aria-label="Filtrar historial">{(["ALL", "COMPLETED", "FAILED", "CANCELLED"] as Filter[]).map((value) => <button key={value} onClick={() => setFilter(value)} aria-pressed={filter === value} className={`min-h-10 px-3 rounded-lg text-xs border ${filter === value ? "bg-indigo-600 border-indigo-500 text-white" : "border-white/10 text-slate-300"}`}>{value === "ALL" ? "Todos" : labels[value]}</button>)}</div>
     {loading ? <div className="py-16 text-center text-sm text-slate-400">Cargando historial…</div> : error ? <div role="alert" className="py-12 text-center rounded-2xl border border-rose-500/20 text-rose-300">{error}</div> : shown.length ? <div className="space-y-3">{shown.map((item) => { const tool = getToolById(item.toolId); return <article key={item.id} className="p-4 rounded-xl bg-[#101218] border border-white/[0.06] flex flex-col sm:flex-row gap-3 justify-between">

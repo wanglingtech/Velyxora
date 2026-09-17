@@ -211,6 +211,7 @@ export class ApiClient {
 
   links = {
     create: (url: string, expiresInDays: number) => this.request<{ slug: string; shortPath: string; targetUrl: string; expiresAt: string }>('/links', { method: 'POST', body: JSON.stringify({ url, expiresInDays }) }),
+    resolve: (slug: string) => this.deduped(`links:resolve:${slug}`, () => this.request<{ targetUrl: string; expiresAt: string | null }>(`/links/${encodeURIComponent(slug)}`)),
   };
 
   probeMedia(fileId: string) {

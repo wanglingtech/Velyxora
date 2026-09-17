@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getToolById } from '../src/registry/tools';
-import { getToolAcceptAttribute, validateFileForTool } from '../src/services/fileValidation';
+import { getHumanFileFormats, getToolAcceptAttribute, validateFileForTool } from '../src/services/fileValidation';
 
 const tool = (id: string) => {
   const result = getToolById(id);
@@ -28,4 +28,11 @@ test('Office rechaza extensiones cruzadas y muestra el formato real', () => {
   assert.equal(txt.valid, false);
   if (!txt.valid) { assert.match(txt.message, /\.DOCX/); assert.doesNotMatch(txt.message, /\.WORD/); }
   assert.equal(validateFileForTool(tool('xlsx-to-pdf'), { name: 'document.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }).valid, false);
+});
+
+test('los formatos visibles son humanos y la validación conserva MIME y extensión', () => {
+  assert.deepEqual(getHumanFileFormats(tool('word-to-pdf')), ['DOCX']);
+  assert.deepEqual(getHumanFileFormats(tool('xlsx-to-pdf')), ['XLSX']);
+  assert.doesNotMatch(getHumanFileFormats(tool('word-to-pdf')).join(' '), /application\//);
+  assert.match(getToolAcceptAttribute(tool('word-to-pdf')), /application\/vnd\.openxmlformats/);
 });

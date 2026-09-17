@@ -24,12 +24,18 @@ import { useAuth } from './auth/AuthContext';
 import { AdminRoute, ProtectedRoute } from './auth/RouteGuards';
 import { AppLoader } from './components/common/AppLoader';
 import { FeedbackView } from './components/views/FeedbackViews';
+import { ShortLinkView } from './components/views/ShortLinkView';
+import { pathForView, routeFromPath } from './services/appRouting';
 
 export default function App() {
+  const initialRoute = routeFromPath(window.location.pathname);
+  const initialTool = initialRoute.view === 'tool' && initialRoute.param ? getToolById(initialRoute.param) || null : null;
   const { user: currentUser, isLoading: authLoading, logout } = useAuth();
-  const [activeView, setActiveView] = useState<string>('home');
-  const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [activeTool, setActiveTool] = useState<ToolDefinition | null>(null);
+  const [activeView, setActiveView] = useState<string>(initialRoute.view === 'tool' && !initialTool ? 'not-found' : initialRoute.view);
+  const [activeCategory, setActiveCategory] = useState<string>(initialRoute.view === 'category' ? initialRoute.param || 'all' : 'all');
+  const [activeTool, setActiveTool] = useState<ToolDefinition | null>(initialTool);
+  const [shortSlug, setShortSlug] = useState(initialRoute.view === 'short-link' ? initialRoute.param || '' : '');
+  const [authMode, setAuthMode] = useState<'login'|'register'>(initialRoute.authMode || 'login');
   const [activeFile, setActiveFile] = useState<File | undefined>(undefined);
   const [mediaUrl, setMediaUrl] = useState<string>('');
   const [detectedFile, setDetectedFile] = useState<DetectedFileInfo | null>(null);
@@ -53,6 +59,18 @@ export default function App() {
     return () => window.clearInterval(interval);
   }, [authLoading]);
   useEffect(() => { historyService.setAuthenticated(Boolean(currentUser)); }, [currentUser]);
+  useEffect(() => {
+    const sync = () => {
+      const route = routeFromPath(window.location.pathname);
+      const routeTool = route.view === 'tool' && route.param ? getToolById(route.param) || null : null;
+      setActiveView(route.view === 'tool' && !routeTool ? 'not-found' : route.view); setAuthMode(route.authMode || 'login');
+      if (route.view === 'short-link') setShortSlug(route.param || '');
+      if (route.view === 'category') setActiveCategory(route.param || 'all');
+      if (route.view === 'tool') setActiveTool(routeTool);
+    };
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, []);
 
   const handleToggleFavorite = (toolId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -66,6 +84,7 @@ export default function App() {
     setActiveTool(tool);
     setActiveFile(file);
     setActiveView('tool');
+    window.history.pushState({}, '', pathForView('tool', tool.slug));
     setIsMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -73,6 +92,7 @@ export default function App() {
   const handleOpenMediaDownloader = (url?: string) => {
     if (url) setMediaUrl(url);
     setActiveView('media-downloader');
+    window.history.pushState({}, '', pathForView('media-downloader'));
     setIsMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -80,6 +100,7 @@ export default function App() {
   const handleSelectCategory = (catId: string) => {
     setActiveCategory(catId);
     setActiveView('category');
+    window.history.pushState({}, '', pathForView('category', catId));
     setIsMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -98,6 +119,7 @@ export default function App() {
 
   const handleNavigate = (view: string, param?: any) => {
     setActiveView(view);
+    if (view === 'auth') setAuthMode('login');
     if (view === 'category' && param) {
       setActiveCategory(param);
     }
@@ -106,12 +128,14 @@ export default function App() {
       setActiveFile(undefined);
     }
     setIsMobileMenuOpen(false);
+    const path = pathForView(view, typeof param === 'string' ? param : undefined);
+    if (window.location.pathname !== path) window.history.pushState({}, '', path);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (!bootstrapReady) return <AppLoader progress={progress} />;
 
-  const authFallback = <AuthView onAuthenticated={(user) => handleNavigate(user.role === 'ADMIN' ? 'admin' : 'account')} onBack={() => handleNavigate('home')} />;
+  const authFallback = <AuthView initialMode="login" onAuthenticated={(user) => handleNavigate(user.role === 'ADMIN' ? 'admin' : 'account')} onBack={() => handleNavigate('home')} />;
 
   return (
     <div className="min-h-screen bg-[#08090D] text-[#F5F7FA] flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
@@ -175,7 +199,7 @@ export default function App() {
               onBack={() => {
                 setActiveTool(null);
                 setActiveFile(undefined);
-                setActiveView('home');
+                handleNavigate('home');
               }}
             /></React.Suspense>
           )}
@@ -183,7 +207,7 @@ export default function App() {
           {activeView === 'media-downloader' && (
             <React.Suspense fallback={<div className="p-8 text-sm text-slate-400">Cargando herramienta…</div>}><MediaDownloaderView
               initialUrl={mediaUrl}
-              onBack={() => setActiveView('home')}
+              onBack={() => handleNavigate('home')}
             /></React.Suspense>
           )}
 
@@ -201,11 +225,13 @@ export default function App() {
 
           {activeView === 'settings' && <SettingsView onBack={() => handleNavigate('home')} />}
 
-          {activeView === 'auth' && <AuthView onAuthenticated={(user) => handleNavigate(user.role === 'ADMIN' ? 'admin' : 'account')} onBack={() => handleNavigate('home')} />}
+          {activeView === 'auth' && <AuthView initialMode={authMode} onAuthenticated={(user) => handleNavigate(user.role === 'ADMIN' ? 'admin' : 'account')} onBack={() => handleNavigate('home')} />}
           {activeView === 'account' && <ProtectedRoute fallback={authFallback}><AccountView onBack={() => handleNavigate('home')} /></ProtectedRoute>}
           {activeView === 'admin' && <AdminRoute fallback={<section className="mx-auto max-w-xl rounded-2xl border border-red-500/20 bg-[#101218] p-8"><h1 className="text-xl font-bold">Acceso denegado</h1><p className="mt-2 text-slate-400">Esta sección requiere una sesión administrativa.</p><button onClick={() => handleNavigate('home')} className="mt-5 min-h-11 text-indigo-400">Regresar</button></section>}><AdminView onBack={() => handleNavigate('account')} /></AdminRoute>}
           {activeView === 'complaints' && <FeedbackView kind="complaint" onBack={() => handleNavigate('home')} />}
           {activeView === 'suggestions' && <FeedbackView kind="suggestion" onBack={() => handleNavigate('home')} />}
+          {activeView === 'short-link' && <ShortLinkView slug={shortSlug} onHome={() => handleNavigate('home')} />}
+          {activeView === 'not-found' && <section className="mx-auto max-w-xl rounded-2xl border border-white/10 bg-[#101218] p-8 text-center"><h1 className="text-2xl font-bold">Página no encontrada</h1><p className="mt-2 text-sm text-slate-400">La ruta solicitada no existe en VELYXORA.</p><button onClick={() => handleNavigate('home')} className="mt-6 min-h-11 rounded-xl bg-indigo-600 px-5 text-sm">Ir al inicio</button></section>}
 
           {(activeView === 'about' || activeView === 'privacy' || activeView === 'terms') && (
             <LegalView page={activeView as any} onBack={() => handleNavigate('home')} />
