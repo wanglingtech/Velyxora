@@ -4,7 +4,7 @@
 
 Configura `DATABASE_URL` y un `AUTH_PASSWORD_PEPPER` aleatorio desde `.env.example`; ejecuta `npm run db:generate`, `npm run db:migrate` y `npm run db:seed`. Para crear el primer administrador, define temporalmente `INITIAL_ADMIN_EMAIL` e `INITIAL_ADMIN_PASSWORD` solo en el entorno del seed. El registro público nunca acepta ADMIN.
 
-Auth usa sesiones opacas en cookie HttpOnly, SameSite=Lax, Secure en producción y CSRF de doble envío. Los pagos son revisión manual Yape (`BETA_MANUAL`), no una pasarela automática.
+Auth usa sesiones opacas en cookie HttpOnly y Secure en producción, con `SameSite` configurable mediante `SESSION_COOKIE_SAME_SITE` (`none` por defecto en producción y `lax` en desarrollo) y protección CSRF por token de sesión. Para la beta Vercel/Railway cross-site se usa `none`; al migrar a `velyxora.com` + `api.velyxora.com`, configure `lax`. Los pagos son revisión manual Yape (`BETA_MANUAL`), no una pasarela automática.
 
 ## Herramientas FFmpeg
 

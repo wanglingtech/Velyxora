@@ -81,7 +81,7 @@ export interface MediaAnalysisResponse {
   notice?: string;
 }
 
-class ApiClient {
+export class ApiClient {
   private baseUrl: string;
   private csrf = '';
   private cachedHealth: { data: BackendHealth | null; timestamp: number } = {

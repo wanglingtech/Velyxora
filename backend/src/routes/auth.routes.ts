@@ -1,9 +1,11 @@
 import { Router } from 'express';
+import type { CookieOptions, Response } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { authService, SESSION_COOKIE } from '../services/authService';
 import { requireAuth } from '../middleware/auth';
 import { prisma } from '../db/prisma';
 import { logger } from '../utils/logger';
+import { ENV } from '../config/env';
 
 const router = Router();
 const loginWindowMs = process.env.NODE_ENV === 'production' ? 15 * 60_000 : 60_000;
@@ -19,9 +21,18 @@ const authLimit = rateLimit({
     res.status(429).json({ success: false, error: { code: 'AUTH_RATE_LIMITED', message: 'Has realizado demasiados intentos de inicio de sesión. Inténtalo nuevamente en unos minutos.', retryAfter } });
   },
 });
-const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' };
-const setSessionCookies = (res: any, session: { token: string; csrf: string; expiresAt: Date }) => {
-  res.cookie(SESSION_COOKIE, session.token, { ...cookieOptions, expires: session.expiresAt });
+export const buildSessionCookieOptions = (
+  nodeEnv: string,
+  sameSite: CookieOptions['sameSite'],
+): CookieOptions => ({
+  httpOnly: true,
+  secure: nodeEnv === 'production',
+  sameSite,
+  path: '/',
+});
+export const sessionCookieOptions = buildSessionCookieOptions(ENV.NODE_ENV, ENV.SESSION_COOKIE_SAME_SITE);
+const setSessionCookies = (res: Response, session: { token: string; csrf: string; expiresAt: Date }) => {
+  res.cookie(SESSION_COOKIE, session.token, { ...sessionCookieOptions, expires: session.expiresAt });
 };
 const publicUser = (user: { id: string; email: string; displayName: string | null; role: string; status: string }) => ({ id: user.id, email: user.email, displayName: user.displayName, role: user.role, status: user.status });
 
@@ -55,7 +66,7 @@ router.get('/me', requireAuth, async (req, res) => {
 
 router.post('/logout', requireAuth, async (req, res) => {
   await prisma.session.delete({ where: { id: req.auth!.sessionId } });
-  res.clearCookie(SESSION_COOKIE, cookieOptions);
+  res.clearCookie(SESSION_COOKIE, sessionCookieOptions);
   logger.info(`AUTH_LOGOUT userId=${req.auth!.userId} endpoint=${req.originalUrl} status=200`);
   res.json({ success: true });
 });

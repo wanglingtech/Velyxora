@@ -1,5 +1,6 @@
 import path from "path";
 import dotenv from "dotenv";
+import type { CookieOptions } from "express";
 
 dotenv.config();
 
@@ -18,8 +19,22 @@ const resolveBackendPath = (
     : path.resolve(backendRoot, target);
 };
 
+export type SessionCookieSameSite = Extract<CookieOptions["sameSite"], "lax" | "none">;
+
+export const resolveSessionCookieSameSite = (
+  value: string | undefined,
+  nodeEnv: string,
+): SessionCookieSameSite => {
+  const configured = value?.trim().toLowerCase();
+  if (configured === "lax" || configured === "none") return configured;
+  if (configured) throw new Error("SESSION_COOKIE_SAME_SITE debe ser 'lax' o 'none'.");
+  return nodeEnv === "production" ? "none" : "lax";
+};
+
+const nodeEnv = process.env.NODE_ENV || "development";
+
 export const ENV = {
-  NODE_ENV: process.env.NODE_ENV || "development",
+  NODE_ENV: nodeEnv,
   PORT: Number(process.env.PORT) || 3000,
   CORS_ORIGINS: (process.env.CORS_ORIGIN || "http://localhost:5173")
     .split(",")
@@ -40,4 +55,8 @@ export const ENV = {
   RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: 1000,
   TRUST_PROXY: process.env.TRUST_PROXY === "true" ? 1 : false,
+  SESSION_COOKIE_SAME_SITE: resolveSessionCookieSameSite(
+    process.env.SESSION_COOKIE_SAME_SITE,
+    nodeEnv,
+  ),
 };

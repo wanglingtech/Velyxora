@@ -11,7 +11,7 @@ The beta file flow is `upload -> processing -> result -> download -> TTL cleanup
 ## Railway
 
 1. Create the API service from this repository using `Dockerfile`; add Railway PostgreSQL and expose its `DATABASE_URL` to the API.
-2. Configure the production variables from `.env.example`. Railway supplies `PORT`; set `NODE_ENV=production`, `CORS_ORIGIN=https://velyxora.com`, `TRUST_PROXY=true`, and a stable random `AUTH_PASSWORD_PEPPER`.
+2. Configure the production variables from `.env.example`. Railway supplies `PORT`; during the cross-site beta set `NODE_ENV=production`, `CORS_ORIGIN=https://velyxora.vercel.app`, `SESSION_COOKIE_SAME_SITE=none`, `TRUST_PROXY=true`, and a stable random `AUTH_PASSWORD_PEPPER`. After moving the frontend and API to `velyxora.com` subdomains, change the origin to `https://velyxora.com` and `SESSION_COOKIE_SAME_SITE=lax`.
 3. Keep the pre-deploy command `npx prisma migrate deploy`, start command `node backend/dist/server.mjs`, and health path `/api/health` from `railway.json`.
 4. Run `npm run db:seed` manually once if plans/admin are required. The seed is idempotent and does not rotate an existing admin password. Remove `INITIAL_ADMIN_PASSWORD` afterward.
 5. Attach `api.velyxora.com` only after verification. Do not configure a persistent volume for temporary files.
@@ -19,7 +19,7 @@ The beta file flow is `upload -> processing -> result -> download -> TTL cleanup
 ## Vercel
 
 1. Import the repository using its root, build command `npm run build:frontend`, and output directory `dist` (also encoded in `vercel.json`).
-2. Set `VITE_API_URL=https://api.velyxora.com/api` before building. The SPA rewrite is provided by `vercel.json`.
+2. During beta set `VITE_API_URL=https://velyxora-production.up.railway.app/api` before building. After the custom-domain migration use `https://api.velyxora.com/api`. The SPA rewrite is provided by `vercel.json`.
 3. Attach `velyxora.com`. Recommended canonical policy: redirect `www.velyxora.com` permanently to the apex. If `www` serves the SPA, add it to `CORS_ORIGIN`.
 
 ## Cloudflare DNS (manual, after services exist)

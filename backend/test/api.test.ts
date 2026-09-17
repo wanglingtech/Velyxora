@@ -4,8 +4,22 @@ import request from "supertest";
 import { backendApp } from "../src/app";
 import fs from "node:fs";
 import path from "node:path";
-import { ENV } from "../src/config/env";
+import { ENV, resolveSessionCookieSameSite } from "../src/config/env";
 import { storageService } from "../src/services/storageService";
+import { buildSessionCookieOptions } from "../src/routes/auth.routes";
+
+test("production session cookies are cross-site safe and configurable for the custom domain", () => {
+  assert.strictEqual(resolveSessionCookieSameSite(undefined, "production"), "none");
+  assert.strictEqual(resolveSessionCookieSameSite("lax", "production"), "lax");
+  assert.strictEqual(resolveSessionCookieSameSite("none", "production"), "none");
+  assert.throws(() => resolveSessionCookieSameSite("invalid", "production"));
+  const betaCookie = buildSessionCookieOptions("production", "none");
+  assert.strictEqual(betaCookie.httpOnly, true);
+  assert.strictEqual(betaCookie.secure, true);
+  assert.strictEqual(betaCookie.path, "/");
+  assert.strictEqual(betaCookie.sameSite, "none");
+  assert.strictEqual(buildSessionCookieOptions("production", "lax").sameSite, "lax");
+});
 
 test("GET /api/health returns valid health schema and dynamic service status", async () => {
   const res = await request(backendApp).get("/api/health");
@@ -39,6 +53,15 @@ test("CORS permits the local frontend on health and auth preflight", async () =>
   const me = await request(backendApp).get("/api/auth/me").set("Origin", origin);
   assert.strictEqual(me.status, 401);
   assert.strictEqual(me.headers["access-control-allow-origin"], origin);
+});
+
+test("CORS rejects unconfigured browser origins and never returns a wildcard", async () => {
+  const allowed = await request(backendApp).get("/api/health").set("Origin", "http://localhost:5173");
+  assert.notStrictEqual(allowed.headers["access-control-allow-origin"], "*");
+
+  const rejected = await request(backendApp).get("/api/health").set("Origin", "https://attacker.invalid");
+  assert.strictEqual(rejected.status, 500);
+  assert.strictEqual(rejected.headers["access-control-allow-origin"], undefined);
 });
 
 test("GET /api/tools returns available tool capabilities", async () => {
