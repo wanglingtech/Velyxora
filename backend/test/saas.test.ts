@@ -22,6 +22,40 @@ test('anon en endpoint USER protegido recibe 401', async () => {
   assert.equal(response.status, 401);
 });
 
+test('login real reutiliza la cookie en auth/me, account, payments y media analyze', async () => {
+  const suffix = randomUUID();
+  const email = `session-flow-${suffix}@example.invalid`;
+  const password = 'Session-flow-seguro-123';
+  await seedInitialData(prisma);
+  const plan = await prisma.plan.findUniqueOrThrow({ where: { code: 'FREE' } });
+  const user = await prisma.user.create({ data: { email, passwordHash: await hashPassword(password), displayName: 'Session Flow' } });
+  await prisma.userPlan.create({ data: { userId: user.id, planId: plan.id } });
+  try {
+    const agent = request.agent(createBackendApp());
+    const login = await agent.post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200);
+    assert.match(String(login.headers['set-cookie']?.[0]), new RegExp(`^${SESSION_COOKIE}=`));
+    assert.ok(login.body.data.csrf);
+
+    const me = await agent.get('/api/auth/me');
+    assert.equal(me.status, 200);
+    assert.equal(me.body.data.user.email, email);
+    assert.equal((await agent.get('/api/account')).status, 200);
+    assert.equal((await agent.get('/api/payments/config')).status, 200);
+
+    const analyze = await agent
+      .post('/api/media/analyze')
+      .set('X-CSRF-Token', login.body.data.csrf)
+      .send({ url: 'https://example.com/not-allowlisted' });
+    assert.equal(analyze.status, 422);
+    assert.equal(analyze.body.error.code, 'ANALYSIS_FAILED');
+  } finally {
+    await prisma.session.deleteMany({ where: { userId: user.id } });
+    await prisma.userPlan.deleteMany({ where: { userId: user.id } });
+    await prisma.user.delete({ where: { id: user.id } });
+  }
+});
+
 test('autorización USER→ADMIN 403 y ADMIN permitido', () => {
   const middleware = requireRole('ADMIN');
   const response = () => { const state: any = {}; return { state, status(code: number) { state.code = code; return this; }, json(body: any) { state.body = body; return this; } }; };

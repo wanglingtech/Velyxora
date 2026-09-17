@@ -5,6 +5,9 @@ import { logger } from '../utils/logger';
 
 export const SESSION_COOKIE = 'velyxora_session';
 const hashToken = (value: string) => createHash('sha256').update(value).digest('hex');
+export type SessionResolution =
+  | { status: 'AUTHENTICATED'; session: NonNullable<Awaited<ReturnType<AuthService['findSession']>>> }
+  | { status: 'MISSING_COOKIE' | 'SESSION_NOT_FOUND' | 'SESSION_EXPIRED' | 'USER_INACTIVE'; session: null };
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 export const identityHash = (email: string) => createHash('sha256').update(normalizeEmail(email)).digest('hex');
 
@@ -53,11 +56,22 @@ export class AuthService {
     return { token, csrf, expiresAt, user: session.user };
   }
 
+  private findSession(token: string) {
+    return prisma.session.findUnique({ where: { tokenHash: hashToken(token) }, include: { user: true } });
+  }
+
+  async resolveDetailed(token?: string): Promise<SessionResolution> {
+    if (!token) return { status: 'MISSING_COOKIE', session: null };
+    const session = await this.findSession(token);
+    if (!session) return { status: 'SESSION_NOT_FOUND', session: null };
+    if (session.expiresAt <= new Date()) return { status: 'SESSION_EXPIRED', session: null };
+    if (session.user.status !== 'ACTIVE') return { status: 'USER_INACTIVE', session: null };
+    return { status: 'AUTHENTICATED', session };
+  }
+
   async resolve(token?: string) {
-    if (!token) return null;
-    const session = await prisma.session.findUnique({ where: { tokenHash: hashToken(token) }, include: { user: true } });
-    if (!session || session.expiresAt <= new Date() || session.user.status !== 'ACTIVE') return null;
-    return session;
+    const result = await this.resolveDetailed(token);
+    return result.session;
   }
 
   verifyCsrf(session: { csrfHash: string }, csrf?: string) { return Boolean(csrf && hashToken(csrf) === session.csrfHash); }

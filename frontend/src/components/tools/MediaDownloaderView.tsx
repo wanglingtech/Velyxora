@@ -16,6 +16,7 @@ import {
 import {
   ALL_MEDIA_ADAPTERS,
   findMatchingMediaAdapter,
+  mediaAnalyzeErrorMessage,
   mediaFormatActionLabel,
 } from "../../services/mediaService";
 import { MediaMetadata, MediaFormatOption } from "../../types/media";
@@ -70,8 +71,8 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
       setSelectedFormat(initialFormat);
       setMetadata(meta);
       toast.success("Contenido analizado con éxito", meta.title);
-    } catch (err: any) {
-      const message = err?.message || "No fue posible analizar esta URL.";
+    } catch (err: unknown) {
+      const message = mediaAnalyzeErrorMessage(err);
       const title = message.startsWith("Backend no disponible")
         ? "Backend no disponible"
         : message.includes("No compatible")

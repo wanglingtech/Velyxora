@@ -9,7 +9,8 @@ import {
   parseColorToAll,
 } from '../src/services/dataConverterService';
 import { generateQrCode } from '../src/services/conversionEngine';
-import { mediaFormatActionLabel } from '../src/services/mediaService';
+import { mediaAnalyzeErrorMessage, mediaFormatActionLabel } from '../src/services/mediaService';
+import { ApiError } from '../src/services/apiClient';
 
 test('conversores de datos producen salidas reales y rechazan JSON inválido', () => {
   assert.deepEqual(csvToJson('name,age\n"Ada",37').json, [{ name: 'Ada', age: 37 }]);
@@ -32,6 +33,14 @@ test('media downloader renderiza un estado válido cuando aún no hay formato se
   assert.equal(mediaFormatActionLabel(null), 'Selecciona un formato');
   assert.equal(mediaFormatActionLabel({ id: 'audio', extension: 'mp3', formatNote: 'Audio MP3' }), 'Descargar Audio MP3');
   assert.equal(mediaFormatActionLabel({ id: 'fallback', extension: 'webm' }), 'Descargar WEBM');
+});
+
+test('media downloader convierte AUTH_REQUIRED en un mensaje humano sin romper el render', () => {
+  assert.equal(
+    mediaAnalyzeErrorMessage(new ApiError('Inicia sesión.', 401, 'AUTH_REQUIRED')),
+    'Tu sesión no está disponible. Inicia sesión nuevamente.',
+  );
+  assert.equal(mediaAnalyzeErrorMessage(new Error('Proveedor no compatible')), 'Proveedor no compatible');
 });
 
 test('Code 128B codifica ASCII y rechaza caracteres fuera del alfabeto', () => {

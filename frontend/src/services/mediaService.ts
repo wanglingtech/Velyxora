@@ -1,5 +1,5 @@
 import { MediaFormatOption, MediaMetadata } from "../types/media";
-import { apiClient, MediaAnalysisResponse } from "./apiClient";
+import { ApiError, apiClient, MediaAnalysisResponse } from "./apiClient";
 
 interface MediaAdapter {
   id: string;
@@ -98,6 +98,13 @@ export const mediaFormatActionLabel = (format: MediaFormatOption | null): string
   format
     ? `Descargar ${format.formatNote || format.label || format.extension.toUpperCase()}`
     : 'Selecciona un formato';
+
+export const mediaAnalyzeErrorMessage = (error: unknown): string =>
+  error instanceof ApiError && (error.status === 401 || error.code === 'AUTH_REQUIRED')
+    ? 'Tu sesión no está disponible. Inicia sesión nuevamente.'
+    : error instanceof Error
+      ? error.message
+      : 'No fue posible analizar esta URL.';
 
 export const ALL_MEDIA_ADAPTERS: MediaAdapter[] = [
   createAdapter("youtube", "YouTube", ["youtube.com", "youtu.be"]),

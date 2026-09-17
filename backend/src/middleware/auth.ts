@@ -4,9 +4,15 @@ import { authService, SESSION_COOKIE } from '../services/authService';
 import { logger } from '../utils/logger';
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const session = await authService.resolve(req.cookies?.[SESSION_COOKIE]);
+  const resolution = await authService.resolveDetailed(req.cookies?.[SESSION_COOKIE]);
+  const session = resolution.session;
   if (!session) {
-    logger.warn(`AUTH_SESSION_INVALID endpoint=${req.originalUrl} status=401`);
+    logger.warn('AUTH_SESSION_REJECTED', {
+      reason: resolution.status,
+      method: req.method,
+      path: req.originalUrl.split('?')[0],
+      status: 401,
+    });
     res.status(401).json({ success: false, error: { code: 'AUTH_REQUIRED', message: 'Inicia sesión.' } }); return;
   }
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !authService.verifyCsrf(session, req.header('x-csrf-token'))) {
