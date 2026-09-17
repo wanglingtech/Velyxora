@@ -21,8 +21,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     catch (error) { if (error instanceof ApiError && error.status !== 401) console.warn('No se pudo restaurar la sesión.', error); setUser(null); return null; }
   }, []);
   useEffect(() => { void refreshSession().finally(() => setLoading(false)); }, [refreshSession]);
-  const login = useCallback(async (input: Credentials) => { const result = await apiClient.auth.login(input.email, input.password); setUser(result.user); return result.user; }, []);
-  const register = useCallback(async (input: RegisterInput) => { const result = await apiClient.auth.register(input.email, input.password, input.displayName); setUser(result.user); return result.user; }, []);
+  const login = useCallback(async (input: Credentials) => {
+    await apiClient.auth.login(input.email, input.password);
+    const current = await apiClient.auth.me();
+    setUser(current);
+    return current;
+  }, []);
+  const register = useCallback(async (input: RegisterInput) => {
+    await apiClient.auth.register(input.email, input.password, input.displayName);
+    const current = await apiClient.auth.me();
+    setUser(current);
+    return current;
+  }, []);
   const logout = useCallback(async () => { try { await apiClient.auth.logout(); } finally { setUser(null); } }, []);
   const value = useMemo(() => ({ user, isAuthenticated: Boolean(user), isLoading, login, register, logout, refreshSession }), [user, isLoading, login, register, logout, refreshSession]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

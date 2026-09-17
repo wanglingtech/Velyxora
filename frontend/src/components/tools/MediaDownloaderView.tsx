@@ -16,6 +16,7 @@ import {
 import {
   ALL_MEDIA_ADAPTERS,
   findMatchingMediaAdapter,
+  mediaFormatActionLabel,
 } from "../../services/mediaService";
 import { MediaMetadata, MediaFormatOption } from "../../types/media";
 import { toast } from "../common/ToastContainer";
@@ -65,10 +66,9 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
 
     try {
       const meta = await adapter.analyze(targetUrl);
+      const initialFormat = meta.availableFormats[0] ?? null;
+      setSelectedFormat(initialFormat);
       setMetadata(meta);
-      if (meta.availableFormats.length > 0) {
-        setSelectedFormat(meta.availableFormats[0]);
-      }
       toast.success("Contenido analizado con éxito", meta.title);
     } catch (err: any) {
       const message = err?.message || "No fue posible analizar esta URL.";
@@ -357,7 +357,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
                     className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all"
                   >
                     <DownloadCloud className="w-4 h-4" />
-                    <span>Descargar {selectedFormat.formatNote}</span>
+                    <span>{mediaFormatActionLabel(selectedFormat)}</span>
                   </button>
                 )}
               </div>

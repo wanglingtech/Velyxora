@@ -18,7 +18,10 @@ test("production session cookies are cross-site safe and configurable for the cu
   assert.strictEqual(betaCookie.secure, true);
   assert.strictEqual(betaCookie.path, "/");
   assert.strictEqual(betaCookie.sameSite, "none");
-  assert.strictEqual(buildSessionCookieOptions("production", "lax").sameSite, "lax");
+  assert.strictEqual(betaCookie.partitioned, true);
+  const customDomainCookie = buildSessionCookieOptions("production", "lax");
+  assert.strictEqual(customDomainCookie.sameSite, "lax");
+  assert.strictEqual(customDomainCookie.partitioned, false);
 });
 
 test("GET /api/health returns valid health schema and dynamic service status", async () => {

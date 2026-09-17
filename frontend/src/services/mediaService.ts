@@ -1,4 +1,4 @@
-import { MediaMetadata } from "../types/media";
+import { MediaFormatOption, MediaMetadata } from "../types/media";
 import { apiClient, MediaAnalysisResponse } from "./apiClient";
 
 interface MediaAdapter {
@@ -40,7 +40,11 @@ const extractEmbedUrl = (embedHtml?: string): string | undefined => {
 const mapAnalysis = (
   analysis: MediaAnalysisResponse,
   platformLabel: string,
-): MediaMetadata => ({
+): MediaMetadata => {
+  const formats = Array.isArray(analysis.formats)
+    ? analysis.formats.filter((format) => format && typeof format.formatId === 'string' && typeof format.extension === 'string')
+    : [];
+  return ({
   originalUrl: analysis.url,
   platform: analysis.platform,
   platformLabel,
@@ -53,7 +57,7 @@ const mapAnalysis = (
       ? undefined
       : `${Math.floor(analysis.durationSeconds / 60)}:${String(Math.round(analysis.durationSeconds % 60)).padStart(2, "0")}`,
   contentType: analysis.contentType,
-  availableFormats: analysis.formats.map((format) => ({
+  availableFormats: formats.map((format) => ({
     id: format.formatId,
     extension: format.extension,
     label:
@@ -87,7 +91,13 @@ const mapAnalysis = (
       "El análisis usa metadata autorizada del proveedor; la extracción directa requiere un motor externo.",
   },
   id: analysis.url,
-});
+  });
+};
+
+export const mediaFormatActionLabel = (format: MediaFormatOption | null): string =>
+  format
+    ? `Descargar ${format.formatNote || format.label || format.extension.toUpperCase()}`
+    : 'Selecciona un formato';
 
 export const ALL_MEDIA_ADAPTERS: MediaAdapter[] = [
   createAdapter("youtube", "YouTube", ["youtube.com", "youtu.be"]),

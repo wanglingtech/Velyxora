@@ -9,6 +9,7 @@ import {
   parseColorToAll,
 } from '../src/services/dataConverterService';
 import { generateQrCode } from '../src/services/conversionEngine';
+import { mediaFormatActionLabel } from '../src/services/mediaService';
 
 test('conversores de datos producen salidas reales y rechazan JSON inválido', () => {
   assert.deepEqual(csvToJson('name,age\n"Ada",37').json, [{ name: 'Ada', age: 37 }]);
@@ -25,6 +26,12 @@ test('markdown, color y diff cubren resultado válido y entrada inválida', () =
   assert.equal(parseColorToAll('#ff0000')?.hex, '#FF0000');
   assert.equal(parseColorToAll('no-es-un-color'), null);
   assert.deepEqual(computeTextDiff('a\nb', 'a\nc').map((line) => line.type), ['unchanged', 'removed', 'added']);
+});
+
+test('media downloader renderiza un estado válido cuando aún no hay formato seleccionado', () => {
+  assert.equal(mediaFormatActionLabel(null), 'Selecciona un formato');
+  assert.equal(mediaFormatActionLabel({ id: 'audio', extension: 'mp3', formatNote: 'Audio MP3' }), 'Descargar Audio MP3');
+  assert.equal(mediaFormatActionLabel({ id: 'fallback', extension: 'webm' }), 'Descargar WEBM');
 });
 
 test('Code 128B codifica ASCII y rechaza caracteres fuera del alfabeto', () => {

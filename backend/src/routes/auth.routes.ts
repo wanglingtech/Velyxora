@@ -45,6 +45,7 @@ export const buildSessionCookieOptions = (
   httpOnly: true,
   secure: nodeEnv === 'production',
   sameSite,
+  partitioned: nodeEnv === 'production' && sameSite === 'none',
   path: '/',
 });
 export const sessionCookieOptions = buildSessionCookieOptions(ENV.NODE_ENV, ENV.SESSION_COOKIE_SAME_SITE);
