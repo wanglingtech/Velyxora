@@ -130,6 +130,27 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     isClientReady: true
   },
   {
+    id: 'sticker-maker',
+    slug: 'sticker-maker',
+    name: 'Crear Sticker',
+    description: 'Encuadra una imagen y genera un sticker WebP estático de 512 × 512, localmente en tu navegador.',
+    category: 'image',
+    subcategory: 'Edición',
+    icon: 'Sticker',
+    inputTypes: ['image/png', 'image/jpeg', 'image/webp'],
+    outputTypes: ['image/webp'],
+    acceptedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
+    acceptedMimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: false,
+    supportsPreview: true,
+    keywords: ['sticker', 'pegatina', 'webp', '512', 'cuadrado', 'whatsapp', 'imagen'],
+    popular: true,
+    isClientReady: true,
+    creditsCost: 0,
+  },
+  {
     id: 'image-to-base64',
     slug: 'image-to-base64',
     name: 'Imagen a Base64',
@@ -954,8 +975,9 @@ export const CATEGORIES_CONFIG = [
 
 export const PUBLIC_TOOL_REGISTRY = TOOL_REGISTRY.filter((tool) => tool.public !== false);
 
-export type ToolRunnerKind = 'standard-file' | 'pdf' | 'image-advanced' | 'data-code' | 'utilities' | 'barcode' | 'qr' | 'text' | 'creative';
+export type ToolRunnerKind = 'standard-file' | 'sticker-maker' | 'pdf' | 'image-advanced' | 'data-code' | 'utilities' | 'barcode' | 'qr' | 'text' | 'creative';
 export function getToolRunnerKind(tool: ToolDefinition): ToolRunnerKind | null {
+  if (tool.id === 'sticker-maker') return 'sticker-maker';
   if (['url-shortener','icon-maker','social-text-studio','emoji-tool'].includes(tool.id)) return 'creative';
   if (tool.id === 'password-generator') return 'text';
   if (['images-to-pdf', 'text-to-pdf'].includes(tool.id)) return 'pdf';

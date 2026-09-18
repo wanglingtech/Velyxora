@@ -47,3 +47,13 @@ Share no necesita variables de entorno, permisos backend ni cambios de despliegu
 ## WhatsApp payment contact checks
 
 Con una cuenta de prueba, cree una orden y compruebe sin enviar mensajes que `PENDING_PAYMENT` muestra “Consultar por WhatsApp”, que después de registrar los nueve dígitos `PENDING_REVIEW` muestra “Contactar por WhatsApp” y que estados terminales no muestran la acción. Inspeccione la URL `wa.me`: debe contener el número sin `+`, espacios ni separadores y un parámetro `text` codificado. El mensaje solo debe contener plan, monto/moneda, email, ID y, cuando corresponda, reference. El usuario controla el envío; WhatsApp/Meta procesa los datos cuando decide continuar. Esta fase no usa Cloud API ni sustituye la revisión administrativa.
+
+## Sticker Maker manual checks
+
+- Desktop Chrome/Edge: cargar PNG, JPEG y WebP; probar imagen vertical, horizontal y cuadrada; arrastrar, cambiar zoom, restablecer, generar y descargar.
+- Transparencia: verificar un PNG con alpha sobre el tablero del editor y en el WebP descargado.
+- Compresión: confirmar 512×512, MIME WebP, tamaño mostrado y señalización honesta cuando supera 100 KB.
+- Móvil: probar viewport estrecho, Pointer Events táctiles, scroll fuera del canvas, preview y Compartir cuando Web Share admite archivos.
+- Share: probar `navigator.canShare` positivo y negativo; el negativo debe descargar. No es necesario enviar ni instalar el archivo en WhatsApp.
+
+No requiere variables, backend ni despliegue especial. Los límites cliente son 15 MiB, 8192 px por lado y 40 MP. La compatibilidad WebP/Share depende del navegador objetivo; background removal, borde de silueta, animación y packs quedan fuera del MVP.

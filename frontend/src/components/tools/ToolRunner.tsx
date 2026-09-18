@@ -40,6 +40,7 @@ import { BarcodeToolRunner } from "./subtools/BarcodeToolRunner";
 import { ImageAdvancedTools } from "./subtools/ImageAdvancedTools";
 import { DataAndCodeTools } from "./subtools/DataAndCodeTools";
 import { UtilitiesToolRunner } from "./subtools/UtilitiesToolRunner";
+import { StickerMakerTool } from "./subtools/StickerMakerTool";
 import { useAuth } from "../../auth/AuthContext";
 const CreativeTools = React.lazy(() => import("./subtools/CreativeTools").then((module) => ({ default: module.CreativeTools })));
 
@@ -724,6 +725,8 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
       {!activeJob && (
         <div className="space-y-6">
           {/* ==================== PDF TOOLS (Client-Side & Server) ==================== */}
+          {runnerKind === "sticker-maker" && <StickerMakerTool tool={tool} initialFile={selectedFile || undefined} />}
+
           {runnerKind === "pdf" && (
             <PdfToolRunner
               tool={tool}

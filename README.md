@@ -179,3 +179,9 @@ El historial previo a cuentas/DB es local, versionado y guarda solo metadatos. P
 La capa Share del frontend admite resultados `file`, `text` y `url`. Los resultados que pasan por `JobProgressView` pueden abrir el menú nativo del sistema con `navigator.share()`: los archivos se ofrecen únicamente después de que `navigator.canShare({ files })` confirme soporte; si no existe soporte se conserva la descarga, y los textos usan copiar al portapapeles como fallback. Una cancelación voluntaria del menú no se presenta como fallo.
 
 Las URL solo son compartibles/copiables mediante este contrato cuando son HTTP(S) públicas; se rechazan `blob:`, `file:`, localhost, redes privadas, credenciales embebidas, rutas relativas e IDs de almacenamiento. VELYXORA no publica directamente en redes sociales, no solicita credenciales sociales y no sube resultados a un intermediario para compartir. Esta acción es local y no consume créditos.
+
+## Crear Sticker
+
+Sticker Maker es una herramienta pública de Imagen para PNG, JPG/JPEG y WebP. Valida MIME, firma, decodificación, bytes y dimensiones; permite encuadre 1:1 mediante arrastre, zoom y restablecimiento, y genera localmente un WebP estático de 512 × 512. Prueba calidades 92%, 82%, 72%, 62%, 52% y 42% hasta intentar alcanzar 100 KB, con un máximo acotado de seis exportaciones. Si no alcanza el objetivo, permite descargar el resultado pero lo identifica como fuera del objetivo.
+
+La herramienta preserva transparencia cuando la entrada y el navegador la proporcionan, cuesta 0 créditos y está disponible para FREE, PLUS y PRO. No elimina fondos, no crea stickers animados o packs, no instala archivos en WhatsApp y no implementa un borde de silueta. Descargar siempre permanece disponible; Compartir reutiliza Share Layer y su fallback de descarga.

@@ -47,7 +47,7 @@ Compartir es local, no consume créditos y no introduce endpoints, persistencia,
 | Preferencias locales | `COMPLETE` | validación, update/reset, saveHistory, confirmación y movimiento reducido |
 | Persistencia en cuenta/DB | `NOT_IMPLEMENTED` | fuera de alcance hasta autenticación |
 
-El catálogo contiene 65 definiciones y publica 55 herramientas utilizables. Diez definiciones internas se excluyen explícitamente con `public: false` hasta contar con runner real: `image-cropper`, `audio-channel-converter`, `audio-format-converter`, `base64-text-converter`, `url-encoder-decoder`, `regex-tester`, `line-cleaner-sorter`, `slug-generator`, `media-url-analyzer` (la vista dedicada sigue disponible en navegación) y `merge-pdf`.
+El catálogo contiene 66 definiciones y publica 56 herramientas utilizables. Diez definiciones internas se excluyen explícitamente con `public: false` hasta contar con runner real: `image-cropper`, `audio-channel-converter`, `audio-format-converter`, `base64-text-converter`, `url-encoder-decoder`, `regex-tester`, `line-cleaner-sorter`, `slug-generator`, `media-url-analyzer` (la vista dedicada sigue disponible en navegación) y `merge-pdf`.
 
 La clasificación conservadora herramienta por herramienta de este cierre está en `FINAL_PRE_AUTH_AUDIT.md`; sustituye las afirmaciones históricas no respaldadas por una ejecución actual que aparecen más abajo en este documento.
 
@@ -102,6 +102,10 @@ Phase 2B fixed the shared result-delivery defect: client jobs now download their
 
 Implementado en Mi cuenta para órdenes Yape propias con estado `PENDING_PAYMENT` (consulta) y `PENDING_REVIEW` (contacto para revisión). El enlace prellena plan, monto/moneda, email e ID de orden; la referencia de nueve dígitos solo se incluye cuando existe. El usuario revisa, modifica y decide enviar en WhatsApp. No hay Cloud API, bot, envío automático, consumo de créditos ni activación de planes; `PaymentService.review()` conserva toda la autoridad.
 
+## Fase 1C — Sticker Maker
+
+`Crear Sticker` está público en Imagen con runner local propio. Acepta PNG/JPG/WebP auténticos hasta 15 MiB, 8192 px por lado y 40 megapíxeles; ofrece preview 1:1, paneo Pointer Events, zoom y reset. Produce WebP estático 512×512, intenta seis calidades para el objetivo ≤100 KB y diferencia explícitamente un resultado que no lo alcance. Preserva alpha mediante Canvas transparente. No incluye borde de silueta, background removal, animación, packs ni instalación automática. Usa Share Layer para `File` con fallback de descarga y registra solo metadata de historial con costo 0.
+
 ### Status Definitions
 
 - `COMPLETE`: Fully implemented and verified working without simulated stubs or fake data.
@@ -117,6 +121,7 @@ Implementado en Mi cuenta para órdenes Yape propias con estado `PENDING_PAYMENT
 | **PNG to WebP**                  | image            | CLIENT_SIDE     | browser-canvas          | `COMPLETE`                 | Yes              | N/A              | Yes            | Native Canvas Blob encoding with quality control                                                |
 | **JPG to PNG**                   | image            | CLIENT_SIDE     | browser-canvas          | `COMPLETE`                 | Yes              | N/A              | Yes            | Lossless 2D canvas extraction                                                                   |
 | **Image Compressor**             | image            | CLIENT_SIDE     | browser-canvas          | `COMPLETE`                 | Yes              | N/A              | Yes            | Stepwise JPEG/WebP compression with size diffing                                                |
+| **Crear Sticker**                | image            | CLIENT_SIDE     | browser-canvas          | `COMPLETE`                 | Yes              | N/A              | Yes            | Static 512×512 WebP, bounded ≤100 KB compression target, local crop/zoom and Share fallback      |
 | **Image Resizer**                | image            | CLIENT_SIDE     | browser-canvas          | `COMPLETE`                 | Yes              | N/A              | Yes            | Pixel & percentage scaling with aspect ratio lock                                               |
 | **Crop Image**                   | image            | CLIENT_SIDE     | browser-canvas          | `COMPLETE`                 | Yes              | N/A              | Yes            | 1:1, 4:3, 16:9, and custom rectangular crop                                                     |
 | **Image Watermark**              | image            | CLIENT_SIDE     | browser-canvas          | `COMPLETE`                 | Yes              | N/A              | Yes            | 5-quadrant placement, opacity, and custom text                                                  |

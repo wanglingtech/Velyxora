@@ -5,6 +5,7 @@
 | **PNG**                   | JPG, WebP      | BrowserImageEngine     | Browser Canvas                 | `COMPLETE`                 |
 | **JPG**                   | PNG, WebP      | BrowserImageEngine     | Browser Canvas                 | `COMPLETE`                 |
 | **WebP**                  | PNG, JPG       | BrowserImageEngine     | Browser Canvas                 | `COMPLETE`                 |
+| **PNG/JPG/WebP (Sticker)**| WebP 512×512   | StickerMakerService    | Browser Canvas, ≤100 KB target | `COMPLETE`                 |
 | **SVG**                   | PNG, JPG       | BrowserImageEngine     | Browser Canvas                 | `COMPLETE`                 |
 | **Images (JPG/PNG/WebP)** | PDF            | pdf-lib/browser-canvas | Browser Blob PDF               | `COMPLETE`                 |
 | **Plain Text**            | PDF            | pdf-lib                | Browser Blob PDF               | `COMPLETE`                 |

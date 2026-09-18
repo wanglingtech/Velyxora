@@ -8,7 +8,7 @@
 - [x] Cancelación voluntaria diferenciada de fallos reales.
 - [x] Integración inicial en `JobProgressView` sin cambiar motores.
 - [ ] Integrar gradualmente runners con resultados propios después de revisión manual.
-- [ ] Fases futuras: Sticker Maker, TTS/STT y WhatsApp Business/Cloud API; no forman parte de 1A ni 1B.
+- [ ] Fases futuras: TTS/STT y WhatsApp Business/Cloud API; no forman parte de 1A–1C.
 
 ## Fase 1B — WhatsApp Click-to-Chat de pagos
 
@@ -17,7 +17,16 @@
 - [x] Consulta en `PENDING_PAYMENT` y contacto para revisión en `PENDING_REVIEW`; estados terminales sin acción.
 - [x] Enlace `wa.me` codificado, iniciado y enviado únicamente por decisión del usuario.
 - [x] Sin Cloud API, bot, cambios DB, créditos o activación de planes.
-- [ ] Fase 1C Sticker Maker, TTS/STT y automatización WhatsApp permanecen fuera de alcance.
+- [ ] TTS/STT y automatización WhatsApp permanecen fuera de alcance.
+
+## Fase 1C — Sticker Maker
+
+- [x] Herramienta pública `sticker-maker` separada de `image-cropper`, que continúa oculta.
+- [x] Validación PNG/JPEG/WebP por MIME, firma, decodificación y límites de memoria.
+- [x] Editor local 1:1 con paneo Pointer Events, zoom y restablecimiento.
+- [x] WebP estático 512×512 con estrategia acotada hacia ≤100 KB y estado oversize explícito.
+- [x] Descarga, Share Layer con fallback e historial de metadata a 0 créditos.
+- [ ] Futuro evaluable: borde de silueta, background removal y stickers animados; no implementados en este MVP.
 
 ## Fase SaaS beta
 
