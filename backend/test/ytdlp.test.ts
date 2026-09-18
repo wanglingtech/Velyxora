@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { providerRegistry } from "../src/providers/ProviderRegistry";
-import { buildAnalyzeArgs, friendlyError, isRequestedFormatAvailable, normalizeFormats, parseAnalysis } from "../src/services/ytDlpService";
+import { assertUsableAnalysisFormats, buildAnalyzeArgs, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, selectThumbnail } from "../src/services/ytDlpService";
 import { backendApp } from "../src/app";
 import { ytDlpService } from "../src/services/ytDlpService";
 import { ENV } from "../src/config/env";
@@ -25,8 +25,51 @@ test("yt-dlp formats are normalized, deduplicated and include real MP3 conversio
     { format_id: "v2", ext: "mp4", vcodec: "h264", acodec: "none", height: 720, fps: 30, filesize: 1100 },
     { format_id: "a1", ext: "m4a", vcodec: "none", acodec: "aac", abr: 128 },
   ]);
-  assert.equal(formats.filter((format) => format.type === "video").length, 1);
+  assert.equal(formats.filter((format) => format.type === "video").length, 2);
   assert.ok(formats.some((format) => format.formatId === "audio-mp3-192" && format.container === "mp3"));
+});
+
+test("normalization preserves video-only, audio-only and combined adaptive formats", () => {
+  const { formats, diagnostics } = normalizeFormatsWithDiagnostics([
+    { format_id: "video", ext: "mp4", vcodec: "avc1", acodec: "none", height: 1080 },
+    { format_id: "audio", ext: "m4a", vcodec: "none", acodec: "mp4a.40.2", abr: 128 },
+    { format_id: "combined", ext: "mp4", vcodec: "avc1", acodec: "mp4a.40.2", height: 360 },
+  ]);
+  assert.ok(formats.some((format) => format.formatId === "video" && format.hasVideo && !format.hasAudio));
+  assert.ok(formats.some((format) => format.formatId === "audio" && !format.hasVideo && format.hasAudio));
+  assert.ok(formats.some((format) => format.formatId === "combined" && format.hasVideo && format.hasAudio));
+  assert.equal(diagnostics.rawFormatsCount, 3);
+  assert.equal(diagnostics.afterDeduplication, 3);
+  assert.equal(diagnostics.videoCount, 2);
+  assert.equal(diagnostics.combinedCount, 1);
+  assert.ok(diagnostics.audioCount >= 1);
+});
+
+test("format diagnostics distinguish empty extractor output from filtered non-media entries", () => {
+  const empty = normalizeFormatsWithDiagnostics([]).diagnostics;
+  assert.equal(empty.rawFormatsCount, 0);
+  assert.equal(empty.normalizedFormatsCount, 0);
+  const filtered = normalizeFormatsWithDiagnostics([
+    { format_id: "storyboard", ext: "mhtml", vcodec: "none", acodec: "none" },
+    { ext: "mp4", vcodec: "avc1", acodec: "none" },
+  ]).diagnostics;
+  assert.equal(filtered.rawFormatsCount, 2);
+  assert.equal(filtered.afterIdFilter, 1);
+  assert.equal(filtered.afterCodecFilter, 0);
+  assert.equal(filtered.normalizedFormatsCount, 0);
+  assert.throws(() => assertUsableAnalysisFormats("youtube", empty), (error: any) => error.code === "MEDIA_FORMATS_UNAVAILABLE");
+  assert.throws(() => assertUsableAnalysisFormats("youtube", filtered), (error: any) => error.code === "MEDIA_FORMATS_UNAVAILABLE");
+});
+
+test("thumbnail selection avoids a known maxres candidate and warning logs are categorized", () => {
+  assert.equal(selectThumbnail({
+    thumbnail: "https://i.ytimg.com/vi/id/maxresdefault.webp",
+    thumbnails: [
+      { url: "https://i.ytimg.com/vi/id/maxresdefault.webp", width: 1280 },
+      { url: "https://i.ytimg.com/vi/id/hqdefault.jpg", width: 480 },
+    ],
+  }), "https://i.ytimg.com/vi/id/hqdefault.jpg");
+  assert.deepEqual(classifyWarnings("WARNING: missing PO Token; SABR formats unavailable"), ["po_token_required", "sabr_restriction", "formats_unavailable"]);
 });
 
 test("analyze requests JSON metadata and formats without selecting or downloading a format", () => {

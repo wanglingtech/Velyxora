@@ -8,13 +8,20 @@ import { MediaAnalysisResult, MediaPlatform, MediaStreamFormat } from "../types/
 export type RawFormat = {
   format_id?: string; ext?: string; vcodec?: string; acodec?: string;
   width?: number; height?: number; fps?: number; tbr?: number; abr?: number;
-  filesize?: number; filesize_approx?: number; format_note?: string;
+  filesize?: number; filesize_approx?: number; format_note?: string; protocol?: string;
 };
 
 export type RawInfo = {
   webpage_url?: string; title?: string; uploader?: string; channel?: string;
   uploader_url?: string; thumbnail?: string; duration?: number; extractor_key?: string;
+  thumbnails?: Array<{ url?: string; width?: number; height?: number; preference?: number }>;
   formats?: RawFormat[];
+};
+
+export type FormatDiagnostics = {
+  rawFormatsCount: number; afterIdFilter: number; afterExtensionFilter: number;
+  afterCodecFilter: number; afterDeduplication: number; normalizedFormatsCount: number;
+  videoCount: number; audioCount: number; combinedCount: number;
 };
 
 export class YtDlpError extends Error {
@@ -36,18 +43,22 @@ export function friendlyError(stderr: string, stage: YtDlpStage): YtDlpError {
   return new YtDlpError("PROVIDER_UNAVAILABLE", "El proveedor cambió su sistema o el contenido no está disponible temporalmente.");
 }
 
-export function normalizeFormats(formats: RawFormat[] = []): MediaStreamFormat[] {
+const hasUsableCodec = (codec: unknown): boolean =>
+  typeof codec === "string" && !["", "none", "unknown"].includes(codec.trim().toLowerCase());
+
+export function normalizeFormatsWithDiagnostics(formats: RawFormat[] = []): { formats: MediaStreamFormat[]; diagnostics: FormatDiagnostics } {
   const normalized: MediaStreamFormat[] = [];
   const seen = new Set<string>();
-  for (const item of formats) {
-    if (!item.format_id || !item.ext) continue;
-    const hasVideo = Boolean(item.vcodec && item.vcodec !== "none");
-    const hasAudio = Boolean(item.acodec && item.acodec !== "none");
-    if (!hasVideo && !hasAudio) continue;
+  const withId = formats.filter((item) => typeof item.format_id === "string" && item.format_id.trim());
+  const withExtension = withId.filter((item) => typeof item.ext === "string" && item.ext.trim());
+  const withCodec = withExtension.filter((item) => hasUsableCodec(item.vcodec) || hasUsableCodec(item.acodec));
+  for (const item of withCodec) {
+    const hasVideo = hasUsableCodec(item.vcodec);
+    const hasAudio = hasUsableCodec(item.acodec);
     const type = hasVideo ? "video" : "audio";
     const resolution = hasVideo && item.height ? `${item.height}p` : undefined;
     const bitrate = Math.round(item.abr || item.tbr || 0) || undefined;
-    const key = `${type}:${item.ext}:${resolution || bitrate || item.format_id}:${hasAudio}`;
+    const key = `${item.format_id}:${type}:${item.ext}`;
     if (seen.has(key)) continue;
     seen.add(key);
     normalized.push({
@@ -57,16 +68,35 @@ export function normalizeFormats(formats: RawFormat[] = []): MediaStreamFormat[]
       codec: hasVideo ? item.vcodec : item.acodec, fps: item.fps, bitrate,
     });
   }
+  const afterDeduplication = normalized.length;
   if (normalized.some((format) => format.hasAudio)) {
     for (const bitrate of [128, 192, 320]) normalized.push({
       formatId: `audio-mp3-${bitrate}`, type: "audio", container: "mp3", extension: "mp3",
       qualityLabel: `MP3 ${bitrate} kbps`, hasVideo: false, hasAudio: true, bitrate,
     });
   }
-  return normalized.sort((a, b) => a.type.localeCompare(b.type) || (b.resolution || "").localeCompare(a.resolution || ""));
+  const sorted = normalized.sort((a, b) => a.type.localeCompare(b.type) || (b.resolution || "").localeCompare(a.resolution || ""));
+  return { formats: sorted, diagnostics: {
+    rawFormatsCount: formats.length, afterIdFilter: withId.length,
+    afterExtensionFilter: withExtension.length, afterCodecFilter: withCodec.length,
+    afterDeduplication, normalizedFormatsCount: sorted.length,
+    videoCount: sorted.filter((format) => format.hasVideo).length,
+    audioCount: sorted.filter((format) => format.hasAudio && !format.hasVideo).length,
+    combinedCount: sorted.filter((format) => format.hasVideo && format.hasAudio).length,
+  } };
 }
 
-const COMMON_ARGS = ["--ignore-config", "--no-playlist", "--no-warnings", "--js-runtimes", "node"];
+export const normalizeFormats = (formats: RawFormat[] = []): MediaStreamFormat[] =>
+  normalizeFormatsWithDiagnostics(formats).formats;
+
+export function assertUsableAnalysisFormats(platform: MediaPlatform, diagnostics: FormatDiagnostics): void {
+  if (diagnostics.afterDeduplication > 0) return;
+  const reason = diagnostics.rawFormatsCount === 0 ? "extractor_returned_no_formats" : "no_usable_audio_or_video_formats";
+  logger.warn("MEDIA_FORMATS_UNAVAILABLE", { provider: platform, reason });
+  throw new YtDlpError("MEDIA_FORMATS_UNAVAILABLE", "No fue posible obtener formatos descargables para este contenido.");
+}
+
+const COMMON_ARGS = ["--ignore-config", "--no-playlist", "--js-runtimes", "node"];
 
 export const buildAnalyzeArgs = (url: string): string[] => [
   ...COMMON_ARGS,
@@ -82,7 +112,7 @@ export function parseAnalysis(data: RawInfo, requestedUrl: string, platform: Med
   return {
     url: data.webpage_url || requestedUrl, platform, title: data.title || "Contenido multimedia",
     author: data.uploader || data.channel || "Autor no disponible", authorUrl: data.uploader_url,
-    thumbnailUrl: data.thumbnail, durationSeconds: data.duration,
+    thumbnailUrl: selectThumbnail(data), durationSeconds: data.duration,
     contentType: (data.formats || []).some((format) => format.vcodec && format.vcodec !== "none") ? "video" : "audio",
     formats, isDirectDownloadPossible: formats.length > 0,
     requiresExternalExtractor: true,
@@ -90,6 +120,14 @@ export function parseAnalysis(data: RawInfo, requestedUrl: string, platform: Med
       ? "Usa esta herramienta solo con contenido público o que tengas permiso para descargar."
       : "La metadata es pública, pero el proveedor no expuso formatos descargables.",
   };
+}
+
+export function selectThumbnail(data: RawInfo): string | undefined {
+  const candidates = (data.thumbnails || [])
+    .filter((item): item is { url: string; width?: number; height?: number; preference?: number } => typeof item.url === "string" && /^https:\/\//i.test(item.url))
+    .filter((item) => !/maxresdefault\.(?:webp|jpg)(?:$|\?)/i.test(item.url))
+    .sort((a, b) => ((b.preference || 0) - (a.preference || 0)) || ((b.width || 0) - (a.width || 0)));
+  return candidates[0]?.url || data.thumbnail;
 }
 
 export const isRequestedFormatAvailable = (formats: MediaStreamFormat[], formatId: string): boolean =>
@@ -113,6 +151,9 @@ class YtDlpService {
   async analyze(url: string, platform: MediaPlatform): Promise<MediaAnalysisResult> {
     logger.info("YT_DLP_STAGE", { provider: platform, stage: "analyze" });
     const data = await this.extractInfo(url, "analyze", platform);
+    const { diagnostics } = normalizeFormatsWithDiagnostics(data.formats);
+    logger.info("MEDIA_ANALYZE_FORMATS", { provider: platform, ...diagnostics });
+    assertUsableAnalysisFormats(platform, diagnostics);
     return parseAnalysis(data, url, platform);
   }
 
@@ -161,7 +202,11 @@ class YtDlpService {
       child.once("close", (code) => {
         clearTimeout(timer); signal?.removeEventListener("abort", abort);
         if (signal?.aborted) return;
-        if (code === 0) resolve(stdout); else {
+        if (code === 0) {
+          const warningCategories = classifyWarnings(stderr);
+          if (warningCategories.length) logger.warn("YT_DLP_WARNINGS", { provider, stage, categories: warningCategories });
+          resolve(stdout);
+        } else {
           const error = friendlyError(stderr, stage);
           logger.warn("YT_DLP_FAILURE", { provider, stage, category: error.code, exitCode: code });
           reject(error);
@@ -169,6 +214,18 @@ class YtDlpService {
       });
     });
   }
+}
+
+export function classifyWarnings(stderr: string): string[] {
+  const categories = new Set<string>();
+  const value = stderr.toLowerCase();
+  if (value.includes("po token")) categories.add("po_token_required");
+  if (value.includes("sabr")) categories.add("sabr_restriction");
+  if (value.includes("sign in to confirm") || value.includes("not a bot")) categories.add("bot_verification");
+  if (value.includes("format") && value.includes("unavailable")) categories.add("formats_unavailable");
+  if (value.includes("javascript runtime") || value.includes("challenge")) categories.add("javascript_challenge");
+  if (/warning:/i.test(stderr) && categories.size === 0) categories.add("provider_warning");
+  return [...categories];
 }
 
 export const ytDlpService = new YtDlpService();

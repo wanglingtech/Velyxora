@@ -108,6 +108,9 @@ export const selectInitialMediaFormat = (metadata: MediaMetadata): MediaFormatOp
 
 export const EMPTY_MEDIA_FORMATS_MESSAGE = 'No se encontraron formatos compatibles para este contenido.';
 
+export const shouldShowMediaThumbnail = (thumbnailUrl: string | undefined, failed: boolean): boolean =>
+  Boolean(thumbnailUrl) && !failed;
+
 export const mediaFormatActionLabel = (format: MediaFormatOption | null): string =>
   format
     ? `Descargar ${format.formatNote || format.label || format.extension.toUpperCase()}`

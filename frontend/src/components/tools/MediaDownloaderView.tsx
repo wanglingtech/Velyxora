@@ -22,6 +22,7 @@ import {
   mediaAnalyzeErrorMessage,
   mediaFormatActionLabel,
   selectInitialMediaFormat,
+  shouldShowMediaThumbnail,
 } from "../../services/mediaService";
 import { MediaMetadata, MediaFormatOption } from "../../types/media";
 import { toast } from "../common/ToastContainer";
@@ -46,6 +47,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
   const [selectedFormat, setSelectedFormat] =
     useState<MediaFormatOption | null>(null);
   const [downloadJob, setDownloadJob] = useState<ConversionJobResponse | null>(null);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
   const [creditEstimate, setCreditEstimate] = useState<{ estimatedCredits: number; currentBalance: number; balanceAfter: number } | null>(null);
   const actionRef = useRef(false); const cancelRef = useRef(false);
   useEffect(() => { if (!selectedFormat) { setCreditEstimate(null); return; } let active = true; apiClient.estimateCredits('media-downloader', 0).then((value) => { if (active) setCreditEstimate(value); }).catch(() => { if (active) setCreditEstimate(null); }); return () => { active = false; }; }, [selectedFormat]);
@@ -71,6 +73,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
     setMetadata(null);
     setSelectedFormat(null);
     setDownloadJob(null);
+    setThumbnailFailed(false);
 
     try {
       const meta = await adapter.analyze(targetUrl);
@@ -160,6 +163,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
             setMetadata(null);
             setSelectedFormat(null);
             setDownloadJob(null);
+            setThumbnailFailed(false);
           }}
           disabled={isProcessing}
           onKeyDown={(e) => {
@@ -230,12 +234,13 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
                   allowFullScreen
                 />
               </div>
-            ) : metadata.thumbnailUrl ? (
+            ) : shouldShowMediaThumbnail(metadata.thumbnailUrl, thumbnailFailed) ? (
               <div className="relative w-full aspect-video max-h-[320px] overflow-hidden">
                 <img
                   src={metadata.thumbnailUrl}
                   alt={metadata.title}
                   className="w-full h-full object-cover"
+                  onError={() => setThumbnailFailed(true)}
                 />
               </div>
             ) : (

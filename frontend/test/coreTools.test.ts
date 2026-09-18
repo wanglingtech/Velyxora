@@ -9,7 +9,7 @@ import {
   parseColorToAll,
 } from '../src/services/dataConverterService';
 import { generateQrCode } from '../src/services/conversionEngine';
-import { EMPTY_MEDIA_FORMATS_MESSAGE, canStartMediaAnalyze, completedMediaOutput, mediaAnalyzeErrorMessage, mediaFormatActionLabel, normalizeMediaAnalysis, selectInitialMediaFormat } from '../src/services/mediaService';
+import { EMPTY_MEDIA_FORMATS_MESSAGE, canStartMediaAnalyze, completedMediaOutput, mediaAnalyzeErrorMessage, mediaFormatActionLabel, normalizeMediaAnalysis, selectInitialMediaFormat, shouldShowMediaThumbnail } from '../src/services/mediaService';
 import { ApiError } from '../src/services/apiClient';
 
 test('conversores de datos producen salidas reales y rechazan JSON inválido', () => {
@@ -76,6 +76,12 @@ test('media downloader conserva estado explícito cuando analyze no devuelve for
   assert.equal(metadata.availableFormats.length, 0);
   assert.equal(selectInitialMediaFormat(metadata), null);
   assert.equal(EMPTY_MEDIA_FORMATS_MESSAGE, 'No se encontraron formatos compatibles para este contenido.');
+});
+
+test('media thumbnail failure switches to the safe preview fallback', () => {
+  assert.equal(shouldShowMediaThumbnail('https://i.ytimg.com/vi/id/hqdefault.jpg', false), true);
+  assert.equal(shouldShowMediaThumbnail('https://i.ytimg.com/vi/id/hqdefault.jpg', true), false);
+  assert.equal(shouldShowMediaThumbnail(undefined, false), false);
 });
 
 test('media downloader termina inmediatamente si COMPLETED no contiene output', () => {
