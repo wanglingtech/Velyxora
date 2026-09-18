@@ -141,6 +141,23 @@ Cancels an active or queued conversion job.
 
 ---
 
+## Payments: WhatsApp Click-to-Chat configuration
+
+`GET /api/payments/config` requires the existing authenticated session and returns the manual Yape configuration plus:
+
+```json
+{
+  "whatsapp": {
+    "enabled": true,
+    "phone": "51968555200"
+  }
+}
+```
+
+`phone` is the public destination configured by backend `WHATSAPP_ADMIN_PHONE_E164`, normalized to the digits required by `wa.me`; it is independent from `YAPE_PHONE`. Invalid non-empty configuration prevents backend startup. No endpoint sends WhatsApp messages. Order plan, amount, currency, reference and status continue to come from the authenticated user's existing `/api/account` or `/api/payments/orders` DTOs, both filtered by ownership.
+
+---
+
 ## 4. Media Analysis & Downloader
 
 ### `POST /api/media/analyze`

@@ -10,8 +10,10 @@ import {
   Sparkles,
   UserRound,
   Zap,
+  MessageCircle,
 } from "lucide-react";
 import { CurrentUser, useAuth } from "../../auth/AuthContext";
+import { buildPaymentWhatsAppUrl, isPaymentWhatsAppStatus } from "../../services/paymentWhatsappService";
 
 const shell =
   "mx-auto max-w-3xl rounded-2xl border border-white/10 bg-[#101218] p-5 sm:p-8";
@@ -523,6 +525,8 @@ export function AccountView({ onBack }: { onBack: () => void }) {
                   }
                   onSubmit={() => submitReference(order.id)}
                   onCancel={() => cancelOrder(order.id)}
+                  email={data.email}
+                  whatsappPhone={paymentConfig?.whatsapp?.enabled ? paymentConfig.whatsapp.phone : null}
                 />
               ))
             )}
@@ -571,6 +575,8 @@ function PaymentCard({
   onChange,
   onSubmit,
   onCancel,
+  email,
+  whatsappPhone,
 }: {
   order: any;
   value: string;
@@ -578,6 +584,8 @@ function PaymentCard({
   onChange: (value: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
+  email: string;
+  whatsappPhone?: string | null;
 }) {
   const steps = [
     "Orden creada",
@@ -593,6 +601,14 @@ function PaymentCard({
       : order.status === "PENDING_REVIEW"
         ? 3
         : steps.length - 1;
+  let whatsappUrl: string | null = null;
+  if (whatsappPhone && isPaymentWhatsAppStatus(order.status)) {
+    try {
+      whatsappUrl = buildPaymentWhatsAppUrl({ phone: whatsappPhone, email, order });
+    } catch {
+      whatsappUrl = null;
+    }
+  }
   return (
     <article className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm">
       <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
@@ -674,6 +690,23 @@ function PaymentCard({
           >
             Cancelar operación
           </button>
+        </div>
+      )}
+      {whatsappUrl && (
+        <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={order.status === "PENDING_REVIEW" ? "Contactar por WhatsApp sobre esta orden" : "Consultar por WhatsApp sobre esta orden"}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/30 px-4 font-semibold text-emerald-200 sm:w-auto"
+          >
+            <MessageCircle className="h-4 w-4" aria-hidden="true" />
+            {order.status === "PENDING_REVIEW" ? "Contactar por WhatsApp" : "Consultar por WhatsApp"}
+          </a>
+          <p className="mt-2 text-xs leading-relaxed text-slate-400">
+            Abre WhatsApp con un mensaje prellenado. Puedes revisarlo o modificarlo; VELYXORA no lo envía automáticamente.
+          </p>
         </div>
       )}
     </article>

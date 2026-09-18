@@ -16,6 +16,7 @@ import { seedInitialData } from '../src/services/seedService';
 import { isSafeRedirectTarget, validateShortLinkTarget } from '../src/services/shortLinkService';
 import { validateUploadMetadata } from '../src/security/uploadPolicy';
 import { effectiveUploadLimit } from '../src/middleware/uploadHandler';
+import { normalizeWhatsAppPhoneE164 } from '../src/config/whatsapp';
 
 test('anon en endpoint USER protegido recibe 401', async () => {
   const response = await request(createBackendApp()).get('/api/auth/me');
@@ -106,6 +107,14 @@ test('seed admin crea, diagnostica mismatch y solo rota password con opt-in expl
 test('referencia Yape Perú acepta solo nueve dígitos y normaliza bordes', () => {
   assert.equal(normalizePeruPhone(' 968555200 '), '968555200');
   for (const value of ['968 555 200', '+51968555200', '96855520', '9685552000', 'abcdefghi', '<script>1']) assert.throws(() => normalizePeruPhone(value), /9 dígitos/);
+});
+
+test('WhatsApp admin exige E.164 y expone solo los dígitos para Click-to-Chat', () => {
+  assert.equal(normalizeWhatsAppPhoneE164(undefined), null);
+  assert.equal(normalizeWhatsAppPhoneE164('  +51968555200  '), '51968555200');
+  for (const value of ['51968555200', '+51 968555200', '+51-968555200', '+012345678', '+123']) {
+    assert.throws(() => normalizeWhatsAppPhoneE164(value), /E\.164/);
+  }
 });
 
 test('shortener distingue resolución, expiración y conserva destinos completos', async () => {

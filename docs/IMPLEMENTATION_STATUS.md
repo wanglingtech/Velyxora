@@ -98,6 +98,10 @@ This document tracks the implementation status of the tools represented by the c
 
 Phase 2B fixed the shared result-delivery defect: client jobs now download their real Blob through `downloadService`, while backend jobs return `output.fileId` and download through `GET /api/download/:fileId`. Tools still requiring unavailable host binaries remain `BACKEND_READY`/`REQUIRES_EXTERNAL_ENGINE`, not complete.
 
+## Fase 1B — WhatsApp Click-to-Chat de pagos
+
+Implementado en Mi cuenta para órdenes Yape propias con estado `PENDING_PAYMENT` (consulta) y `PENDING_REVIEW` (contacto para revisión). El enlace prellena plan, monto/moneda, email e ID de orden; la referencia de nueve dígitos solo se incluye cuando existe. El usuario revisa, modifica y decide enviar en WhatsApp. No hay Cloud API, bot, envío automático, consumo de créditos ni activación de planes; `PaymentService.review()` conserva toda la autoridad.
+
 ### Status Definitions
 
 - `COMPLETE`: Fully implemented and verified working without simulated stubs or fake data.

@@ -12,6 +12,7 @@ The beta file flow is `upload -> processing -> result -> download -> TTL cleanup
 
 1. Create the API service from this repository using `Dockerfile`; add Railway PostgreSQL and expose its `DATABASE_URL` to the API.
 2. Configure the production variables from `.env.example`. Railway supplies `PORT`; during the cross-site beta set `NODE_ENV=production`, `CORS_ORIGIN=https://velyxora.vercel.app`, `SESSION_COOKIE_SAME_SITE=none`, `TRUST_PROXY=true`, and a stable random `AUTH_PASSWORD_PEPPER`. After moving the frontend and API to `velyxora.com` subdomains, change the origin to `https://velyxora.com` and `SESSION_COOKIE_SAME_SITE=lax`.
+   For payment contact, set optional `WHATSAPP_ADMIN_PHONE_E164` to the public destination in strict E.164 form (leading `+`, country code and 8–15 total digits, for example `+51968555200`). It is separate from `YAPE_PHONE`; invalid non-empty configuration stops startup instead of producing a broken link.
 3. Keep the pre-deploy command `npx prisma migrate deploy`, start command `node backend/dist/server.mjs`, and health path `/api/health` from `railway.json`.
 4. Run `npm run db:seed` manually once if plans/admin are required. The seed is idempotent and does not rotate an existing admin password. Remove `INITIAL_ADMIN_PASSWORD` afterward.
 5. Attach `api.velyxora.com` only after verification. Do not configure a persistent volume for temporary files.
@@ -42,3 +43,7 @@ Run `npm run typecheck`, `npm run lint`, `npm test`, `npm run build:frontend`, `
 ## Share Layer checks
 
 Share no necesita variables de entorno, permisos backend ni cambios de despliegue. Debe validarse en HTTPS y en los navegadores/SO objetivo porque Web Share y el soporte de tipos de archivo varían. La revisión manual debe cubrir: share sheet disponible, `canShare` negativo, navegador sin Web Share, cancelación, fallback de descarga/copia y portapapeles bloqueado. VELYXORA no controla ni registra el destino elegido por el usuario y no publica directamente en redes sociales.
+
+## WhatsApp payment contact checks
+
+Con una cuenta de prueba, cree una orden y compruebe sin enviar mensajes que `PENDING_PAYMENT` muestra “Consultar por WhatsApp”, que después de registrar los nueve dígitos `PENDING_REVIEW` muestra “Contactar por WhatsApp” y que estados terminales no muestran la acción. Inspeccione la URL `wa.me`: debe contener el número sin `+`, espacios ni separadores y un parámetro `text` codificado. El mensaje solo debe contener plan, monto/moneda, email, ID y, cuando corresponda, reference. El usuario controla el envío; WhatsApp/Meta procesa los datos cuando decide continuar. Esta fase no usa Cloud API ni sustituye la revisión administrativa.

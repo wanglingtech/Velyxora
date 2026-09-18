@@ -1,6 +1,7 @@
 import path from "path";
 import dotenv from "dotenv";
 import type { CookieOptions } from "express";
+import { normalizeWhatsAppPhoneE164 } from "./whatsapp";
 
 dotenv.config();
 
@@ -72,4 +73,5 @@ export const ENV = {
     process.env.SESSION_COOKIE_SAME_SITE,
     nodeEnv,
   ),
+  WHATSAPP_ADMIN_PHONE: normalizeWhatsAppPhoneE164(process.env.WHATSAPP_ADMIN_PHONE_E164),
 };

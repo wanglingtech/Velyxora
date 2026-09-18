@@ -6,6 +6,8 @@ Configura `DATABASE_URL` y un `AUTH_PASSWORD_PEPPER` aleatorio desde `.env.examp
 
 Auth usa sesiones opacas en cookie HttpOnly y Secure en producción, con `SameSite` configurable mediante `SESSION_COOKIE_SAME_SITE` (`none` por defecto en producción y `lax` en desarrollo) y protección CSRF por token de sesión. Para la beta Vercel/Railway cross-site se usa `none`; al migrar a `velyxora.com` + `api.velyxora.com`, configure `lax`. Los pagos son revisión manual Yape (`BETA_MANUAL`), no una pasarela automática.
 
+Las órdenes Yape propias en `PENDING_PAYMENT` o `PENDING_REVIEW` pueden abrir WhatsApp Click-to-Chat desde Mi cuenta. Configure en el backend `WHATSAPP_ADMIN_PHONE_E164` con un número público independiente de `YAPE_PHONE` (por ejemplo, `+51968555200`). El mensaje usa plan, monto, moneda, email e ID obtenidos del backend y añade la referencia solo cuando existe y es válida. VELYXORA no envía el mensaje, no usa WhatsApp Cloud API y no activa planes: el usuario lo revisa y decide enviarlo, mientras la revisión administrativa existente sigue siendo autoritativa.
+
 ## Herramientas FFmpeg
 
 El catálogo expone conversiones reales de video y audio mediante el backend: MP4/WebM, MP3/WAV, GIF, recorte, silencio, velocidad, compresión, resolución, bitrate y normalización. El frontend sólo envía opciones tipadas; el servidor usa `spawn` con argumentos separados, valida cada resultado con FFprobe y publica la descarga únicamente después de `COMPLETED`.

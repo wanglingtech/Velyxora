@@ -8,6 +8,8 @@ Una operación SERVER autenticada calcula costo en backend, comprueba plan/concu
 
 Yape beta exige revisión ADMIN. Aprobar converge en Payment, PURCHASE, UserPlan y audit log dentro de una transacción. `PaymentProvider` queda como contrato sin checkout/webhook simulado. El downloader aplica `ProviderPolicyService` antes de SSRF/yt-dlp; GenericProvider no elude la allowlist.
 
+WhatsApp Click-to-Chat es una ayuda de contacto separada de Share Layer y de la aprobación. `GET /api/payments/config`, protegido por sesión, expone únicamente el número público normalizado; las órdenes y la cuenta continúan llegando desde consultas limitadas por `userId`. El navegador construye `https://wa.me/<número>?text=<mensaje codificado>` solo para `PENDING_PAYMENT` y `PENDING_REVIEW`, usando el DTO real de la orden. No hay envío servidor, webhook, bot, Cloud API ni cambio de estado provocado por WhatsApp.
+
 El historial local no se borra. Una futura `ApiHistoryRepository` importará solo metadata tras consentimiento.
 
 VELYXORA is engineered as a resilient, privacy-first, hybrid media and document transformation platform. It strictly enforces separation of concerns between client-side compute, server-side media processing, and external provider integrations.

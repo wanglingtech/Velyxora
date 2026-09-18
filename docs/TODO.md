@@ -8,7 +8,16 @@
 - [x] Cancelación voluntaria diferenciada de fallos reales.
 - [x] Integración inicial en `JobProgressView` sin cambiar motores.
 - [ ] Integrar gradualmente runners con resultados propios después de revisión manual.
-- [ ] Fases futuras: Sticker Maker, WhatsApp de pagos, TTS/STT y WhatsApp Business; no forman parte de 1A.
+- [ ] Fases futuras: Sticker Maker, TTS/STT y WhatsApp Business/Cloud API; no forman parte de 1A ni 1B.
+
+## Fase 1B — WhatsApp Click-to-Chat de pagos
+
+- [x] Configuración backend independiente `WHATSAPP_ADMIN_PHONE_E164`, validada como E.164.
+- [x] Mensajes mínimos construidos desde la cuenta y `PaymentOrder` propios devueltos por backend.
+- [x] Consulta en `PENDING_PAYMENT` y contacto para revisión en `PENDING_REVIEW`; estados terminales sin acción.
+- [x] Enlace `wa.me` codificado, iniciado y enviado únicamente por decisión del usuario.
+- [x] Sin Cloud API, bot, cambios DB, créditos o activación de planes.
+- [ ] Fase 1C Sticker Maker, TTS/STT y automatización WhatsApp permanecen fuera de alcance.
 
 ## Fase SaaS beta
 
