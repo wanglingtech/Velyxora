@@ -9,7 +9,7 @@ import {
   parseColorToAll,
 } from '../src/services/dataConverterService';
 import { generateQrCode } from '../src/services/conversionEngine';
-import { mediaAnalyzeErrorMessage, mediaFormatActionLabel } from '../src/services/mediaService';
+import { EMPTY_MEDIA_FORMATS_MESSAGE, canStartMediaAnalyze, completedMediaOutput, mediaAnalyzeErrorMessage, mediaFormatActionLabel, normalizeMediaAnalysis, selectInitialMediaFormat } from '../src/services/mediaService';
 import { ApiError } from '../src/services/apiClient';
 
 test('conversores de datos producen salidas reales y rechazan JSON inválido', () => {
@@ -41,6 +41,49 @@ test('media downloader convierte AUTH_REQUIRED en un mensaje humano sin romper e
     'Tu sesión no está disponible. Inicia sesión nuevamente.',
   );
   assert.equal(mediaAnalyzeErrorMessage(new Error('Proveedor no compatible')), 'Proveedor no compatible');
+});
+
+test('media downloader no inicia otro análisis mientras analiza o procesa', () => {
+  assert.equal(canStartMediaAnalyze(false, false), true);
+  assert.equal(canStartMediaAnalyze(true, false), false);
+  assert.equal(canStartMediaAnalyze(false, true), false);
+});
+
+test('media downloader conserva formatos parciales y clasifica video, audio y combined', () => {
+  const metadata = normalizeMediaAnalysis({
+    url: 'https://youtube.com/watch?v=test', platform: 'youtube', title: 'Test', author: 'Creator',
+    formats: [
+      { format_id: 'video-only', ext: 'mp4', vcodec: 'avc1', acodec: 'none', hasVideo: false, hasAudio: false },
+      { id: 'audio-only', container: 'm4a', vcodec: 'none', acodec: 'mp4a', hasVideo: false, hasAudio: false },
+      { formatId: 'combined', extension: 'webm', vcodec: 'vp9', acodec: 'opus', hasVideo: true, hasAudio: true },
+    ],
+    isDirectDownloadPossible: true, requiresExternalExtractor: true,
+  }, 'YouTube');
+  assert.equal(metadata.availableFormats.length, 3);
+  assert.deepEqual(metadata.availableFormats.map((format) => [format.id, format.type, format.hasVideo, format.hasAudio]), [
+    ['video-only', 'video', true, false],
+    ['audio-only', 'audio', false, true],
+    ['combined', 'video', true, true],
+  ]);
+  assert.equal(selectInitialMediaFormat(metadata)?.id, 'video-only');
+});
+
+test('media downloader conserva estado explícito cuando analyze no devuelve formatos', () => {
+  const metadata = normalizeMediaAnalysis({
+    url: 'https://youtube.com/watch?v=empty', platform: 'youtube', title: 'Empty', author: 'Creator', formats: [],
+    isDirectDownloadPossible: false, requiresExternalExtractor: true,
+  }, 'YouTube');
+  assert.equal(metadata.availableFormats.length, 0);
+  assert.equal(selectInitialMediaFormat(metadata), null);
+  assert.equal(EMPTY_MEDIA_FORMATS_MESSAGE, 'No se encontraron formatos compatibles para este contenido.');
+});
+
+test('media downloader termina inmediatamente si COMPLETED no contiene output', () => {
+  assert.throws(
+    () => completedMediaOutput({ id: 'job', toolId: 'media-downloader', status: 'COMPLETED', progress: 100 }),
+    /sin un archivo de salida válido/,
+  );
+  assert.equal(completedMediaOutput({ id: 'job', toolId: 'media-downloader', status: 'PROCESSING', progress: 50 }), null);
 });
 
 test('Code 128B codifica ASCII y rechaza caracteres fuera del alfabeto', () => {

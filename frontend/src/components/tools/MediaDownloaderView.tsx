@@ -15,9 +15,13 @@ import {
 } from "lucide-react";
 import {
   ALL_MEDIA_ADAPTERS,
+  EMPTY_MEDIA_FORMATS_MESSAGE,
+  canStartMediaAnalyze,
+  completedMediaOutput,
   findMatchingMediaAdapter,
   mediaAnalyzeErrorMessage,
   mediaFormatActionLabel,
+  selectInitialMediaFormat,
 } from "../../services/mediaService";
 import { MediaMetadata, MediaFormatOption } from "../../types/media";
 import { toast } from "../common/ToastContainer";
@@ -37,6 +41,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
   const { user } = useAuth();
   const [url, setUrl] = useState(initialUrl);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [metadata, setMetadata] = useState<MediaMetadata | null>(null);
   const [selectedFormat, setSelectedFormat] =
     useState<MediaFormatOption | null>(null);
@@ -46,6 +51,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
   useEffect(() => { if (!selectedFormat) { setCreditEstimate(null); return; } let active = true; apiClient.estimateCredits('media-downloader', 0).then((value) => { if (active) setCreditEstimate(value); }).catch(() => { if (active) setCreditEstimate(null); }); return () => { active = false; }; }, [selectedFormat]);
 
   const handleAnalyze = async (inputUrl?: string) => {
+    if (!canStartMediaAnalyze(isAnalyzing, isProcessing)) return;
     const targetUrl = (inputUrl || url).trim();
     if (!targetUrl) {
       toast.warning("Por favor ingresa una URL válida.");
@@ -64,10 +70,11 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
     setIsAnalyzing(true);
     setMetadata(null);
     setSelectedFormat(null);
+    setDownloadJob(null);
 
     try {
       const meta = await adapter.analyze(targetUrl);
-      const initialFormat = meta.availableFormats[0] ?? null;
+      const initialFormat = selectInitialMediaFormat(meta);
       setSelectedFormat(initialFormat);
       setMetadata(meta);
       toast.success("Contenido analizado con éxito", meta.title);
@@ -88,6 +95,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
     if (!selectedFormat || !metadata || actionRef.current) return;
     if (user?.role !== 'ADMIN' && creditEstimate && creditEstimate.balanceAfter < 0) { toast.error('Créditos insuficientes', 'Necesitas obtener créditos antes de descargar.'); return; }
     actionRef.current = true;
+    setIsProcessing(true);
     try {
       let job = await apiClient.startMediaDownload({
         url: metadata.originalUrl,
@@ -101,8 +109,9 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
         await new Promise((resolve) => setTimeout(resolve, 1000));
         job = await apiClient.getJobStatus(job.id);
         setDownloadJob(job);
-        if (job.status === "COMPLETED" && job.output) {
-          await downloadService.downloadBackendFile(job.output.fileId, job.output.filename);
+        if (job.status === "COMPLETED") {
+          const output = completedMediaOutput(job)!;
+          await downloadService.downloadBackendFile(output.fileId, output.filename);
           window.dispatchEvent(new Event('velyxora:credits-changed'));
           return;
         }
@@ -112,7 +121,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
       throw new Error("La descarga excedió el tiempo de espera.");
     } catch (error: any) {
       toast.error("No fue posible descargar", error.message);
-    } finally { actionRef.current = false; }
+    } finally { actionRef.current = false; setIsProcessing(false); }
   };
 
   const handleCancel = async () => {
@@ -146,7 +155,13 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
         <input
           type="url"
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setMetadata(null);
+            setSelectedFormat(null);
+            setDownloadJob(null);
+          }}
+          disabled={isProcessing}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -159,7 +174,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
 
         <button
           onClick={() => handleAnalyze()}
-          disabled={isAnalyzing || !url.trim()}
+          disabled={!canStartMediaAnalyze(isAnalyzing, isProcessing) || !url.trim()}
           className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all shrink-0"
         >
           {isAnalyzing ? (
@@ -274,6 +289,11 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
               </div>
 
               <div className="space-y-5">
+                {metadata.availableFormats.length === 0 && (
+                  <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-200">
+                    {EMPTY_MEDIA_FORMATS_MESSAGE}
+                  </p>
+                )}
                 {(["video", "audio"] as const).map((group) => (
                   <div key={group} className="space-y-2">
                     <h5 className="text-[11px] font-bold tracking-widest text-indigo-300">{group.toUpperCase()}</h5>

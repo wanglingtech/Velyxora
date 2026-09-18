@@ -1,5 +1,5 @@
 import { MediaFormatOption, MediaMetadata } from "../types/media";
-import { ApiError, apiClient, MediaAnalysisResponse } from "./apiClient";
+import { ApiError, apiClient, ConversionJobResponse, MediaAnalysisResponse } from "./apiClient";
 
 interface MediaAdapter {
   id: string;
@@ -27,7 +27,7 @@ const createAdapter = (
   },
   async analyze(url) {
     const analysis = await apiClient.analyzeMediaUrl(url);
-    return mapAnalysis(analysis, name);
+    return normalizeMediaAnalysis(analysis, name);
   },
 });
 
@@ -37,13 +37,22 @@ const extractEmbedUrl = (embedHtml?: string): string | undefined => {
   return match?.[1];
 };
 
-const mapAnalysis = (
+export const normalizeMediaAnalysis = (
   analysis: MediaAnalysisResponse,
   platformLabel: string,
 ): MediaMetadata => {
-  const formats = Array.isArray(analysis.formats)
-    ? analysis.formats.filter((format) => format && typeof format.formatId === 'string' && typeof format.extension === 'string')
-    : [];
+  const formats = Array.isArray(analysis.formats) ? analysis.formats.flatMap((format) => {
+    if (!format) return [];
+    const formatId = [format.formatId, format.format_id, format.id].find((value) => typeof value === 'string' && value.trim())?.trim();
+    const extension = [format.extension, format.container, format.ext].find((value) => typeof value === 'string' && value.trim())?.trim().toLowerCase();
+    const declaredType = format.type || format.kind;
+    const hasVideo = format.hasVideo === true || (Boolean(format.vcodec) && format.vcodec !== 'none') || declaredType === 'video';
+    const hasAudio = format.hasAudio === true || (Boolean(format.acodec) && format.acodec !== 'none') || declaredType === 'audio';
+    if (!formatId || !extension || (!hasVideo && !hasAudio)) return [];
+    const type: 'video' | 'audio' = hasVideo ? 'video' : 'audio';
+    const qualityLabel = format.qualityLabel || format.formatNote || format.format_note || format.label || format.resolution;
+    return [{ ...format, formatId, extension, type, hasVideo, hasAudio, qualityLabel }];
+  }) : [];
   return ({
   originalUrl: analysis.url,
   platform: analysis.platform,
@@ -80,7 +89,7 @@ const mapAnalysis = (
     type: format.type,
     fps: format.fps,
     bitrate: format.bitrate,
-    filesize: format.estimatedSize,
+    filesize: format.estimatedSize || format.filesize || format.filesizeApprox || format.filesize_approx,
     codec: format.codec,
   })),
   requiresServerEngine: analysis.requiresExternalExtractor,
@@ -94,6 +103,11 @@ const mapAnalysis = (
   });
 };
 
+export const selectInitialMediaFormat = (metadata: MediaMetadata): MediaFormatOption | null =>
+  metadata.availableFormats[0] ?? null;
+
+export const EMPTY_MEDIA_FORMATS_MESSAGE = 'No se encontraron formatos compatibles para este contenido.';
+
 export const mediaFormatActionLabel = (format: MediaFormatOption | null): string =>
   format
     ? `Descargar ${format.formatNote || format.label || format.extension.toUpperCase()}`
@@ -105,6 +119,15 @@ export const mediaAnalyzeErrorMessage = (error: unknown): string =>
     : error instanceof Error
       ? error.message
       : 'No fue posible analizar esta URL.';
+
+export const canStartMediaAnalyze = (isAnalyzing: boolean, isProcessing: boolean): boolean =>
+  !isAnalyzing && !isProcessing;
+
+export const completedMediaOutput = (job: ConversionJobResponse): ConversionJobResponse['output'] | null => {
+  if (job.status !== 'COMPLETED') return null;
+  if (!job.output) throw new Error('El trabajo terminó sin un archivo de salida válido.');
+  return job.output;
+};
 
 export const ALL_MEDIA_ADAPTERS: MediaAdapter[] = [
   createAdapter("youtube", "YouTube", ["youtube.com", "youtu.be"]),
