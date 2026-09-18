@@ -44,7 +44,8 @@ ENV NODE_ENV=production \
     FFMPEG_PATH=ffmpeg \
     FFPROBE_PATH=ffprobe \
     LIBREOFFICE_PATH=soffice \
-    YT_DLP_PATH=yt-dlp
+    YT_DLP_PATH=yt-dlp \
+    PATH="/opt/velyxora-ytdlp/bin:${PATH}"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -56,6 +57,7 @@ RUN apt-get update \
         ca-certificates \
         curl \
         python3 \
+        python3-venv \
         fonts-dejavu-core \
     && curl --fail --show-error --silent --location \
         "https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/yt-dlp" \
@@ -63,6 +65,16 @@ RUN apt-get update \
     && echo "${YT_DLP_SHA256}  /usr/local/bin/yt-dlp" | sha256sum --check --strict \
     && chmod 0755 /usr/local/bin/yt-dlp \
     && test "$(/usr/local/bin/yt-dlp --version)" = "${YT_DLP_VERSION}" \
+    && python3 -m venv /opt/velyxora-ytdlp \
+    && /opt/velyxora-ytdlp/bin/python -m pip install \
+        --disable-pip-version-check \
+        --no-cache-dir \
+        certifi==2026.7.22 \
+        cffi==2.1.1 \
+        curl-cffi==0.16.0 \
+        pycparser==3.0 \
+    && test "$(/opt/velyxora-ytdlp/bin/python -c 'import curl_cffi; print(curl_cffi.__version__)')" = "0.16.0" \
+    && yt-dlp --list-impersonate-targets | grep -Eq 'curl_cffi$' \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
