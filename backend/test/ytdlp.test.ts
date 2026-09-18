@@ -73,6 +73,15 @@ test("YouTube bot verification is reported as provider restriction without affec
   );
 });
 
+test("TikTok post access restriction is provider-specific and unknown failures remain generic", () => {
+  const blocked = "ERROR: [TikTok] 123: Your IP address is blocked from accessing this post";
+  const tiktokError = friendlyError(blocked, "analyze", "tiktok");
+  assert.equal(tiktokError.code, "MEDIA_PROVIDER_RESTRICTED");
+  assert.equal(tiktokError.message, "TikTok no permitió acceder a este contenido desde el servidor. Prueba con otra publicación pública o inténtalo más tarde.");
+  assert.equal(friendlyError("ERROR: [TikTok] unexpected response", "analyze", "tiktok").code, "PROVIDER_UNAVAILABLE");
+  assert.equal(friendlyError(blocked, "analyze", "vimeo").code, "PROVIDER_UNAVAILABLE");
+});
+
 test("thumbnail selection avoids a known maxres candidate and warning logs are categorized", () => {
   assert.equal(selectThumbnail({
     thumbnail: "https://i.ytimg.com/vi/id/maxresdefault.webp",

@@ -31,8 +31,11 @@ export class YtDlpError extends Error {
 export type YtDlpStage = "analyze" | "process" | "diagnostic";
 type YtDlpRunResult = { stdout: string; warningCategories: string[] };
 
-export function friendlyError(stderr: string, stage: YtDlpStage): YtDlpError {
+export function friendlyError(stderr: string, stage: YtDlpStage, provider?: MediaPlatform): YtDlpError {
   const value = stderr.toLowerCase();
+  if (provider === "tiktok" && value.includes("your ip address is blocked from accessing this post")) {
+    return new YtDlpError("MEDIA_PROVIDER_RESTRICTED", "TikTok no permitió acceder a este contenido desde el servidor. Prueba con otra publicación pública o inténtalo más tarde.");
+  }
   if (value.includes("requested format is not available") || value.includes("no video formats")) {
     return stage === "process"
       ? new YtDlpError("FORMAT_UNAVAILABLE", "El formato seleccionado ya no está disponible.")
@@ -212,7 +215,10 @@ class YtDlpService {
           if (warningCategories.length) logger.warn("YT_DLP_WARNINGS", { provider, stage, categories: warningCategories });
           resolve({ stdout, warningCategories });
         } else {
-          const error = friendlyError(stderr, stage);
+          const error = friendlyError(stderr, stage, provider);
+          if (provider === "tiktok" && error.code === "MEDIA_PROVIDER_RESTRICTED") {
+            logger.warn("MEDIA_PROVIDER_RESTRICTED", { provider, reason: "post_access_restricted" });
+          }
           logger.warn("YT_DLP_FAILURE", { provider, stage, category: error.code, exitCode: code });
           reject(error);
         }
