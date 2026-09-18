@@ -26,21 +26,29 @@ export const downloadService = {
   },
 
   async downloadFromUrl(url: string, filename?: string): Promise<DownloadedFile> {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`DOWNLOAD_FAILED: HTTP ${response.status}.`);
-    const blob = await response.blob();
-    const result = {
-      blob,
-      filename: filename || "descarga",
-      contentType: response.headers.get("content-type") || blob.type || "application/octet-stream",
-    };
+    const result = await this.getFromUrl(url, filename);
     clickBlob(result.blob, result.filename);
     return result;
   },
 
+  async getFromUrl(url: string, filename?: string): Promise<DownloadedFile> {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`DOWNLOAD_FAILED: HTTP ${response.status}.`);
+    const blob = await response.blob();
+    return {
+      blob,
+      filename: filename || "descarga",
+      contentType: response.headers.get("content-type") || blob.type || "application/octet-stream",
+    };
+  },
+
   async downloadBackendFile(fileId: string, filename?: string): Promise<DownloadedFile> {
-    const result = await apiClient.downloadFile(fileId);
+    const result = await this.getBackendFile(fileId);
     clickBlob(result.blob, filename || result.filename);
     return result;
+  },
+
+  async getBackendFile(fileId: string): Promise<DownloadedFile> {
+    return apiClient.downloadFile(fileId);
   },
 };

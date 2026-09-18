@@ -81,3 +81,14 @@ The active Vite configuration is the single root `vite.config.ts`; it uses `fron
 - **Strict SSRF Isolation**: Incoming media URLs are audited against loopback (`127.0.0.1`, `::1`), private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local metadata endpoints (`169.254.169.254`), and forbidden URI schemes (`file://`, `ftp://`) before making external HTTP requests.
 - **Child Process Execution**: FFmpeg and LibreOffice use `spawn` with separated arguments and sanitized paths. Process cancellation and hard execution timeouts remain pending work.
 - **Ephemeral Storage Lifecycle**: Files in `temp/` and `storage/` are indexed with creation timestamps and automatically evicted every 30 minutes to prevent disk exhaustion.
+
+## Share layer
+
+`frontend/src/services/shareService.ts` define un contrato discriminado para `file`, `text` y `url`. `JobProgressView` es la primera integración: cubre los resultados Blob de imagen/audio/video/PDF/QR que usan el job común, los archivos temporales descargables del backend y los resultados de texto del mismo flujo. Los runners con UI y descarga propias todavía no están integrados para evitar refactors transversales.
+
+- `file`: resuelve el `File` de forma diferida, comprueba `navigator.canShare({ files })` y llama a `navigator.share`; sin soporte conserva la descarga existente.
+- `text`: usa `navigator.share` o copia el texto como fallback.
+- `url`: solo admite HTTP(S) público y usa compartir o copiar enlace. La integración común actual no convierte `downloadUrl`, `fileId` ni Blob URLs en enlaces públicos; una herramienta futura debe aportar explícitamente una URL pública válida.
+- `AbortError` representa cancelación del usuario y no genera error. Otros fallos se propagan a la UI.
+
+Para integrar una herramienta futura se construye un único `ShareTarget` con el contenido real y su fallback ya funcional. La capa no hace uploads, no conoce redes sociales, no consume créditos y no cambia los motores de procesamiento ni la API backend.

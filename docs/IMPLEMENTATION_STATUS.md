@@ -22,6 +22,19 @@
 | Payment gateway | `POST_BETA` | no implementado |
 | License | `PROPRIETARY` | All Rights Reserved |
 
+## Fase 1A — Share Layer
+
+| Área | Estado | Evidencia/limitación |
+|---|---|---|
+| Contrato `file` / `text` / `url` | `COMPLETE` | servicio frontend discriminado y pruebas unitarias |
+| Web Share de archivo | `COMPLETE` | exige `navigator.share` y `navigator.canShare({ files })` |
+| Fallback archivo/texto/URL | `COMPLETE` | descargar/copiar texto/copiar URL pública |
+| Integración `JobProgressView` | `COMPLETE` | Blobs locales, archivos temporales backend y texto |
+| Runners con resultado propio | `NOT_INTEGRATED` | permanecen sin cambios para limitar superficie de Fase 1A |
+| Publicación social directa | `NOT_IMPLEMENTED` | el destino lo elige el usuario en el share sheet |
+
+Compartir es local, no consume créditos y no introduce endpoints, persistencia, OAuth ni credenciales sociales. Las URLs privadas/locales, Blob URLs, rutas relativas, credenciales embebidas e IDs internos no son compartibles como enlace. La compatibilidad visual/móvil real queda sujeta a la revisión manual en navegadores objetivo.
+
 ## Fase LibreOffice + UX funcional (2026-09-13)
 
 | Área | Estado | Evidencia/limitación |

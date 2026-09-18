@@ -1,5 +1,15 @@
 # VELYXORA — Actionable Roadmap & Engineering Next Steps
 
+## Fase 1A — Share Layer
+
+- [x] Contrato reutilizable para archivo, texto y URL pública.
+- [x] Web Share con `navigator.canShare({ files })` para archivos.
+- [x] Fallbacks de descarga, copiar texto y copiar enlace público.
+- [x] Cancelación voluntaria diferenciada de fallos reales.
+- [x] Integración inicial en `JobProgressView` sin cambiar motores.
+- [ ] Integrar gradualmente runners con resultados propios después de revisión manual.
+- [ ] Fases futuras: Sticker Maker, WhatsApp de pagos, TTS/STT y WhatsApp Business; no forman parte de 1A.
+
 ## Fase SaaS beta
 
 - [x] Schema Prisma y migración PostgreSQL.

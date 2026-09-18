@@ -171,3 +171,9 @@ The current baseline includes real client PDF generation through `frontend/src/s
 Las conversiones `DOCX`, `XLSX`, `PPTX`, `ODT`, `ODS` y `ODP` a PDF usan un proceso real de LibreOffice headless. Configure `LIBREOFFICE_PATH` (en Windows, por ejemplo `C:\Program Files\LibreOffice\program\soffice.exe`) y opcionalmente `LIBREOFFICE_TIMEOUT_MS` (por defecto 600000). Cada job usa un perfil temporal aislado; la salida debe existir, no estar vacía y tener estructura PDF válida antes de publicarse.
 
 El historial previo a cuentas/DB es local, versionado y guarda solo metadatos. Puede desactivarse sin eliminar entradas existentes. Las preferencias y la reducción de movimiento también se guardan localmente.
+
+## Compartir resultados
+
+La capa Share del frontend admite resultados `file`, `text` y `url`. Los resultados que pasan por `JobProgressView` pueden abrir el menú nativo del sistema con `navigator.share()`: los archivos se ofrecen únicamente después de que `navigator.canShare({ files })` confirme soporte; si no existe soporte se conserva la descarga, y los textos usan copiar al portapapeles como fallback. Una cancelación voluntaria del menú no se presenta como fallo.
+
+Las URL solo son compartibles/copiables mediante este contrato cuando son HTTP(S) públicas; se rechazan `blob:`, `file:`, localhost, redes privadas, credenciales embebidas, rutas relativas e IDs de almacenamiento. VELYXORA no publica directamente en redes sociales, no solicita credenciales sociales y no sube resultados a un intermediario para compartir. Esta acción es local y no consume créditos.

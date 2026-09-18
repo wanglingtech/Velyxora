@@ -3,16 +3,16 @@ import {
   Download,
   CheckCircle2,
   AlertCircle,
-  X,
   RotateCcw,
   Copy,
   Check,
+  Share2,
 } from "lucide-react";
 import { ProcessingJob } from "../../types";
 import { formatFileSize } from "../../services/detectionService";
-import { CapabilityBadge } from "./Badge";
 import { downloadService } from "../../services/downloadService";
 import { toast } from "./ToastContainer";
+import { shareService } from "../../services/shareService";
 
 interface JobProgressViewProps {
   job: ProcessingJob;
@@ -30,26 +30,100 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
   );
   const [copied, setCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+
+  const performDownload = async () => {
+    if (!job.output) throw new Error("DOWNLOAD_FAILED: no existe un resultado.");
+    const filename = customFilename || job.output.filename;
+    if (job.output.blob) downloadService.downloadBlob(job.output.blob, filename);
+    else if (typeof job.output.fileId === "string") await downloadService.downloadBackendFile(job.output.fileId, filename);
+    else if (job.output.downloadUrl) await downloadService.downloadFromUrl(job.output.downloadUrl, filename);
+    else throw new Error("DOWNLOAD_FAILED: no existe un archivo de salida.");
+  };
 
   const handleDownload = async () => {
     if (!job.output || isDownloading) return;
     setIsDownloading(true);
     try {
-      const filename = customFilename || job.output.filename;
-      if (job.output.blob) downloadService.downloadBlob(job.output.blob, filename);
-      else if (typeof job.output.fileId === "string") await downloadService.downloadBackendFile(job.output.fileId, filename);
-      else if (job.output.downloadUrl) await downloadService.downloadFromUrl(job.output.downloadUrl, filename);
-      else throw new Error("DOWNLOAD_FAILED: no existe un archivo de salida.");
+      await performDownload();
     } catch (error) {
       toast.error("No se pudo descargar", error instanceof Error ? error.message : "DOWNLOAD_FAILED");
     } finally { setIsDownloading(false); }
   };
 
-  const handleCopyText = () => {
+  const copyText = async (text: string) => {
+    if (!navigator.clipboard?.writeText) throw new Error("CLIPBOARD_UNAVAILABLE");
+    await navigator.clipboard.writeText(text);
+  };
+
+  const handleCopyText = async () => {
     if (job.output?.textResult) {
-      navigator.clipboard.writeText(job.output.textResult);
+      try {
+        await copyText(job.output.textResult);
+      } catch {
+        toast.error("No se pudo copiar", "El portapapeles no está disponible en este navegador.");
+        return;
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!job.output || isSharing) return;
+    setIsSharing(true);
+    try {
+      const filename = customFilename || job.output.filename;
+      const hasFile = Boolean(job.output.blob || job.output.fileId || job.output.downloadUrl);
+      const outcome = hasFile
+        ? await shareService.share({
+            kind: "file",
+            title: job.toolName || "Resultado de VELYXORA",
+            text: "Resultado generado con VELYXORA",
+            getFile: async () => {
+              let blob: Blob;
+              let resolvedName = filename;
+              if (job.output!.blob) blob = job.output!.blob;
+              else if (typeof job.output!.fileId === "string") {
+                const result = await downloadService.getBackendFile(job.output!.fileId);
+                blob = result.blob;
+                resolvedName = filename || result.filename;
+              } else if (job.output!.downloadUrl) {
+                const result = await downloadService.getFromUrl(job.output!.downloadUrl, filename);
+                blob = result.blob;
+                resolvedName = result.filename;
+              } else throw new Error("SHARE_FILE_UNAVAILABLE");
+              if (!blob.size) throw new Error("SHARE_FILE_EMPTY");
+              return new File([blob], resolvedName || "resultado", {
+                type: job.output!.mimeType || blob.type || "application/octet-stream",
+              });
+            },
+            download: performDownload,
+          })
+        : await shareService.share({
+            kind: "text",
+            title: job.toolName || "Resultado de VELYXORA",
+            text: job.output.textResult || "",
+            copy: copyText,
+          });
+
+      if (outcome.status === "fallback") {
+        toast.info(
+          "Compartir no está disponible",
+          outcome.action === "download"
+            ? "Se conservó la descarga del archivo."
+            : "El resultado se copió al portapapeles.",
+        );
+      }
+    } catch (error) {
+      toast.error(
+        "No se pudo compartir",
+        error instanceof Error && error.message === "CLIPBOARD_UNAVAILABLE"
+          ? "El portapapeles no está disponible en este navegador."
+          : "El navegador no pudo abrir el menú para compartir.",
+      );
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -234,7 +308,7 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
         {/* Download and Action Row */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-white/[0.06]">
           {job.output.blob || job.output.fileId || job.output.downloadUrl ? (
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               <input
                 type="text"
                 value={customFilename || job.output.filename}
@@ -250,7 +324,28 @@ export const JobProgressView: React.FC<JobProgressViewProps> = ({
                 <Download className="w-4 h-4" />
                 <span>{isDownloading ? "Descargando…" : "Descargar archivo"}</span>
               </button>
+              <button
+                onClick={handleShare}
+                disabled={isSharing || isDownloading}
+                aria-label="Compartir archivo generado"
+                title="Compartir"
+                className="px-4 py-2 rounded-xl border border-indigo-500/30 hover:bg-indigo-500/10 text-indigo-200 text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-60 shrink-0"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>{isSharing ? "Preparando…" : "Compartir"}</span>
+              </button>
             </div>
+          ) : job.output.textResult ? (
+            <button
+              onClick={handleShare}
+              disabled={isSharing}
+              aria-label="Compartir texto generado"
+              title="Compartir"
+              className="px-4 py-2 rounded-xl border border-indigo-500/30 hover:bg-indigo-500/10 text-indigo-200 text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-60 w-full sm:w-auto"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>{isSharing ? "Preparando…" : "Compartir"}</span>
+            </button>
           ) : (
             <div />
           )}

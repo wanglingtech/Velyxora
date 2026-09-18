@@ -38,3 +38,7 @@ The Docker image installs the official `yt-dlp` release pinned by `YT_DLP_VERSIO
 ## Release checks
 
 Run `npm run typecheck`, `npm run lint`, `npm test`, `npm run build:frontend`, `npm run build:backend`, `npx prisma validate`, `npx prisma generate`, `npx prisma migrate status`, and `git diff --check`. When Docker is available, build the image and test `/api/health` plus PostgreSQL, FFmpeg, FFprobe, LibreOffice, yt-dlp, media conversion, and Office conversion inside the container.
+
+## Share Layer checks
+
+Share no necesita variables de entorno, permisos backend ni cambios de despliegue. Debe validarse en HTTPS y en los navegadores/SO objetivo porque Web Share y el soporte de tipos de archivo varían. La revisión manual debe cubrir: share sheet disponible, `canShare` negativo, navegador sin Web Share, cancelación, fallback de descarga/copia y portapapeles bloqueado. VELYXORA no controla ni registra el destino elegido por el usuario y no publica directamente en redes sociales.

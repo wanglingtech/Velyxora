@@ -25,3 +25,7 @@
 | **Markdown**              | HTML           | BrowserTextEngine      | Markdown Lexer                 | `COMPLETE`                 |
 | **Code 128 Data**         | PNG Barcode    | BrowserCanvasEngine    | Canvas 2D Barcode              | `COMPLETE`                 |
 | **URL / Text**            | QR Code (PNG)  | BrowserQrEngine        | QRCode Canvas Matrix           | `COMPLETE`                 |
+
+## Compatibilidad de Share
+
+Share no transforma formatos. Los archivos ya generados conservan su MIME y nombre y se entregan al menú nativo únicamente si `navigator.canShare({ files })` los acepta en el navegador/SO actual. La disponibilidad puede variar incluso para un formato de esta matriz; la descarga existente permanece como fallback. Los resultados de texto pueden compartirse o copiarse. Las URL requieren un destino HTTP(S) público real.
