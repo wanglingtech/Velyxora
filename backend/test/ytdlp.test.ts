@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { providerRegistry } from "../src/providers/ProviderRegistry";
-import { assertUsableAnalysisFormats, buildAnalyzeArgs, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, selectThumbnail } from "../src/services/ytDlpService";
+import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildTikTokFailureDiagnostic, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, selectThumbnail } from "../src/services/ytDlpService";
 import { backendApp } from "../src/app";
 import { ytDlpService } from "../src/services/ytDlpService";
 import { ENV } from "../src/config/env";
@@ -80,6 +80,58 @@ test("TikTok post access restriction is provider-specific and unknown failures r
   assert.equal(tiktokError.message, "TikTok no permitió acceder a este contenido desde el servidor. Prueba con otra publicación pública o inténtalo más tarde.");
   assert.equal(friendlyError("ERROR: [TikTok] unexpected response", "analyze", "tiktok").code, "PROVIDER_UNAVAILABLE");
   assert.equal(friendlyError(blocked, "analyze", "vimeo").code, "PROVIDER_UNAVAILABLE");
+});
+
+test("TikTok failures are classified into closed sanitized reasons", () => {
+  const cases = [
+    ["Your IP address is blocked from accessing this post", "post_access_restricted"],
+    ["Unable to extract challenge data", "challenge_data_unavailable"],
+    ["Unable to solve JS challenge", "challenge_solve_failed"],
+    ["Unexpected response from webpage request", "unexpected_webpage_response"],
+    ["Unable to extract universal data for rehydration", "web_data_unavailable"],
+    ["Unable to extract webpage video data", "webpage_video_data_unavailable"],
+    ["TikTok is requiring login for access to this content", "login_required"],
+    ["This post may not be comfortable for some audiences. Log in for access", "sensitive_content_login_required"],
+    ["The extractor is attempting impersonation, but no impersonate target is available", "impersonation_unavailable"],
+  ] as const;
+  for (const [stderr, expected] of cases) {
+    assert.equal(classifyTikTokFailure(`ERROR: [TikTok] ${stderr}`, "tiktok"), expected);
+  }
+  assert.equal(classifyTikTokFailure("ERROR: [TikTok] unknown extraction failure", "tiktok"), "unclassified");
+});
+
+test("TikTok classification is provider-specific and fatal failures take precedence over impersonation warnings", () => {
+  const impersonation = "WARNING: The extractor is attempting impersonation, but no impersonate target is available";
+  const challenge = "ERROR: Unable to solve JS challenge";
+  assert.equal(classifyTikTokFailure(`${impersonation}\n${challenge}`, "tiktok"), "challenge_solve_failed");
+  assert.equal(classifyTikTokFailure(impersonation, "tiktok"), "impersonation_unavailable");
+  assert.equal(classifyTikTokFailure(challenge, "youtube"), "unclassified");
+  assert.equal(friendlyError(impersonation, "analyze", "tiktok").code, "PROVIDER_UNAVAILABLE");
+});
+
+test("TikTok diagnostics expose only closed non-sensitive fields", () => {
+  const sensitiveStderr = "ERROR URL=https://tiktok.com/@private/video/1 IP=192.0.2.1 cookie=session token=secret Authorization=Bearer-secret Unable to solve JS challenge";
+  const diagnostic = buildTikTokFailureDiagnostic(sensitiveStderr, "analyze", 1);
+  assert.deepEqual(diagnostic, {
+    provider: "tiktok",
+    stage: "analyze",
+    reason: "challenge_solve_failed",
+    exitCode: 1,
+  });
+  assert.deepEqual(Object.keys(diagnostic), ["provider", "stage", "reason", "exitCode"]);
+  const serialized = JSON.stringify(diagnostic);
+  for (const secret of ["stderr", "stdout", "tiktok.com", "192.0.2.1", "cookie", "secret", "authorization", "header"]) {
+    assert.doesNotMatch(serialized.toLowerCase(), new RegExp(secret.replace(".", "\\.")));
+  }
+});
+
+test("TikTok access reasons preserve the existing public error mapping", () => {
+  const blocked = "Your IP address is blocked from accessing this post";
+  const login = "TikTok is requiring login for access to this content";
+  const sensitive = "This post may not be comfortable for some audiences. Log in for access";
+  assert.equal(friendlyError(blocked, "analyze", "tiktok").code, "MEDIA_PROVIDER_RESTRICTED");
+  assert.equal(friendlyError(login, "analyze", "tiktok").code, "NOT_PUBLIC");
+  assert.equal(friendlyError(sensitive, "analyze", "tiktok").code, "PROVIDER_UNAVAILABLE");
 });
 
 test("thumbnail selection avoids a known maxres candidate and warning logs are categorized", () => {

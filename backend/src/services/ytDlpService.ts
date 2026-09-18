@@ -31,6 +31,58 @@ export class YtDlpError extends Error {
 export type YtDlpStage = "analyze" | "process" | "diagnostic";
 type YtDlpRunResult = { stdout: string; warningCategories: string[] };
 
+export type TikTokFailureReason =
+  | "post_access_restricted"
+  | "challenge_data_unavailable"
+  | "challenge_solve_failed"
+  | "unexpected_webpage_response"
+  | "web_data_unavailable"
+  | "webpage_video_data_unavailable"
+  | "login_required"
+  | "sensitive_content_login_required"
+  | "impersonation_unavailable"
+  | "unclassified";
+
+export type TikTokFailureDiagnostic = {
+  provider: "tiktok";
+  stage: YtDlpStage;
+  reason: TikTokFailureReason;
+  exitCode: number | null;
+};
+
+const TIKTOK_FATAL_FAILURE_PATTERNS: ReadonlyArray<readonly [string, TikTokFailureReason]> = [
+  ["unable to extract challenge data", "challenge_data_unavailable"],
+  ["unable to solve js challenge", "challenge_solve_failed"],
+  ["unexpected response from webpage request", "unexpected_webpage_response"],
+  ["unable to extract universal data for rehydration", "web_data_unavailable"],
+  ["unable to extract webpage video data", "webpage_video_data_unavailable"],
+];
+
+const TIKTOK_ACCESS_FAILURE_PATTERNS: ReadonlyArray<readonly [string, TikTokFailureReason]> = [
+  ["your ip address is blocked from accessing this post", "post_access_restricted"],
+  ["tiktok is requiring login for access to this content", "login_required"],
+  ["this post may not be comfortable for some audiences. log in for access", "sensitive_content_login_required"],
+];
+
+export function classifyTikTokFailure(stderr: string, provider?: MediaPlatform): TikTokFailureReason {
+  if (provider !== "tiktok") return "unclassified";
+  const value = stderr.toLowerCase();
+  for (const [pattern, reason] of TIKTOK_FATAL_FAILURE_PATTERNS) {
+    if (value.includes(pattern)) return reason;
+  }
+  for (const [pattern, reason] of TIKTOK_ACCESS_FAILURE_PATTERNS) {
+    if (value.includes(pattern)) return reason;
+  }
+  if (value.includes("the extractor is attempting impersonation, but no impersonate target is available")) {
+    return "impersonation_unavailable";
+  }
+  return "unclassified";
+}
+
+export function buildTikTokFailureDiagnostic(stderr: string, stage: YtDlpStage, exitCode: number | null): TikTokFailureDiagnostic {
+  return { provider: "tiktok", stage, reason: classifyTikTokFailure(stderr, "tiktok"), exitCode };
+}
+
 export function friendlyError(stderr: string, stage: YtDlpStage, provider?: MediaPlatform): YtDlpError {
   const value = stderr.toLowerCase();
   if (provider === "tiktok" && value.includes("your ip address is blocked from accessing this post")) {
@@ -215,6 +267,9 @@ class YtDlpService {
           if (warningCategories.length) logger.warn("YT_DLP_WARNINGS", { provider, stage, categories: warningCategories });
           resolve({ stdout, warningCategories });
         } else {
+          if (provider === "tiktok") {
+            logger.warn("TIKTOK_FAILURE_DIAGNOSTIC", buildTikTokFailureDiagnostic(stderr, stage, code));
+          }
           const error = friendlyError(stderr, stage, provider);
           if (provider === "tiktok" && error.code === "MEDIA_PROVIDER_RESTRICTED") {
             logger.warn("MEDIA_PROVIDER_RESTRICTED", { provider, reason: "post_access_restricted" });
