@@ -29,6 +29,7 @@ export class YtDlpError extends Error {
 }
 
 export type YtDlpStage = "analyze" | "process" | "diagnostic";
+type YtDlpRunResult = { stdout: string; warningCategories: string[] };
 
 export function friendlyError(stderr: string, stage: YtDlpStage): YtDlpError {
   const value = stderr.toLowerCase();
@@ -89,8 +90,12 @@ export function normalizeFormatsWithDiagnostics(formats: RawFormat[] = []): { fo
 export const normalizeFormats = (formats: RawFormat[] = []): MediaStreamFormat[] =>
   normalizeFormatsWithDiagnostics(formats).formats;
 
-export function assertUsableAnalysisFormats(platform: MediaPlatform, diagnostics: FormatDiagnostics): void {
+export function assertUsableAnalysisFormats(platform: MediaPlatform, diagnostics: FormatDiagnostics, warningCategories: string[] = []): void {
   if (diagnostics.afterDeduplication > 0) return;
+  if (platform === "youtube" && warningCategories.includes("bot_verification")) {
+    logger.warn("MEDIA_PROVIDER_RESTRICTED", { provider: platform, reason: "bot_verification" });
+    throw new YtDlpError("MEDIA_PROVIDER_RESTRICTED", "El proveedor no permitió obtener los formatos de este contenido desde el servidor. Inténtalo más tarde o utiliza otro contenido compatible.");
+  }
   const reason = diagnostics.rawFormatsCount === 0 ? "extractor_returned_no_formats" : "no_usable_audio_or_video_formats";
   logger.warn("MEDIA_FORMATS_UNAVAILABLE", { provider: platform, reason });
   throw new YtDlpError("MEDIA_FORMATS_UNAVAILABLE", "No fue posible obtener formatos descargables para este contenido.");
@@ -143,32 +148,32 @@ class YtDlpService {
   async getVersion(): Promise<string | null> {
     if (this.version) return this.version;
     try {
-      this.version = (await this.run(["--ignore-config", "--version"], "diagnostic", undefined, 5000)).trim();
+      this.version = (await this.run(["--ignore-config", "--version"], "diagnostic", undefined, 5000)).stdout.trim();
       return this.version || null;
     } catch { return null; }
   }
 
   async analyze(url: string, platform: MediaPlatform): Promise<MediaAnalysisResult> {
     logger.info("YT_DLP_STAGE", { provider: platform, stage: "analyze" });
-    const data = await this.extractInfo(url, "analyze", platform);
+    const { data, warningCategories } = await this.extractInfo(url, "analyze", platform);
     const { diagnostics } = normalizeFormatsWithDiagnostics(data.formats);
     logger.info("MEDIA_ANALYZE_FORMATS", { provider: platform, ...diagnostics });
-    assertUsableAnalysisFormats(platform, diagnostics);
+    assertUsableAnalysisFormats(platform, diagnostics, warningCategories);
     return parseAnalysis(data, url, platform);
   }
 
   async assertFormatAvailable(url: string, formatId: string, platform: MediaPlatform): Promise<void> {
     logger.info("YT_DLP_STAGE", { provider: platform, stage: "process", action: "revalidate-format" });
-    const data = await this.extractInfo(url, "process", platform);
+    const { data } = await this.extractInfo(url, "process", platform);
     const analysis = parseAnalysis(data, url, platform);
     if (!isRequestedFormatAvailable(analysis.formats, formatId)) {
       throw new YtDlpError("FORMAT_UNAVAILABLE", "El formato seleccionado ya no está disponible. Analiza el recurso nuevamente.");
     }
   }
 
-  private async extractInfo(url: string, stage: "analyze" | "process", platform: MediaPlatform): Promise<RawInfo> {
-    const stdout = await this.run(buildAnalyzeArgs(url), stage, undefined, 30_000, undefined, platform);
-    return JSON.parse(stdout) as RawInfo;
+  private async extractInfo(url: string, stage: "analyze" | "process", platform: MediaPlatform): Promise<{ data: RawInfo; warningCategories: string[] }> {
+    const result = await this.run(buildAnalyzeArgs(url), stage, undefined, 30_000, undefined, platform);
+    return { data: JSON.parse(result.stdout) as RawInfo, warningCategories: result.warningCategories };
   }
 
   async download(url: string, formatId: string, container: string, type: "video" | "audio", outputStem: string, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<string> {
@@ -189,7 +194,7 @@ class YtDlpService {
     return path.join(path.dirname(outputStem), files[0]);
   }
 
-  private run(args: string[], stage: YtDlpStage, signal?: AbortSignal, timeoutMs = ENV.YT_DLP_TIMEOUT_MS, onLine?: (line: string) => void, provider?: MediaPlatform): Promise<string> {
+  private run(args: string[], stage: YtDlpStage, signal?: AbortSignal, timeoutMs = ENV.YT_DLP_TIMEOUT_MS, onLine?: (line: string) => void, provider?: MediaPlatform): Promise<YtDlpRunResult> {
     return new Promise((resolve, reject) => {
       const child = spawn(ENV.YT_DLP_PATH, args, { windowsHide: true, shell: false });
       let stdout = "", stderr = "";
@@ -205,7 +210,7 @@ class YtDlpService {
         if (code === 0) {
           const warningCategories = classifyWarnings(stderr);
           if (warningCategories.length) logger.warn("YT_DLP_WARNINGS", { provider, stage, categories: warningCategories });
-          resolve(stdout);
+          resolve({ stdout, warningCategories });
         } else {
           const error = friendlyError(stderr, stage);
           logger.warn("YT_DLP_FAILURE", { provider, stage, category: error.code, exitCode: code });

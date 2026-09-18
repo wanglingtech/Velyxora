@@ -61,6 +61,18 @@ test("format diagnostics distinguish empty extractor output from filtered non-me
   assert.throws(() => assertUsableAnalysisFormats("youtube", filtered), (error: any) => error.code === "MEDIA_FORMATS_UNAVAILABLE");
 });
 
+test("YouTube bot verification is reported as provider restriction without affecting other providers", () => {
+  const empty = normalizeFormatsWithDiagnostics([]).diagnostics;
+  assert.throws(
+    () => assertUsableAnalysisFormats("youtube", empty, ["bot_verification"]),
+    (error: any) => error.code === "MEDIA_PROVIDER_RESTRICTED" && /proveedor no permitió/i.test(error.message),
+  );
+  assert.throws(
+    () => assertUsableAnalysisFormats("vimeo", empty, ["bot_verification"]),
+    (error: any) => error.code === "MEDIA_FORMATS_UNAVAILABLE",
+  );
+});
+
 test("thumbnail selection avoids a known maxres candidate and warning logs are categorized", () => {
   assert.equal(selectThumbnail({
     thumbnail: "https://i.ytimg.com/vi/id/maxresdefault.webp",
