@@ -29,7 +29,153 @@ export class YtDlpError extends Error {
 }
 
 export type YtDlpStage = "analyze" | "process" | "diagnostic";
-type YtDlpRunResult = { stdout: string; warningCategories: string[] };
+type YtDlpRunResult = {
+  stdout: string;
+  warningCategories: string[];
+  stagingTrace?: {
+    runtime: StagingRuntimeDiagnostics;
+    stderr: string;
+    durationMs: number;
+  };
+};
+
+export type ImpersonationTargetFamily = "chrome" | "edge" | "firefox" | "safari" | "tor" | "unknown";
+export type TikTokExtractionStage = "http_initial" | "webpage_received" | "challenge_detection" | "metadata" | "formats" | "unknown";
+export type TikTokResponseClassification = TikTokFailureReason | "success" | "http_error" | "unknown";
+
+export type StagingRuntimeDiagnostics = {
+  ytDlpVersion: string | null;
+  curlCffiAvailable: boolean;
+  curlCffiVersion: string | null;
+  impersonationTargetsCount: number;
+  impersonationBackend: "curl_cffi" | "none" | "unknown";
+  pythonEnvironment: "venv" | "system" | "unknown";
+};
+
+export type TikTokStagingExtractionDiagnostics = StagingRuntimeDiagnostics & {
+  provider: "tiktok";
+  stage: "analyze";
+  impersonationRequested: true;
+  impersonationApplied: boolean | null;
+  impersonationTargetFamily: ImpersonationTargetFamily | null;
+  redirectOccurred: boolean | null;
+  httpStatus: number | null;
+  responseClassification: TikTokResponseClassification;
+  extractionStage: TikTokExtractionStage;
+  metadataObtained: boolean;
+  rawFormatsCount: number;
+  usableFormatsCount: number;
+  durationMs: number;
+};
+
+const DIAGNOSTIC_BUFFER_LIMIT = 64 * 1024;
+
+export const shouldEnableTikTokStagingDiagnostics = (
+  enabled: boolean,
+  provider: MediaPlatform | undefined,
+  stage: YtDlpStage,
+): boolean => enabled && provider === "tiktok" && stage === "analyze";
+
+export const withTikTokStagingDiagnosticsArgs = (args: string[], enabled: boolean): string[] =>
+  enabled ? ["--verbose", ...args] : args;
+
+export const buildAnalyzeExecutionPlan = (url: string, stagingDiagnostics: boolean): string[][] =>
+  [withTikTokStagingDiagnosticsArgs(buildAnalyzeArgs(url), stagingDiagnostics)];
+
+export function parseImpersonationTargetFamily(target: string): ImpersonationTargetFamily {
+  const normalized = target.trim().toLowerCase();
+  for (const family of ["chrome", "edge", "firefox", "safari", "tor"] as const) {
+    if (normalized.startsWith(family)) return family;
+  }
+  return "unknown";
+}
+
+const safeHttpStatus = (value: string): number | null => {
+  const status = Number(value);
+  return Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
+};
+
+export function parseTikTokVerboseDiagnostics(stderr: string): Pick<TikTokStagingExtractionDiagnostics,
+  "impersonationApplied" | "impersonationTargetFamily" | "redirectOccurred" | "httpStatus" | "extractionStage"> {
+  let impersonationApplied: boolean | null = null;
+  let impersonationTargetFamily: ImpersonationTargetFamily | null = null;
+  let redirectOccurred: boolean | null = null;
+  let httpStatus: number | null = null;
+  let extractionStage: TikTokExtractionStage = "http_initial";
+
+  for (const line of stderr.slice(0, DIAGNOSTIC_BUFFER_LIMIT).split(/\r?\n/)) {
+    const target = /^\[debug\] \[TikTok\] Impersonation target: ([A-Za-z][A-Za-z0-9_:-]*)\s*$/.exec(line);
+    if (target) {
+      impersonationApplied = true;
+      impersonationTargetFamily = parseImpersonationTargetFamily(target[1]);
+      extractionStage = "webpage_received";
+      continue;
+    }
+    if (/attempting impersonation, but no impersonate target is available/i.test(line)) {
+      impersonationApplied = false;
+      continue;
+    }
+    if (/^\[redirect\] Following redirect to /i.test(line)) {
+      redirectOccurred = true;
+      continue;
+    }
+    const status = /\bHTTP Error ([1-5][0-9]{2})\b/i.exec(line);
+    if (status) httpStatus = safeHttpStatus(status[1]);
+    if (/Unexpected response from webpage request|Unable to extract challenge data|Unable to solve JS challenge/i.test(line)) {
+      extractionStage = "challenge_detection";
+    } else if (/Unable to extract universal data for rehydration/i.test(line)) {
+      extractionStage = "metadata";
+    } else if (/Unable to extract webpage video data/i.test(line)) {
+      extractionStage = "formats";
+    }
+  }
+
+  return { impersonationApplied, impersonationTargetFamily, redirectOccurred, httpStatus, extractionStage };
+}
+
+export function parseStagingRuntimeDiagnostics(output: string): StagingRuntimeDiagnostics {
+  const ytDlpVersionMatch = /^yt_dlp=([0-9]+(?:\.[0-9]+){1,3})$/m.exec(output);
+  const versionMatch = /^curl_cffi=([0-9]+(?:\.[0-9]+){1,3})$/m.exec(output);
+  const targetsMatch = /^impersonation_targets=([0-9]+)$/m.exec(output);
+  const backendMatch = /^impersonation_backend=(curl_cffi|none)$/m.exec(output);
+  const environmentMatch = /^python_environment=(venv|system)$/m.exec(output);
+  const pythonEnvironment = environmentMatch?.[1] === "venv"
+    ? "venv"
+    : environmentMatch?.[1] === "system" ? "system" : "unknown";
+  const impersonationBackend = backendMatch?.[1] === "curl_cffi"
+    ? "curl_cffi"
+    : backendMatch?.[1] === "none" ? "none" : versionMatch ? "unknown" : "none";
+  const impersonationTargetsCount = targetsMatch ? Number(targetsMatch[1]) : 0;
+  return {
+    ytDlpVersion: ytDlpVersionMatch?.[1] || null,
+    curlCffiAvailable: Boolean(versionMatch),
+    curlCffiVersion: versionMatch?.[1] || null,
+    impersonationTargetsCount,
+    impersonationBackend,
+    pythonEnvironment,
+  };
+}
+
+export function buildTikTokStagingDiagnostic(
+  runtime: StagingRuntimeDiagnostics,
+  stderr: string,
+  reason: TikTokFailureReason | "success",
+  durationMs: number,
+  formatCounts?: { raw: number; usable: number },
+): TikTokStagingExtractionDiagnostics {
+  const parsed = parseTikTokVerboseDiagnostics(stderr);
+  return {
+    provider: "tiktok", stage: "analyze", ...runtime,
+    impersonationRequested: true,
+    ...parsed,
+    responseClassification: reason === "success" ? "success" : reason,
+    extractionStage: reason === "success" ? "formats" : parsed.extractionStage,
+    metadataObtained: reason === "success",
+    rawFormatsCount: formatCounts?.raw || 0,
+    usableFormatsCount: formatCounts?.usable || 0,
+    durationMs: Math.max(0, Math.round(durationMs)),
+  };
+}
 
 export type TikTokFailureReason =
   | "post_access_restricted"
@@ -195,6 +341,7 @@ export const isRequestedFormatAvailable = (formats: MediaStreamFormat[], formatI
 
 class YtDlpService {
   private version?: string;
+  private stagingRuntimeDiagnostics?: Promise<StagingRuntimeDiagnostics>;
 
   async isAvailable(): Promise<boolean> {
     return Boolean(await this.getVersion());
@@ -210,9 +357,18 @@ class YtDlpService {
 
   async analyze(url: string, platform: MediaPlatform): Promise<MediaAnalysisResult> {
     logger.info("YT_DLP_STAGE", { provider: platform, stage: "analyze" });
-    const { data, warningCategories } = await this.extractInfo(url, "analyze", platform);
+    const { data, warningCategories, stagingTrace } = await this.extractInfo(url, "analyze", platform);
     const { diagnostics } = normalizeFormatsWithDiagnostics(data.formats);
     logger.info("MEDIA_ANALYZE_FORMATS", { provider: platform, ...diagnostics });
+    if (stagingTrace) {
+      logger.info("TIKTOK_STAGING_DIAGNOSTIC", buildTikTokStagingDiagnostic(
+        stagingTrace.runtime,
+        stagingTrace.stderr,
+        "success",
+        stagingTrace.durationMs,
+        { raw: diagnostics.rawFormatsCount, usable: diagnostics.afterDeduplication },
+      ));
+    }
     assertUsableAnalysisFormats(platform, diagnostics, warningCategories);
     return parseAnalysis(data, url, platform);
   }
@@ -226,9 +382,11 @@ class YtDlpService {
     }
   }
 
-  private async extractInfo(url: string, stage: "analyze" | "process", platform: MediaPlatform): Promise<{ data: RawInfo; warningCategories: string[] }> {
-    const result = await this.run(buildAnalyzeArgs(url), stage, undefined, 30_000, undefined, platform);
-    return { data: JSON.parse(result.stdout) as RawInfo, warningCategories: result.warningCategories };
+  private async extractInfo(url: string, stage: "analyze" | "process", platform: MediaPlatform): Promise<{ data: RawInfo; warningCategories: string[]; stagingTrace?: YtDlpRunResult["stagingTrace"] }> {
+    const stagingEnabled = shouldEnableTikTokStagingDiagnostics(ENV.MEDIA_STAGING_DIAGNOSTICS, platform, stage);
+    const [args] = buildAnalyzeExecutionPlan(url, stagingEnabled);
+    const result = await this.run(args, stage, undefined, 30_000, undefined, platform);
+    return { data: JSON.parse(result.stdout) as RawInfo, warningCategories: result.warningCategories, stagingTrace: result.stagingTrace };
   }
 
   async download(url: string, formatId: string, container: string, type: "video" | "audio", outputStem: string, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<string> {
@@ -249,26 +407,82 @@ class YtDlpService {
     return path.join(path.dirname(outputStem), files[0]);
   }
 
-  private run(args: string[], stage: YtDlpStage, signal?: AbortSignal, timeoutMs = ENV.YT_DLP_TIMEOUT_MS, onLine?: (line: string) => void, provider?: MediaPlatform): Promise<YtDlpRunResult> {
+  private runLocalDiagnostic(command: string, args: string[], timeoutMs = 5000): Promise<string> {
+    return new Promise((resolve) => {
+      const child = spawn(command, args, { windowsHide: true, shell: false });
+      let output = "";
+      const append = (chunk: unknown) => {
+        if (output.length >= DIAGNOSTIC_BUFFER_LIMIT) return;
+        output += String(chunk).slice(0, DIAGNOSTIC_BUFFER_LIMIT - output.length);
+      };
+      const timer = setTimeout(() => { child.kill(); resolve(output); }, timeoutMs);
+      child.stdout.on("data", append);
+      child.once("error", () => { clearTimeout(timer); resolve(""); });
+      child.once("close", () => { clearTimeout(timer); resolve(output); });
+    });
+  }
+
+  private getStagingRuntimeDiagnostics(): Promise<StagingRuntimeDiagnostics> {
+    if (!this.stagingRuntimeDiagnostics) {
+      const diagnosticScript = [
+        "import sys, curl_cffi",
+        "from yt_dlp.version import __version__ as ytdlp_version",
+        "from yt_dlp.networking._curlcffi import CurlCFFIRH",
+        "print('yt_dlp=' + ytdlp_version)",
+        "print('curl_cffi=' + curl_cffi.__version__)",
+        "print('impersonation_targets=' + str(len(CurlCFFIRH._SUPPORTED_IMPERSONATE_TARGET_MAP)))",
+        "print('impersonation_backend=curl_cffi')",
+        "print('python_environment=' + ('venv' if sys.prefix == '/opt/velyxora-ytdlp' else 'system'))",
+      ].join("; ");
+      this.stagingRuntimeDiagnostics = this.runLocalDiagnostic("python3", ["-c", diagnosticScript])
+        .then(parseStagingRuntimeDiagnostics);
+    }
+    return this.stagingRuntimeDiagnostics;
+  }
+
+  private async run(args: string[], stage: YtDlpStage, signal?: AbortSignal, timeoutMs = ENV.YT_DLP_TIMEOUT_MS, onLine?: (line: string) => void, provider?: MediaPlatform): Promise<YtDlpRunResult> {
+    const stagingEnabled = shouldEnableTikTokStagingDiagnostics(ENV.MEDIA_STAGING_DIAGNOSTICS, provider, stage);
+    const runtime = stagingEnabled ? await this.getStagingRuntimeDiagnostics() : undefined;
+    const effectiveArgs = args;
+    const startedAt = Date.now();
     return new Promise((resolve, reject) => {
-      const child = spawn(ENV.YT_DLP_PATH, args, { windowsHide: true, shell: false });
-      let stdout = "", stderr = "";
+      const child = spawn(ENV.YT_DLP_PATH, effectiveArgs, { windowsHide: true, shell: false });
+      let stdout = "", stderr = "", diagnosticStderr = "";
       const timer = setTimeout(() => { child.kill(); reject(new YtDlpError("YT_DLP_TIMEOUT", "La operación excedió el tiempo permitido.")); }, timeoutMs);
       const abort = () => { child.kill(); reject(new YtDlpError("YT_DLP_CANCELLED", "Descarga cancelada.")); };
       signal?.addEventListener("abort", abort, { once: true });
       child.stdout.on("data", (chunk) => { const text = chunk.toString(); stdout += text; text.split(/\r?\n/).forEach((line: string) => onLine?.(line)); });
-      child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+      child.stderr.on("data", (chunk) => {
+        const text = chunk.toString();
+        stderr += text;
+        if (stagingEnabled && diagnosticStderr.length < DIAGNOSTIC_BUFFER_LIMIT) {
+          diagnosticStderr += text.slice(0, DIAGNOSTIC_BUFFER_LIMIT - diagnosticStderr.length);
+        }
+      });
       child.once("error", () => { clearTimeout(timer); reject(new YtDlpError("YT_DLP_NOT_AVAILABLE", "El motor de descargas no está disponible.")); });
       child.once("close", (code) => {
         clearTimeout(timer); signal?.removeEventListener("abort", abort);
         if (signal?.aborted) return;
+        const durationMs = Date.now() - startedAt;
         if (code === 0) {
           const warningCategories = classifyWarnings(stderr);
           if (warningCategories.length) logger.warn("YT_DLP_WARNINGS", { provider, stage, categories: warningCategories });
-          resolve({ stdout, warningCategories });
+          resolve({
+            stdout,
+            warningCategories,
+            stagingTrace: stagingEnabled && runtime ? { runtime, stderr: diagnosticStderr, durationMs } : undefined,
+          });
         } else {
           if (provider === "tiktok") {
             logger.warn("TIKTOK_FAILURE_DIAGNOSTIC", buildTikTokFailureDiagnostic(stderr, stage, code));
+          }
+          if (stagingEnabled && runtime) {
+            logger.warn("TIKTOK_STAGING_DIAGNOSTIC", buildTikTokStagingDiagnostic(
+              runtime,
+              diagnosticStderr,
+              classifyTikTokFailure(stderr, provider),
+              durationMs,
+            ));
           }
           const error = friendlyError(stderr, stage, provider);
           if (provider === "tiktok" && error.code === "MEDIA_PROVIDER_RESTRICTED") {

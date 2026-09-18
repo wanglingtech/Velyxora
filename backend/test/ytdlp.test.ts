@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { providerRegistry } from "../src/providers/ProviderRegistry";
-import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildTikTokFailureDiagnostic, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, selectThumbnail } from "../src/services/ytDlpService";
+import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, selectThumbnail, shouldEnableTikTokStagingDiagnostics } from "../src/services/ytDlpService";
 import { backendApp } from "../src/app";
 import { ytDlpService } from "../src/services/ytDlpService";
 import { ENV } from "../src/config/env";
@@ -125,6 +125,93 @@ test("TikTok diagnostics expose only closed non-sensitive fields", () => {
   }
 });
 
+test("TikTok staging diagnostics are strictly gated and keep one extraction execution", () => {
+  assert.equal(shouldEnableTikTokStagingDiagnostics(false, "tiktok", "analyze"), false);
+  assert.equal(shouldEnableTikTokStagingDiagnostics(true, "youtube", "analyze"), false);
+  assert.equal(shouldEnableTikTokStagingDiagnostics(true, "tiktok", "process"), false);
+  assert.equal(shouldEnableTikTokStagingDiagnostics(true, "tiktok", "analyze"), true);
+
+  const normalPlan = buildAnalyzeExecutionPlan("https://tiktok.com/@public/video/1", false);
+  const stagingPlan = buildAnalyzeExecutionPlan("https://tiktok.com/@public/video/1", true);
+  assert.equal(normalPlan.length, 1);
+  assert.equal(stagingPlan.length, 1);
+  assert.equal(normalPlan[0].includes("--verbose"), false);
+  assert.equal(stagingPlan[0].filter((arg) => arg === "--verbose").length, 1);
+  assert.equal(stagingPlan[0].includes("--skip-download"), true);
+  assert.equal(stagingPlan[0].some((arg) => /retry/i.test(arg)), false);
+});
+
+test("TikTok staging runtime diagnostics detect only allowlisted runtime facts", () => {
+  const runtime = parseStagingRuntimeDiagnostics([
+    "yt_dlp=2026.08.19",
+    "curl_cffi=0.16.0",
+    "impersonation_targets=37",
+    "impersonation_backend=curl_cffi",
+    "python_environment=venv",
+    "SECRET=https://example.test/?token=secret",
+  ].join("\n"));
+  assert.deepEqual(runtime, {
+    ytDlpVersion: "2026.08.19",
+    curlCffiAvailable: true,
+    curlCffiVersion: "0.16.0",
+    impersonationTargetsCount: 37,
+    impersonationBackend: "curl_cffi",
+    pythonEnvironment: "venv",
+  });
+  assert.doesNotMatch(JSON.stringify(runtime), /SECRET|example\.test|token/i);
+});
+
+test("TikTok verbose diagnostics sanitize target families, redirects and HTTP status", () => {
+  assert.equal(parseImpersonationTargetFamily("chrome-136:linux"), "chrome");
+  assert.equal(parseImpersonationTargetFamily("safari-18:macos"), "safari");
+  assert.equal(parseImpersonationTargetFamily("custom-1:linux"), "unknown");
+
+  const stderr = [
+    "[debug] [TikTok] Impersonation target: chrome-136:linux",
+    "[redirect] Following redirect to https://private.example/path?token=secret",
+    "WARNING Cookie: session=private Authorization: Bearer-private",
+    "<html><body>private challenge body</body></html>",
+    "ERROR: HTTP Error 403: Forbidden",
+    "ERROR: Unexpected response from webpage request",
+  ].join("\n");
+  const parsed = parseTikTokVerboseDiagnostics(stderr);
+  assert.deepEqual(parsed, {
+    impersonationApplied: true,
+    impersonationTargetFamily: "chrome",
+    redirectOccurred: true,
+    httpStatus: 403,
+    extractionStage: "challenge_detection",
+  });
+  const serialized = JSON.stringify(parsed);
+  for (const forbidden of ["private.example", "token", "cookie", "authorization", "bearer", "html", "stderr"]) {
+    assert.doesNotMatch(serialized.toLowerCase(), new RegExp(forbidden));
+  }
+});
+
+test("TikTok staging diagnostic contains only the closed sanitized schema", () => {
+  const runtime = parseStagingRuntimeDiagnostics("yt_dlp=2026.08.19\ncurl_cffi=0.16.0\nimpersonation_targets=37\nimpersonation_backend=curl_cffi\npython_environment=venv");
+  const diagnostic = buildTikTokStagingDiagnostic(
+    runtime,
+    "Cookie=secret Authorization=Bearer-secret https://tiktok.com/@private/video/1?token=x\n[debug] [TikTok] Impersonation target: safari-18:macos\nERROR: Unexpected response from webpage request",
+    "unexpected_webpage_response",
+    1200.4,
+  );
+  assert.deepEqual(Object.keys(diagnostic), [
+    "provider", "stage", "ytDlpVersion", "curlCffiAvailable", "curlCffiVersion",
+    "impersonationTargetsCount", "impersonationBackend", "pythonEnvironment",
+    "impersonationRequested", "impersonationApplied", "impersonationTargetFamily",
+    "redirectOccurred", "httpStatus", "extractionStage", "responseClassification",
+    "metadataObtained", "rawFormatsCount", "usableFormatsCount", "durationMs",
+  ]);
+  assert.equal(diagnostic.impersonationTargetFamily, "safari");
+  assert.equal(diagnostic.responseClassification, "unexpected_webpage_response");
+  assert.equal(diagnostic.metadataObtained, false);
+  const serialized = JSON.stringify(diagnostic).toLowerCase();
+  for (const forbidden of ["secret", "authorization", "tiktok.com", "token=", "cookie", "stderr", "stdout"]) {
+    assert.doesNotMatch(serialized, new RegExp(forbidden.replace(".", "\\.")));
+  }
+});
+
 test("TikTok access reasons preserve the existing public error mapping", () => {
   const blocked = "Your IP address is blocked from accessing this post";
   const login = "TikTok is requiring login for access to this content";
@@ -202,6 +289,15 @@ test("production Docker pins and verifies yt-dlp instead of using Debian's stale
   assert.match(dockerfile, /yt-dlp --version/);
   assert.doesNotMatch(dockerfile, /^\s*yt-dlp\s*\\$/m);
   assert.doesNotMatch(dockerfile, /yt-dlp\s+-U/);
+});
+
+test("media staging Docker alone enables diagnostics and production Docker stays unconfigured", async () => {
+  const [productionDockerfile, stagingDockerfile] = await Promise.all([
+    readFile("Dockerfile", "utf8"),
+    readFile("Dockerfile.media-staging", "utf8"),
+  ]);
+  assert.doesNotMatch(productionDockerfile, /MEDIA_STAGING_DIAGNOSTICS/);
+  assert.match(stagingDockerfile, /MEDIA_STAGING_DIAGNOSTICS=true/);
 });
 
 test("media process rejects unsafe URLs and invalid format IDs", async () => {

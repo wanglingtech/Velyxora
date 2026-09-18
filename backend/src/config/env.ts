@@ -62,6 +62,7 @@ export const ENV = {
   FFMPEG_TIMEOUT_MS: Number(process.env.FFMPEG_TIMEOUT_MS || 10 * 60 * 1000),
   YT_DLP_PATH: process.env.YT_DLP_PATH || "yt-dlp",
   YT_DLP_TIMEOUT_MS: Number(process.env.YT_DLP_TIMEOUT_MS || 10 * 60 * 1000),
+  MEDIA_STAGING_DIAGNOSTICS: process.env.MEDIA_STAGING_DIAGNOSTICS === "true",
   LIBREOFFICE_PATH: process.env.LIBREOFFICE_PATH || "soffice",
   LIBREOFFICE_TIMEOUT_MS: Number(process.env.LIBREOFFICE_TIMEOUT_MS || 10 * 60 * 1000),
   RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000, // 15 minutes

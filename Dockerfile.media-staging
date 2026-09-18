@@ -45,6 +45,7 @@ ENV NODE_ENV=production \
     FFPROBE_PATH=ffprobe \
     LIBREOFFICE_PATH=soffice \
     YT_DLP_PATH=yt-dlp \
+    MEDIA_STAGING_DIAGNOSTICS=true \
     PATH="/opt/velyxora-ytdlp/bin:${PATH}"
 
 RUN apt-get update \
