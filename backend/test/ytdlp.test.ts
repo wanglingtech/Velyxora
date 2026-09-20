@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { providerRegistry } from "../src/providers/ProviderRegistry";
-import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildDownloadArgs, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, buildYouTubeRawFormatDiagnostics, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, parseYouTubeJscDiagnostics, parseYouTubePotDiagnostics, parseYouTubeRuntimeDiagnostic, selectThumbnail, shouldEnableTikTokStagingDiagnostics, shouldEnableYouTubeDiagnostics, withYouTubeDiagnosticsArgs } from "../src/services/ytDlpService";
+import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildDownloadArgs, buildEffectiveYtDlpArgs, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, buildYouTubeRawFormatDiagnostics, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, parseYouTubeJscDiagnostics, parseYouTubePotDiagnostics, parseYouTubeRuntimeDiagnostic, selectThumbnail, shouldEnableTikTokStagingDiagnostics, shouldEnableYouTubeDiagnostics, withYouTubeDiagnosticsArgs } from "../src/services/ytDlpService";
 import { backendApp } from "../src/app";
 import { ytDlpService } from "../src/services/ytDlpService";
-import { ENV } from "../src/config/env";
+import { ENV, parseBooleanFlag } from "../src/config/env";
 import { readFile } from "node:fs/promises";
 import { buildYouTubeYtDlpArgs, parseInternalPoProviderUrl, YouTubeProvider, YOUTUBE_PO_PROVIDER_VERSION } from "../src/providers/YouTubeProvider";
 import { YtDlpProvider } from "../src/providers/YtDlpProvider";
@@ -80,6 +80,12 @@ test("YouTube diagnostics flag preserves disabled args and only enables supporte
   assert.ok(enabled.includes("youtube:pot_trace=true;jsc_trace=true"));
   assert.ok(enabled.includes("youtube:player-client=mweb"));
   assert.ok(enabled.includes("youtubepot-bgutilhttp:base_url=http://youtube-pot-provider:4416"));
+  const effectiveAnalyze = buildEffectiveYtDlpArgs(base, parseBooleanFlag("true"), "youtube", "analyze");
+  assert.ok(effectiveAnalyze.includes("--verbose"));
+  assert.ok(effectiveAnalyze.includes("youtube:pot_trace=true;jsc_trace=true"));
+  assert.deepEqual(buildEffectiveYtDlpArgs(base, true, "facebook", "analyze"), base);
+  assert.equal(parseBooleanFlag(" TRUE "), true);
+  assert.equal(parseBooleanFlag("false"), false);
 });
 
 test("YouTube diagnostic parsers expose only closed runtime, POT and JSC states", () => {
@@ -123,7 +129,12 @@ test("YouTube POT diagnostics distinguish failure, unavailable and unknown witho
   assert.deepEqual(parseYouTubePotDiagnostics("subs PO Token state changed token=SECRET", "analyze"), [
     { stage: "analyze", context: "subs", status: "unknown" },
   ]);
-  assert.deepEqual(parseYouTubePotDiagnostics("PO Token Providers: bgutil:http-2.0.0", "analyze"), []);
+  assert.deepEqual(parseYouTubePotDiagnostics("PO Token Providers: bgutil:http-2.0.0", "analyze"), [
+    { stage: "analyze", context: "unknown", status: "unknown" },
+  ]);
+  assert.deepEqual(parseYouTubeJscDiagnostics("", "analyze"), [
+    { stage: "analyze", challenge: "unknown", status: "unknown" },
+  ]);
 });
 
 test("YouTube raw format diagnostics use a strict allowlist and redact URL-like or secret fields", () => {

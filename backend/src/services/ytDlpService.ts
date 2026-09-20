@@ -110,6 +110,16 @@ export const withYouTubeDiagnosticsArgs = (args: readonly string[], enabled: boo
     ? ["--verbose", "--extractor-args", "youtube:pot_trace=true;jsc_trace=true", ...args]
     : [...args];
 
+export const buildEffectiveYtDlpArgs = (
+  args: readonly string[],
+  diagnosticsEnabled: boolean,
+  provider?: MediaPlatform,
+  youtubeStage?: YouTubeDiagnosticStage,
+): string[] => withYouTubeDiagnosticsArgs(
+  args,
+  shouldEnableYouTubeDiagnostics(diagnosticsEnabled, provider) && Boolean(youtubeStage),
+);
+
 const safeDiagnosticLabel = (value: unknown, pattern: RegExp, maxLength = 120): string | null => {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -168,7 +178,8 @@ export function parseYouTubePotDiagnostics(stderr: string, stage: YouTubeDiagnos
     const previous = results.get(context);
     results.set(context, previous && previous !== status ? "unknown" : status);
   }
-  return [...results].map(([context, status]) => ({ stage, context, status }));
+  const events: YouTubePotDiagnostic[] = [...results].map(([context, status]) => ({ stage, context, status }));
+  return events.length ? events : [{ stage, context: "unknown", status: "unknown" }];
 }
 
 export function parseYouTubeJscDiagnostics(stderr: string, stage: YouTubeDiagnosticStage): YouTubeJscDiagnostic[] {
@@ -182,7 +193,8 @@ export function parseYouTubeJscDiagnostics(stderr: string, stage: YouTubeDiagnos
       ? "failed" : /(?:resolved|solved|success)/i.test(line) ? "resolved" : /(?:request|fetch|challenge)/i.test(line) ? "requested" : "unknown";
     results.set(challenge, status);
   }
-  return [...results].map(([challenge, status]) => ({ stage, challenge, status }));
+  const events: YouTubeJscDiagnostic[] = [...results].map(([challenge, status]) => ({ stage, challenge, status }));
+  return events.length ? events : [{ stage, challenge: "unknown", status: "unknown" }];
 }
 
 export const shouldEnableTikTokStagingDiagnostics = (
@@ -489,7 +501,11 @@ class YtDlpService {
   }
 
   async analyze(url: string, platform: MediaPlatform, providerArgs: readonly string[] = []): Promise<MediaAnalysisResult> {
-    logger.info("YT_DLP_STAGE", { provider: platform, stage: "analyze" });
+    logger.info("YT_DLP_STAGE", {
+      provider: platform,
+      stage: "analyze",
+      ...(platform === "youtube" ? { youtubeDiagnosticsEnabled: ENV.YOUTUBE_DIAGNOSTICS_ENABLED } : {}),
+    });
     const { data, warningCategories, stagingTrace } = await this.extractInfo(url, "analyze", platform, providerArgs);
     const { diagnostics } = normalizeFormatsWithDiagnostics(data.formats);
     logger.info("MEDIA_ANALYZE_FORMATS", { provider: platform, ...diagnostics });
@@ -583,7 +599,7 @@ class YtDlpService {
     const stagingEnabled = shouldEnableTikTokStagingDiagnostics(ENV.MEDIA_STAGING_DIAGNOSTICS, provider, stage);
     const youtubeDiagnosticsEnabled = shouldEnableYouTubeDiagnostics(ENV.YOUTUBE_DIAGNOSTICS_ENABLED, provider) && Boolean(youtubeStage);
     const runtime = stagingEnabled ? await this.getStagingRuntimeDiagnostics() : undefined;
-    const effectiveArgs = withYouTubeDiagnosticsArgs(args, youtubeDiagnosticsEnabled);
+    const effectiveArgs = buildEffectiveYtDlpArgs(args, ENV.YOUTUBE_DIAGNOSTICS_ENABLED, provider, youtubeStage);
     const startedAt = Date.now();
     return new Promise((resolve, reject) => {
       const child = spawn(ENV.YT_DLP_PATH, effectiveArgs, { windowsHide: true, shell: false });

@@ -34,6 +34,9 @@ export const resolveSessionCookieSameSite = (
 
 const nodeEnv = process.env.NODE_ENV || "development";
 
+export const parseBooleanFlag = (value: string | undefined): boolean =>
+  value?.trim().toLowerCase() === "true";
+
 const parseBoundedMegabytes = (name: string, value: string | undefined, fallback: number): number => {
   const megabytes = value === undefined || value.trim() === "" ? fallback : Number(value);
   if (!Number.isFinite(megabytes) || megabytes < 1 || megabytes > 16_384) {
@@ -64,7 +67,7 @@ export const ENV = {
   YT_DLP_PATH: process.env.YT_DLP_PATH || "yt-dlp",
   YT_DLP_TIMEOUT_MS: Number(process.env.YT_DLP_TIMEOUT_MS || 10 * 60 * 1000),
   YOUTUBE_PO_TOKEN_PROVIDER_URL: process.env.YOUTUBE_PO_TOKEN_PROVIDER_URL || "",
-  YOUTUBE_DIAGNOSTICS_ENABLED: process.env.YOUTUBE_DIAGNOSTICS_ENABLED === "true",
+  YOUTUBE_DIAGNOSTICS_ENABLED: parseBooleanFlag(process.env.YOUTUBE_DIAGNOSTICS_ENABLED),
   MEDIA_STAGING_DIAGNOSTICS: process.env.MEDIA_STAGING_DIAGNOSTICS === "true",
   LIBREOFFICE_PATH: process.env.LIBREOFFICE_PATH || "soffice",
   LIBREOFFICE_TIMEOUT_MS: Number(process.env.LIBREOFFICE_TIMEOUT_MS || 10 * 60 * 1000),
