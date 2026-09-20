@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { providerRegistry } from "../src/providers/ProviderRegistry";
-import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildDownloadArgs, buildEffectiveYtDlpArgs, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, buildYouTubeRawFormatDiagnostics, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, parseYouTubeJscDiagnostics, parseYouTubePotDiagnostics, parseYouTubeRuntimeDiagnostic, selectThumbnail, shouldEnableTikTokStagingDiagnostics, shouldEnableYouTubeDiagnostics, withYouTubeDiagnosticsArgs } from "../src/services/ytDlpService";
+import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildDownloadArgs, buildEffectiveYtDlpArgs, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, buildYouTubeRawFormatDiagnostics, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, parseYouTubeJscDiagnostics, parseYouTubePotDiagnostics, parseYouTubeRuntimeDiagnostic, parseYouTubeTraceDiagnostics, selectThumbnail, shouldEnableTikTokStagingDiagnostics, shouldEnableYouTubeDiagnostics, withYouTubeDiagnosticsArgs } from "../src/services/ytDlpService";
 import { backendApp } from "../src/app";
 import { ytDlpService } from "../src/services/ytDlpService";
 import { ENV, parseBooleanFlag } from "../src/config/env";
@@ -135,6 +135,29 @@ test("YouTube POT diagnostics distinguish failure, unavailable and unknown witho
   assert.deepEqual(parseYouTubeJscDiagnostics("", "analyze"), [
     { stage: "analyze", challenge: "unknown", status: "unknown" },
   ]);
+});
+
+test("YouTube diagnostics recognize yt-dlp 2026 runtime wording without retaining sensitive lines", () => {
+  const stderr = [
+    "[debug] [youtube] [pot] PO Token Providers: none",
+    "[youtube] [jsc:node] Solving JS challenges using node",
+    "[debug] [youtube] [jsc:node] Using challenge solver lib script v0.8.0 (source: python package, variant: minified)",
+    "[debug] [youtube] [jsc:node] Using challenge solver core script v0.8.0 (source: python package, variant: minified)",
+    "[debug] [youtube] Decrypted nsig SECRET_INPUT => SECRET_OUTPUT",
+    "[debug] [youtube] id: Retrieved a gvs PO Token for mweb client token=SECRET",
+    "[debug] [youtube] id: mweb client https formats require a GVS PO Token which was not provided. They will be skipped as they may yield HTTP Error 403. URL=https://secret.test/?pot=SECRET",
+  ].join("\n");
+  const runtime = parseYouTubeRuntimeDiagnostic(stderr, "analyze", true);
+  assert.equal(runtime.pluginDetected, false);
+  assert.equal(runtime.poProviderDetected, false);
+  assert.equal(runtime.ejsDetected, true);
+  assert.equal(runtime.jsRuntime, "node");
+  assert.ok(parseYouTubeJscDiagnostics(stderr, "analyze").some((event) => event.challenge === "n" && event.status === "resolved"));
+  const traces = parseYouTubeTraceDiagnostics(stderr, "analyze");
+  assert.ok(traces.some((event) => event.category === "plugin_discovery" && event.status === "missing"));
+  assert.ok(traces.some((event) => event.category === "ejs_script" && event.status === "detected"));
+  assert.ok(traces.some((event) => event.category === "format_restriction" && event.context === "gvs" && event.status === "skipped"));
+  assert.doesNotMatch(JSON.stringify(traces), /SECRET|secret\.test|pot=|token=|https?:/i);
 });
 
 test("YouTube raw format diagnostics use a strict allowlist and redact URL-like or secret fields", () => {
@@ -427,6 +450,7 @@ test("thumbnail selection avoids a known maxres candidate and warning logs are c
     "po_token_fetch_failed", "po_token_available", "po_token_partially_available",
   ]);
   assert.deepEqual(classifyWarnings("WARNING: PO Token state is unclear"), ["po_token_status_unknown"]);
+  assert.equal(classifyWarnings("You can pass a PO Token using --extractor-args").includes("po_token_available"), false);
 });
 
 test("analyze requests JSON metadata and formats without selecting or downloading a format", () => {

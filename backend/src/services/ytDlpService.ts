@@ -102,6 +102,13 @@ export type YouTubeRawFormatDiagnostic = {
   formatNote: string | null;
 };
 
+export type YouTubeTraceDiagnostic = {
+  stage: YouTubeDiagnosticStage;
+  category: "plugin_discovery" | "po_provider" | "po_token" | "ejs_script" | "js_challenge" | "format_restriction";
+  context: "gvs" | "player" | "subs" | "signature" | "n" | "unknown";
+  status: "detected" | "missing" | "selected" | "reachable" | "unreachable" | "success" | "failed" | "requested" | "resolved" | "skipped" | "unknown";
+};
+
 export const shouldEnableYouTubeDiagnostics = (enabled: boolean, provider?: MediaPlatform): boolean =>
   enabled && provider === "youtube";
 
@@ -153,15 +160,15 @@ export function parseYouTubeRuntimeDiagnostic(
   const pluginDetected = providerLine ? /\bbgutil\b/i.test(providerLine) : null;
   const poProviderDetected = providerLine ? /\bbgutil:http(?:-|\b)/i.test(providerLine) : null;
   const unreachable = lines.some((line) => /(?:bgutil|po token).*(?:connection refused|unable to connect|connection error|timed? out|unreachable)/i.test(line));
-  const ejsLine = lines.find((line) => /(?:JS Challenge Providers?|yt-dlp-ejs|\bejs\b)/i.test(line));
+  const ejsLine = lines.find((line) => /(?:yt-dlp-ejs|\bejs\b|Using challenge solver (?:lib|core) script .*source: python package)/i.test(line));
   return {
     stage,
     playerClient: "mweb",
     pluginDetected,
     poProviderDetected,
     poProviderReachable: unreachable ? false : providerPreflightReachable,
-    ejsDetected: ejsLine ? /(?:yt-dlp-ejs|\bejs\b)/i.test(ejsLine) : null,
-    jsRuntime: lines.some((line) => /(?:JS runtimes?|javascript runtime).*\bnode\b/i.test(line)) ? "node" : null,
+    ejsDetected: ejsLine ? true : null,
+    jsRuntime: lines.some((line) => /(?:(?:JS runtimes?|javascript runtime).*\bnode\b|\[jsc:node\]|Solving JS challenges using node)/i.test(line)) ? "node" : null,
   };
 }
 
@@ -173,8 +180,8 @@ export function parseYouTubePotDiagnostics(stderr: string, stage: YouTubeDiagnos
     let status: YouTubePotDiagnostic["status"] = "unknown";
     if (/(?:not required|does not require|no token required)/i.test(line)) status = "not_required";
     else if (/(?:provider unavailable|no providers?|unavailable)/i.test(line)) status = "unavailable";
-    else if (/(?:failed|failure|error|could not|unable to|missing)/i.test(line)) status = "failed";
-    else if (/(?:success|generated|obtained|provided|fetched|using)/i.test(line)) status = "success";
+    else if (/(?:failed|failure|error|could not|unable to|missing|not provided|no .*provider available)/i.test(line)) status = "failed";
+    else if (/(?:success|generated|obtained|retrieved|provided|fetched)/i.test(line)) status = "success";
     const previous = results.get(context);
     results.set(context, previous && previous !== status ? "unknown" : status);
   }
@@ -186,15 +193,47 @@ export function parseYouTubeJscDiagnostics(stderr: string, stage: YouTubeDiagnos
   const results = new Map<YouTubeJscDiagnostic["challenge"], YouTubeJscDiagnostic["status"]>();
   for (const line of diagnosticLines(stderr)) {
     if (/JS Challenge Providers?:/i.test(line)) continue;
-    if (!/(?:challenge|signature|\bn parameter\b|\bn challenge\b)/i.test(line)) continue;
+    if (!/(?:challenge|signature|\bn parameter\b|\bn challenge\b|nsig)/i.test(line)) continue;
     const challenge: YouTubeJscDiagnostic["challenge"] = /signature|\bsig\b/i.test(line)
-      ? "signature" : /\bn parameter\b|\bn challenge\b/i.test(line) ? "n" : "unknown";
+      ? "signature" : /\bn parameter\b|\bn challenge\b|nsig/i.test(line) ? "n" : "unknown";
     const status: YouTubeJscDiagnostic["status"] = /(?:failed|failure|error|could not|unable to)/i.test(line)
-      ? "failed" : /(?:resolved|solved|success)/i.test(line) ? "resolved" : /(?:request|fetch|challenge)/i.test(line) ? "requested" : "unknown";
+      ? "failed" : /(?:resolved|solved|success|decrypted)/i.test(line) ? "resolved" : /(?:request|fetch|challenge|extracting)/i.test(line) ? "requested" : "unknown";
     results.set(challenge, status);
   }
   const events: YouTubeJscDiagnostic[] = [...results].map(([challenge, status]) => ({ stage, challenge, status }));
   return events.length ? events : [{ stage, challenge: "unknown", status: "unknown" }];
+}
+
+export function parseYouTubeTraceDiagnostics(stderr: string, stage: YouTubeDiagnosticStage): YouTubeTraceDiagnostic[] {
+  const events: YouTubeTraceDiagnostic[] = [];
+  for (const line of diagnosticLines(stderr)) {
+    if (/PO Token Providers?:/i.test(line)) events.push({
+      stage, category: "plugin_discovery", context: "unknown", status: /\bbgutil\b/i.test(line) ? "detected" : "missing",
+    });
+    if (/\[pot:bgutil:http\]/i.test(line)) events.push({
+      stage, category: "po_provider", context: potContext(line),
+      status: /(?:error reaching|unable to connect|unreachable|timed? out)/i.test(line) ? "unreachable" : /(?:generating|selected)/i.test(line) ? "selected" : "reachable",
+    });
+    if (/(?:Retrieved|obtained|generated|fetched) a?\s*(?:gvs|player|subs)?\s*PO Token/i.test(line)) events.push({
+      stage, category: "po_token", context: potContext(line), status: "success",
+    });
+    if (/(?:No .*PO Token provider available|PO Token.*(?:failed|not provided)|(?:failed|not provided).*PO Token)/i.test(line)) events.push({
+      stage, category: "po_token", context: potContext(line), status: "failed",
+    });
+    if (/formats?.*require a GVS PO Token.*not provided.*skipped/i.test(line)) events.push({
+      stage, category: "format_restriction", context: "gvs", status: "skipped",
+    });
+    if (/Using challenge solver (?:lib|core) script .*source: python package/i.test(line)) events.push({
+      stage, category: "ejs_script", context: "unknown", status: "detected",
+    });
+    if (/Solving JS challenges using/i.test(line)) events.push({
+      stage, category: "js_challenge", context: "unknown", status: "requested",
+    });
+    if (/Decrypted nsig/i.test(line)) events.push({
+      stage, category: "js_challenge", context: "n", status: "resolved",
+    });
+  }
+  return events;
 }
 
 export const shouldEnableTikTokStagingDiagnostics = (
@@ -624,6 +663,7 @@ class YtDlpService {
           logger.info("YOUTUBE_DIAGNOSTICS_RUNTIME", parseYouTubeRuntimeDiagnostic(diagnosticStderr, youtubeStage, true));
           for (const event of parseYouTubePotDiagnostics(diagnosticStderr, youtubeStage)) logger.info("YOUTUBE_DIAGNOSTICS_POT", event);
           for (const event of parseYouTubeJscDiagnostics(diagnosticStderr, youtubeStage)) logger.info("YOUTUBE_DIAGNOSTICS_JSC", event);
+          for (const event of parseYouTubeTraceDiagnostics(diagnosticStderr, youtubeStage)) logger.info("YOUTUBE_DIAGNOSTICS_TRACE", event);
         }
         if (code === 0) {
           const warningCategories = classifyWarnings(stderr);
@@ -661,8 +701,9 @@ export function classifyWarnings(stderr: string): string[] {
   const categories = new Set<string>();
   const value = stderr.toLowerCase();
   const mentionsPoToken = /\b(?:po token|pot)\b/i.test(stderr);
-  const poSuccess = /(?:po token|pot).*(?:success|generated|obtained|provided|fetched|using)/i.test(stderr);
-  const poFailure = /(?:(?:po token|pot).*(?:failed|failure|could not|unable to|missing)|(?:failed|failure|could not|unable to|missing).*(?:po token|pot))/i.test(stderr);
+  const lines = diagnosticLines(stderr);
+  const poSuccess = lines.some((line) => /(?:(?:po token|pot).*(?:success|generated|obtained|retrieved|fetched)|(?:success|generated|obtained|retrieved|fetched).*(?:po token|pot))/i.test(line));
+  const poFailure = lines.some((line) => /(?:(?:po token|pot).*(?:failed|failure|could not|unable to|missing|not provided|no .*provider available)|(?:failed|failure|could not|unable to|missing|not provided).*(?:po token|pot))/i.test(line));
   if (/no po token providers?|po token provider.*not (?:found|detected)/i.test(stderr)) categories.add("po_provider_not_detected");
   if (/(?:bgutil|po token).*(?:connection refused|unable to connect|connection error|timed? out|unreachable)/i.test(stderr)) categories.add("po_provider_unreachable");
   if (poFailure) categories.add("po_token_fetch_failed");
