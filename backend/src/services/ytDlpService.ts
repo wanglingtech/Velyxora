@@ -29,6 +29,7 @@ export class YtDlpError extends Error {
 }
 
 export type YtDlpStage = "analyze" | "process" | "diagnostic";
+export type YouTubeDiagnosticStage = "analyze" | "revalidate-format" | "download";
 type YtDlpRunResult = {
   stdout: string;
   warningCategories: string[];
@@ -69,6 +70,120 @@ export type TikTokStagingExtractionDiagnostics = StagingRuntimeDiagnostics & {
 };
 
 const DIAGNOSTIC_BUFFER_LIMIT = 64 * 1024;
+
+export type YouTubeRuntimeDiagnostic = {
+  stage: YouTubeDiagnosticStage;
+  playerClient: "mweb";
+  pluginDetected: boolean | null;
+  poProviderDetected: boolean | null;
+  poProviderReachable: boolean | null;
+  ejsDetected: boolean | null;
+  jsRuntime: "node" | null;
+};
+
+export type YouTubePotDiagnostic = {
+  stage: YouTubeDiagnosticStage;
+  context: "gvs" | "player" | "subs" | "unknown";
+  status: "success" | "failed" | "unavailable" | "not_required" | "unknown";
+};
+
+export type YouTubeJscDiagnostic = {
+  stage: YouTubeDiagnosticStage;
+  challenge: "signature" | "n" | "unknown";
+  status: "requested" | "resolved" | "failed" | "unknown";
+};
+
+export type YouTubeRawFormatDiagnostic = {
+  formatId: string | null;
+  ext: string | null;
+  hasVideoCodec: boolean;
+  hasAudioCodec: boolean;
+  protocol: string | null;
+  formatNote: string | null;
+};
+
+export const shouldEnableYouTubeDiagnostics = (enabled: boolean, provider?: MediaPlatform): boolean =>
+  enabled && provider === "youtube";
+
+export const withYouTubeDiagnosticsArgs = (args: readonly string[], enabled: boolean): string[] =>
+  enabled
+    ? ["--verbose", "--extractor-args", "youtube:pot_trace=true;jsc_trace=true", ...args]
+    : [...args];
+
+const safeDiagnosticLabel = (value: unknown, pattern: RegExp, maxLength = 120): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > maxLength || !pattern.test(trimmed)) return null;
+  if (/https?:|[?&=]|\b(?:token|cookie|authorization|visitor|session|secret|credential)\b/i.test(trimmed)) return null;
+  return trimmed;
+};
+
+export function buildYouTubeRawFormatDiagnostics(formats: RawFormat[] = []): YouTubeRawFormatDiagnostic[] {
+  return formats.map((format) => ({
+    formatId: safeDiagnosticLabel(format.format_id, /^[A-Za-z0-9_.+-]+$/, 100),
+    ext: safeDiagnosticLabel(format.ext, /^[A-Za-z0-9]+$/, 16),
+    hasVideoCodec: hasUsableCodec(format.vcodec),
+    hasAudioCodec: hasUsableCodec(format.acodec),
+    protocol: safeDiagnosticLabel(format.protocol, /^[A-Za-z0-9_.+ -]+$/, 40),
+    formatNote: safeDiagnosticLabel(format.format_note, /^[A-Za-z0-9][A-Za-z0-9 ._+()-]*$/, 120),
+  }));
+}
+
+const diagnosticLines = (stderr: string): string[] => stderr.slice(0, DIAGNOSTIC_BUFFER_LIMIT).split(/\r?\n/);
+const potContext = (line: string): YouTubePotDiagnostic["context"] =>
+  (/\bgvs\b/i.test(line) ? "gvs" : /\bplayer\b/i.test(line) ? "player" : /\bsubs?(?:titles?)?\b/i.test(line) ? "subs" : "unknown");
+
+export function parseYouTubeRuntimeDiagnostic(
+  stderr: string,
+  stage: YouTubeDiagnosticStage,
+  providerPreflightReachable: boolean | null = null,
+): YouTubeRuntimeDiagnostic {
+  const lines = diagnosticLines(stderr);
+  const providerLine = lines.find((line) => /PO Token Providers?:/i.test(line));
+  const pluginDetected = providerLine ? /\bbgutil\b/i.test(providerLine) : null;
+  const poProviderDetected = providerLine ? /\bbgutil:http(?:-|\b)/i.test(providerLine) : null;
+  const unreachable = lines.some((line) => /(?:bgutil|po token).*(?:connection refused|unable to connect|connection error|timed? out|unreachable)/i.test(line));
+  const ejsLine = lines.find((line) => /(?:JS Challenge Providers?|yt-dlp-ejs|\bejs\b)/i.test(line));
+  return {
+    stage,
+    playerClient: "mweb",
+    pluginDetected,
+    poProviderDetected,
+    poProviderReachable: unreachable ? false : providerPreflightReachable,
+    ejsDetected: ejsLine ? /(?:yt-dlp-ejs|\bejs\b)/i.test(ejsLine) : null,
+    jsRuntime: lines.some((line) => /(?:JS runtimes?|javascript runtime).*\bnode\b/i.test(line)) ? "node" : null,
+  };
+}
+
+export function parseYouTubePotDiagnostics(stderr: string, stage: YouTubeDiagnosticStage): YouTubePotDiagnostic[] {
+  const results = new Map<YouTubePotDiagnostic["context"], YouTubePotDiagnostic["status"]>();
+  for (const line of diagnosticLines(stderr)) {
+    if (!/\b(?:po token|pot)\b/i.test(line) || /PO Token Providers?:/i.test(line)) continue;
+    const context = potContext(line);
+    let status: YouTubePotDiagnostic["status"] = "unknown";
+    if (/(?:not required|does not require|no token required)/i.test(line)) status = "not_required";
+    else if (/(?:provider unavailable|no providers?|unavailable)/i.test(line)) status = "unavailable";
+    else if (/(?:failed|failure|error|could not|unable to|missing)/i.test(line)) status = "failed";
+    else if (/(?:success|generated|obtained|provided|fetched|using)/i.test(line)) status = "success";
+    const previous = results.get(context);
+    results.set(context, previous && previous !== status ? "unknown" : status);
+  }
+  return [...results].map(([context, status]) => ({ stage, context, status }));
+}
+
+export function parseYouTubeJscDiagnostics(stderr: string, stage: YouTubeDiagnosticStage): YouTubeJscDiagnostic[] {
+  const results = new Map<YouTubeJscDiagnostic["challenge"], YouTubeJscDiagnostic["status"]>();
+  for (const line of diagnosticLines(stderr)) {
+    if (/JS Challenge Providers?:/i.test(line)) continue;
+    if (!/(?:challenge|signature|\bn parameter\b|\bn challenge\b)/i.test(line)) continue;
+    const challenge: YouTubeJscDiagnostic["challenge"] = /signature|\bsig\b/i.test(line)
+      ? "signature" : /\bn parameter\b|\bn challenge\b/i.test(line) ? "n" : "unknown";
+    const status: YouTubeJscDiagnostic["status"] = /(?:failed|failure|error|could not|unable to)/i.test(line)
+      ? "failed" : /(?:resolved|solved|success)/i.test(line) ? "resolved" : /(?:request|fetch|challenge)/i.test(line) ? "requested" : "unknown";
+    results.set(challenge, status);
+  }
+  return [...results].map(([challenge, status]) => ({ stage, challenge, status }));
+}
 
 export const shouldEnableTikTokStagingDiagnostics = (
   enabled: boolean,
@@ -378,6 +493,11 @@ class YtDlpService {
     const { data, warningCategories, stagingTrace } = await this.extractInfo(url, "analyze", platform, providerArgs);
     const { diagnostics } = normalizeFormatsWithDiagnostics(data.formats);
     logger.info("MEDIA_ANALYZE_FORMATS", { provider: platform, ...diagnostics });
+    if (shouldEnableYouTubeDiagnostics(ENV.YOUTUBE_DIAGNOSTICS_ENABLED, platform)) {
+      for (const format of buildYouTubeRawFormatDiagnostics(data.formats)) {
+        logger.info("YOUTUBE_DIAGNOSTICS_FORMATS", { stage: "analyze", ...format });
+      }
+    }
     if (stagingTrace) {
       logger.info("TIKTOK_STAGING_DIAGNOSTIC", buildTikTokStagingDiagnostic(
         stagingTrace.runtime,
@@ -403,8 +523,15 @@ class YtDlpService {
   private async extractInfo(url: string, stage: "analyze" | "process", platform: MediaPlatform, providerArgs: readonly string[] = []): Promise<{ data: RawInfo; warningCategories: string[]; stagingTrace?: YtDlpRunResult["stagingTrace"] }> {
     const stagingEnabled = shouldEnableTikTokStagingDiagnostics(ENV.MEDIA_STAGING_DIAGNOSTICS, platform, stage);
     const [args] = buildAnalyzeExecutionPlan(url, stagingEnabled, providerArgs);
-    const result = await this.run(args, stage, undefined, 30_000, undefined, platform);
-    return { data: JSON.parse(result.stdout) as RawInfo, warningCategories: result.warningCategories, stagingTrace: result.stagingTrace };
+    const diagnosticStage: YouTubeDiagnosticStage = stage === "analyze" ? "analyze" : "revalidate-format";
+    const result = await this.run(args, stage, undefined, 30_000, undefined, platform, diagnosticStage);
+    const data = JSON.parse(result.stdout) as RawInfo;
+    if (shouldEnableYouTubeDiagnostics(ENV.YOUTUBE_DIAGNOSTICS_ENABLED, platform) && diagnosticStage === "revalidate-format") {
+      for (const format of buildYouTubeRawFormatDiagnostics(data.formats)) {
+        logger.info("YOUTUBE_DIAGNOSTICS_FORMATS", { stage: diagnosticStage, ...format });
+      }
+    }
+    return { data, warningCategories: result.warningCategories, stagingTrace: result.stagingTrace };
   }
 
   async download(url: string, formatId: string, container: string, type: "video" | "audio", outputStem: string, signal?: AbortSignal, onProgress?: (value: number) => void, platform?: MediaPlatform, providerArgs: readonly string[] = []): Promise<string> {
@@ -413,7 +540,7 @@ class YtDlpService {
     await this.run(args, "process", signal, ENV.YT_DLP_TIMEOUT_MS, (line) => {
       const match = line.match(/download:\s*([\d.]+)%/);
       if (match) onProgress?.(Math.min(99, Number(match[1])));
-    }, platform);
+    }, platform, "download");
     const files = fs.readdirSync(path.dirname(outputStem)).filter((name) => name.startsWith(`${path.basename(outputStem)}.`) && !name.endsWith(".part"));
     if (files.length !== 1) throw new YtDlpError("OUTPUT_MISSING", "La descarga no produjo un archivo válido.");
     return path.join(path.dirname(outputStem), files[0]);
@@ -452,10 +579,11 @@ class YtDlpService {
     return this.stagingRuntimeDiagnostics;
   }
 
-  private async run(args: string[], stage: YtDlpStage, signal?: AbortSignal, timeoutMs = ENV.YT_DLP_TIMEOUT_MS, onLine?: (line: string) => void, provider?: MediaPlatform): Promise<YtDlpRunResult> {
+  private async run(args: string[], stage: YtDlpStage, signal?: AbortSignal, timeoutMs = ENV.YT_DLP_TIMEOUT_MS, onLine?: (line: string) => void, provider?: MediaPlatform, youtubeStage?: YouTubeDiagnosticStage): Promise<YtDlpRunResult> {
     const stagingEnabled = shouldEnableTikTokStagingDiagnostics(ENV.MEDIA_STAGING_DIAGNOSTICS, provider, stage);
+    const youtubeDiagnosticsEnabled = shouldEnableYouTubeDiagnostics(ENV.YOUTUBE_DIAGNOSTICS_ENABLED, provider) && Boolean(youtubeStage);
     const runtime = stagingEnabled ? await this.getStagingRuntimeDiagnostics() : undefined;
-    const effectiveArgs = args;
+    const effectiveArgs = withYouTubeDiagnosticsArgs(args, youtubeDiagnosticsEnabled);
     const startedAt = Date.now();
     return new Promise((resolve, reject) => {
       const child = spawn(ENV.YT_DLP_PATH, effectiveArgs, { windowsHide: true, shell: false });
@@ -467,7 +595,7 @@ class YtDlpService {
       child.stderr.on("data", (chunk) => {
         const text = chunk.toString();
         stderr += text;
-        if (stagingEnabled && diagnosticStderr.length < DIAGNOSTIC_BUFFER_LIMIT) {
+        if ((stagingEnabled || youtubeDiagnosticsEnabled) && diagnosticStderr.length < DIAGNOSTIC_BUFFER_LIMIT) {
           diagnosticStderr += text.slice(0, DIAGNOSTIC_BUFFER_LIMIT - diagnosticStderr.length);
         }
       });
@@ -476,6 +604,11 @@ class YtDlpService {
         clearTimeout(timer); signal?.removeEventListener("abort", abort);
         if (signal?.aborted) return;
         const durationMs = Date.now() - startedAt;
+        if (youtubeDiagnosticsEnabled && youtubeStage) {
+          logger.info("YOUTUBE_DIAGNOSTICS_RUNTIME", parseYouTubeRuntimeDiagnostic(diagnosticStderr, youtubeStage, true));
+          for (const event of parseYouTubePotDiagnostics(diagnosticStderr, youtubeStage)) logger.info("YOUTUBE_DIAGNOSTICS_POT", event);
+          for (const event of parseYouTubeJscDiagnostics(diagnosticStderr, youtubeStage)) logger.info("YOUTUBE_DIAGNOSTICS_JSC", event);
+        }
         if (code === 0) {
           const warningCategories = classifyWarnings(stderr);
           if (warningCategories.length) logger.warn("YT_DLP_WARNINGS", { provider, stage, categories: warningCategories });
@@ -511,8 +644,17 @@ class YtDlpService {
 export function classifyWarnings(stderr: string): string[] {
   const categories = new Set<string>();
   const value = stderr.toLowerCase();
-  if (value.includes("po token")) categories.add("po_token_required");
-  if (value.includes("sabr")) categories.add("sabr_restriction");
+  const mentionsPoToken = /\b(?:po token|pot)\b/i.test(stderr);
+  const poSuccess = /(?:po token|pot).*(?:success|generated|obtained|provided|fetched|using)/i.test(stderr);
+  const poFailure = /(?:(?:po token|pot).*(?:failed|failure|could not|unable to|missing)|(?:failed|failure|could not|unable to|missing).*(?:po token|pot))/i.test(stderr);
+  if (/no po token providers?|po token provider.*not (?:found|detected)/i.test(stderr)) categories.add("po_provider_not_detected");
+  if (/(?:bgutil|po token).*(?:connection refused|unable to connect|connection error|timed? out|unreachable)/i.test(stderr)) categories.add("po_provider_unreachable");
+  if (poFailure) categories.add("po_token_fetch_failed");
+  if (poSuccess) categories.add("po_token_available");
+  if (poSuccess && poFailure || /(?:some|partial).*po token|po token.*(?:some|partial)/i.test(stderr)) categories.add("po_token_partially_available");
+  if (/(?:additional|another|separate).*(?:po token|pot)|(?:po token|pot).*(?:additional|another|separate).*context/i.test(stderr)) categories.add("po_additional_context_required");
+  if (mentionsPoToken && categories.size === 0 && !/PO Token Providers?:/i.test(stderr)) categories.add("po_token_status_unknown");
+  if (value.includes("sabr") || /formats?.*(?:skipped|unavailable).*(?:po token|pot)/i.test(stderr)) categories.add("youtube_format_restriction");
   if (value.includes("sign in to confirm") || value.includes("not a bot")) categories.add("bot_verification");
   if (value.includes("format") && value.includes("unavailable")) categories.add("formats_unavailable");
   if (value.includes("javascript runtime") || value.includes("challenge")) categories.add("javascript_challenge");

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { providerRegistry } from "../src/providers/ProviderRegistry";
-import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildDownloadArgs, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, selectThumbnail, shouldEnableTikTokStagingDiagnostics } from "../src/services/ytDlpService";
+import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildDownloadArgs, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, buildYouTubeRawFormatDiagnostics, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, parseYouTubeJscDiagnostics, parseYouTubePotDiagnostics, parseYouTubeRuntimeDiagnostic, selectThumbnail, shouldEnableTikTokStagingDiagnostics, shouldEnableYouTubeDiagnostics, withYouTubeDiagnosticsArgs } from "../src/services/ytDlpService";
 import { backendApp } from "../src/app";
 import { ytDlpService } from "../src/services/ytDlpService";
 import { ENV } from "../src/config/env";
@@ -63,6 +63,79 @@ test("YouTube arguments are isolated and identical for analysis and download bui
   }
   const otherProviderArgs = buildAnalyzeArgs("https://tiktok.com/@a/video/1");
   assert.equal(otherProviderArgs.some((value) => value.includes("player-client") || value.includes("bgutil")), false);
+});
+
+test("YouTube diagnostics flag preserves disabled args and only enables supported diagnostics for YouTube", () => {
+  const base = buildAnalyzeArgs("https://youtube.com/watch?v=public-id", [
+    "--extractor-args", "youtube:player-client=mweb",
+    "--extractor-args", "youtubepot-bgutilhttp:base_url=http://youtube-pot-provider:4416",
+  ]);
+  assert.deepEqual(withYouTubeDiagnosticsArgs(base, false), base);
+  assert.equal(shouldEnableYouTubeDiagnostics(true, "youtube"), true);
+  for (const provider of ["tiktok", "facebook", "instagram"] as const) {
+    assert.equal(shouldEnableYouTubeDiagnostics(true, provider), false);
+  }
+  const enabled = withYouTubeDiagnosticsArgs(base, true);
+  assert.equal(enabled.filter((arg) => arg === "--verbose").length, 1);
+  assert.ok(enabled.includes("youtube:pot_trace=true;jsc_trace=true"));
+  assert.ok(enabled.includes("youtube:player-client=mweb"));
+  assert.ok(enabled.includes("youtubepot-bgutilhttp:base_url=http://youtube-pot-provider:4416"));
+});
+
+test("YouTube diagnostic parsers expose only closed runtime, POT and JSC states", () => {
+  const stderr = [
+    "[debug] [youtube] [pot] PO Token Providers: bgutil:http-2.0.0 (external)",
+    "[debug] JS runtimes: node-22.0",
+    "[debug] JS Challenge Providers: ejs:0.8.0",
+    "[debug] [youtube] [pot] gvs PO Token successfully obtained token=SUPER-SECRET",
+    "[debug] [youtube] signature challenge requested for https://example.test/videoplayback?sig=SECRET",
+    "[debug] [youtube] signature challenge resolved",
+    "[warning] [youtube] n challenge failed Authorization: Bearer SECRET cookie=session",
+  ].join("\n");
+  assert.deepEqual(parseYouTubeRuntimeDiagnostic(stderr, "analyze", true), {
+    stage: "analyze", playerClient: "mweb", pluginDetected: true, poProviderDetected: true,
+    poProviderReachable: true, ejsDetected: true, jsRuntime: "node",
+  });
+  assert.deepEqual(parseYouTubePotDiagnostics(stderr, "analyze"), [
+    { stage: "analyze", context: "gvs", status: "success" },
+  ]);
+  assert.deepEqual(parseYouTubeJscDiagnostics(stderr, "analyze"), [
+    { stage: "analyze", challenge: "signature", status: "resolved" },
+    { stage: "analyze", challenge: "n", status: "failed" },
+  ]);
+  const serialized = JSON.stringify({
+    runtime: parseYouTubeRuntimeDiagnostic(stderr, "analyze", true),
+    pot: parseYouTubePotDiagnostics(stderr, "analyze"),
+    jsc: parseYouTubeJscDiagnostics(stderr, "analyze"),
+  }).toLowerCase();
+  for (const forbidden of ["super-secret", "example.test", "videoplayback", "authorization", "bearer", "cookie", "session", "?sig="]) {
+    assert.doesNotMatch(serialized, new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+});
+
+test("YouTube POT diagnostics distinguish failure, unavailable and unknown without exposing values", () => {
+  assert.deepEqual(parseYouTubePotDiagnostics("gvs PO Token generation failed token=SECRET", "download"), [
+    { stage: "download", context: "gvs", status: "failed" },
+  ]);
+  assert.deepEqual(parseYouTubePotDiagnostics("player PO Token provider unavailable at https://secret.test/?token=x", "revalidate-format"), [
+    { stage: "revalidate-format", context: "player", status: "unavailable" },
+  ]);
+  assert.deepEqual(parseYouTubePotDiagnostics("subs PO Token state changed token=SECRET", "analyze"), [
+    { stage: "analyze", context: "subs", status: "unknown" },
+  ]);
+  assert.deepEqual(parseYouTubePotDiagnostics("PO Token Providers: bgutil:http-2.0.0", "analyze"), []);
+});
+
+test("YouTube raw format diagnostics use a strict allowlist and redact URL-like or secret fields", () => {
+  const diagnostics = buildYouTubeRawFormatDiagnostics([{
+    format_id: "18", ext: "mp4", vcodec: "avc1", acodec: "mp4a", protocol: "https",
+    format_note: "https://media.test/videoplayback?token=SECRET Authorization cookie=session",
+  }]);
+  assert.deepEqual(Object.keys(diagnostics[0]), ["formatId", "ext", "hasVideoCodec", "hasAudioCodec", "protocol", "formatNote"]);
+  assert.deepEqual(diagnostics[0], {
+    formatId: "18", ext: "mp4", hasVideoCodec: true, hasAudioCodec: true, protocol: "https", formatNote: null,
+  });
+  assert.doesNotMatch(JSON.stringify(diagnostics), /media\.test|videoplayback|SECRET|Authorization|cookie|session|\?/i);
 });
 
 test("YouTube provider fails closed before yt-dlp when the PO provider is unavailable", { concurrency: false }, async () => {
@@ -337,7 +410,12 @@ test("thumbnail selection avoids a known maxres candidate and warning logs are c
       { url: "https://i.ytimg.com/vi/id/hqdefault.jpg", width: 480 },
     ],
   }), "https://i.ytimg.com/vi/id/hqdefault.jpg");
-  assert.deepEqual(classifyWarnings("WARNING: missing PO Token; SABR formats unavailable"), ["po_token_required", "sabr_restriction", "formats_unavailable"]);
+  assert.deepEqual(classifyWarnings("WARNING: missing PO Token; SABR formats unavailable"), ["po_token_fetch_failed", "youtube_format_restriction", "formats_unavailable"]);
+  assert.deepEqual(classifyWarnings("[debug] PO Token Providers: bgutil:http-2.0.0"), []);
+  assert.deepEqual(classifyWarnings("WARNING: gvs PO Token obtained; subs PO Token failed"), [
+    "po_token_fetch_failed", "po_token_available", "po_token_partially_available",
+  ]);
+  assert.deepEqual(classifyWarnings("WARNING: PO Token state is unclear"), ["po_token_status_unknown"]);
 });
 
 test("analyze requests JSON metadata and formats without selecting or downloading a format", () => {
