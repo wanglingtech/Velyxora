@@ -1,14 +1,36 @@
-import { BaseMediaProvider } from './MediaProvider';
-import { MediaAnalysisResult, MediaPlatform } from '../types/media';
-import { validateSafeUrl } from '../security/ssrfValidator';
+import { isIP } from "node:net";
+import { ENV } from "../config/env";
+import { MediaAnalysisResult } from "../types/media";
+import { YtDlpError, ytDlpService } from "../services/ytDlpService";
+import { YtDlpProvider } from "./YtDlpProvider";
 
-export class YouTubeProvider extends BaseMediaProvider {
-  readonly platform: MediaPlatform = 'youtube';
-  readonly name = 'YouTube';
-  readonly domainPatterns = [
-    /(^|\.)youtube\.com$/i,
-    /(^|\.)youtu\.be$/i,
+export const YOUTUBE_PO_PROVIDER_VERSION = "2.0.0";
+
+export function parseInternalPoProviderUrl(rawUrl: string): URL | null {
+  try {
+    const url = new URL(rawUrl);
+    const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+    const loopback = hostname === "localhost" || hostname === "::1" || hostname.startsWith("127.");
+    const privateDns = isIP(hostname) === 0 && (!hostname.includes(".") || hostname.endsWith(".internal"));
+    if (url.protocol !== "http:" || !hostname || (!loopback && !privateDns)) return null;
+    if (url.username || url.password || url.search || url.hash || (url.pathname && url.pathname !== "/")) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+export function buildYouTubeYtDlpArgs(providerUrl: URL): string[] {
+  return [
+    "--extractor-args", "youtube:player-client=mweb",
+    "--extractor-args", `youtubepot-bgutilhttp:base_url=${providerUrl.origin}`,
   ];
+}
+
+export class YouTubeProvider extends YtDlpProvider {
+  constructor() {
+    super("youtube", "YouTube", [/(^|\.)youtube\.com$/i, /(^|\.)youtu\.be$/i]);
+  }
 
   extractId(url: string): string | null {
     try {
@@ -22,48 +44,43 @@ export class YouTubeProvider extends BaseMediaProvider {
     }
   }
 
-  async analyze(url: string): Promise<MediaAnalysisResult> {
-    const videoId = this.extractId(url);
-    if (!videoId) {
-      throw new Error('Could not parse a valid YouTube Video ID from the provided URL.');
+  private async invocationArgs(): Promise<string[]> {
+    const providerUrl = parseInternalPoProviderUrl(ENV.YOUTUBE_PO_TOKEN_PROVIDER_URL);
+    if (!providerUrl) {
+      throw new YtDlpError("MEDIA_PROVIDER_RESTRICTED", "El proveedor interno de verificación de YouTube no está configurado de forma segura.");
     }
-
-    // SSRF verification before calling external oembed
-    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&format=json`;
-    const safetyCheck = await validateSafeUrl(oembedUrl);
-    if (!safetyCheck.valid) {
-      throw new Error(safetyCheck.error || 'Security restriction prevented external fetch');
-    }
-
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-
+    const timeout = setTimeout(() => controller.abort(), 3000);
     try {
-      const response = await fetch(oembedUrl, { signal: controller.signal });
+      const response = await fetch(new URL("/ping", providerUrl), { signal: controller.signal });
+      if (!response.ok) throw new Error("unhealthy");
+      // The provider's /ping response is intentionally treated as a liveness
+      // check only; the plugin/image versions are pinned at build time.
+    } catch {
+      throw new YtDlpError("MEDIA_PROVIDER_RESTRICTED", "El proveedor interno de verificación de YouTube no está disponible.");
+    } finally {
       clearTimeout(timeout);
-
-      if (!response.ok) {
-        throw new Error(`YouTube responded with status ${response.status} (${response.statusText}). Video may be private or unavailable.`);
-      }
-
-      const data = (await response.json()) as any;
-
-      return {
-        url,
-        platform: this.platform,
-        title: data.title || `YouTube Video (${videoId})`,
-        author: data.author_name || 'YouTube Creator',
-        authorUrl: data.author_url,
-        thumbnailUrl: data.thumbnail_url || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-        embedHtml: `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`,
-        formats: [],
-        isDirectDownloadPossible: false,
-        requiresExternalExtractor: true,
-        notice: 'Direct media extraction requires yt-dlp and is limited to public, authorized content.',
-      };
-    } catch (err: any) {
-      clearTimeout(timeout);
-      throw new Error(`Failed to fetch YouTube metadata: ${err.message}`);
     }
+    return buildYouTubeYtDlpArgs(providerUrl);
+  }
+
+  async analyze(url: string): Promise<MediaAnalysisResult> {
+    return ytDlpService.analyze(url, this.platform, await this.invocationArgs());
+  }
+
+  async assertFormatAvailable(url: string, formatId: string): Promise<void> {
+    return ytDlpService.assertFormatAvailable(url, formatId, this.platform, await this.invocationArgs());
+  }
+
+  async download(
+    url: string,
+    formatId: string,
+    container: string,
+    type: "video" | "audio",
+    outputStem: string,
+    signal?: AbortSignal,
+    onProgress?: (value: number) => void,
+  ): Promise<string> {
+    return ytDlpService.download(url, formatId, container, type, outputStem, signal, onProgress, this.platform, await this.invocationArgs());
   }
 }

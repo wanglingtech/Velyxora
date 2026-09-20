@@ -36,6 +36,7 @@ FROM node:22-bookworm-slim AS runtime
 
 ARG YT_DLP_VERSION=2026.08.19
 ARG YT_DLP_SHA256=1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6
+ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION=2.0.0
 
 ENV NODE_ENV=production \
     PORT=3000 \
@@ -67,15 +68,51 @@ RUN apt-get update \
     && chmod 0755 /usr/local/bin/yt-dlp \
     && test "$(/usr/local/bin/yt-dlp --version)" = "${YT_DLP_VERSION}" \
     && python3 -m venv /opt/velyxora-ytdlp \
+    && mkdir -p /tmp/yt-dlp-ejs \
+    && /opt/velyxora-ytdlp/bin/python -m pip download \
+        --disable-pip-version-check \
+        --no-cache-dir \
+        --no-deps \
+        --only-binary=:all: \
+        --dest /tmp/yt-dlp-ejs \
+        yt-dlp-ejs==0.8.0 \
+    && EJS_WHEEL="$(find /tmp/yt-dlp-ejs -type f -name 'yt_dlp_ejs-0.8.0-*.whl' -print -quit)" \
+    && test -n "${EJS_WHEEL}" \
+    && test "$(sha256sum "${EJS_WHEEL}" | cut -d ' ' -f 1)" = "79300e5fca7f937a1eeede11f0456862c1b41107ce1d726871e0207424f4bdb4" \
     && /opt/velyxora-ytdlp/bin/python -m pip install \
         --disable-pip-version-check \
         --no-cache-dir \
+        --no-deps \
+        "${EJS_WHEEL}" \
+    && /opt/velyxora-ytdlp/bin/python -m pip install \
+        --disable-pip-version-check \
+        --no-cache-dir \
+        --no-deps \
+        yt-dlp==${YT_DLP_VERSION} \
         certifi==2026.7.22 \
         cffi==2.1.1 \
         curl-cffi==0.16.0 \
         pycparser==3.0 \
+        bgutil-ytdlp-pot-provider==${BGUTIL_YTDLP_POT_PROVIDER_VERSION} \
+    && echo 'GATE curl-cffi version' \
     && test "$(/opt/velyxora-ytdlp/bin/python -c 'import curl_cffi; print(curl_cffi.__version__)')" = "0.16.0" \
-    && yt-dlp --list-impersonate-targets | grep -Eq 'curl_cffi$' \
+    && echo 'GATE yt-dlp version' \
+    && /opt/velyxora-ytdlp/bin/python -c 'import sys; normalize=lambda value: tuple(int(part) for part in value.split(".")); assert normalize(sys.argv[1]) == normalize(sys.argv[2])' "${YT_DLP_VERSION}" "$(/opt/velyxora-ytdlp/bin/python -c 'from importlib.metadata import version; print(version("yt-dlp"))')" \
+    && echo 'GATE bgutil version' \
+    && test "$(/opt/velyxora-ytdlp/bin/python -c 'from importlib.metadata import version; print(version("bgutil-ytdlp-pot-provider"))')" = "${BGUTIL_YTDLP_POT_PROVIDER_VERSION}" \
+    && echo 'GATE yt-dlp-ejs version' \
+    && test "$(/opt/velyxora-ytdlp/bin/python -c 'from importlib.metadata import version; print(version("yt-dlp-ejs"))')" = "0.8.0" \
+    && echo 'GATE EJS core' \
+    && test -f /opt/velyxora-ytdlp/lib/python3.11/site-packages/yt_dlp_ejs/yt/solver/core.min.js \
+    && echo 'GATE EJS lib' \
+    && test -f /opt/velyxora-ytdlp/lib/python3.11/site-packages/yt_dlp_ejs/yt/solver/lib.min.js \
+    && echo 'GATE plugin directory' \
+    && test -d /opt/velyxora-ytdlp/lib/python3.11/site-packages/yt_dlp_plugins \
+    && echo 'GATE plugin distribution' \
+    && /opt/velyxora-ytdlp/bin/python -c 'from importlib.metadata import distribution; files=distribution("bgutil-ytdlp-pot-provider").files or (); assert any(str(path).startswith("yt_dlp_plugins/") for path in files)' \
+    && echo 'GATE executable curl-cffi' \
+    && /opt/velyxora-ytdlp/bin/yt-dlp --list-impersonate-targets | grep -Eq 'curl_cffi$' \
+    && rm -rf /tmp/yt-dlp-ejs \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

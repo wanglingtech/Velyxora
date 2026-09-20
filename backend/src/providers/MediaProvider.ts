@@ -8,6 +8,16 @@ export interface IMediaProvider {
   canHandle(url: string): boolean;
   extractId(url: string): string | null;
   analyze(url: string): Promise<MediaAnalysisResult>;
+  assertFormatAvailable?(url: string, formatId: string): Promise<void>;
+  download?(
+    url: string,
+    formatId: string,
+    container: string,
+    type: "video" | "audio",
+    outputStem: string,
+    signal?: AbortSignal,
+    onProgress?: (value: number) => void,
+  ): Promise<string>;
 }
 
 export abstract class BaseMediaProvider implements IMediaProvider {

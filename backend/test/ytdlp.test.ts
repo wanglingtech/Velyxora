@@ -2,11 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { providerRegistry } from "../src/providers/ProviderRegistry";
-import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, selectThumbnail, shouldEnableTikTokStagingDiagnostics } from "../src/services/ytDlpService";
+import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildDownloadArgs, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, selectThumbnail, shouldEnableTikTokStagingDiagnostics } from "../src/services/ytDlpService";
 import { backendApp } from "../src/app";
 import { ytDlpService } from "../src/services/ytDlpService";
 import { ENV } from "../src/config/env";
 import { readFile } from "node:fs/promises";
+import { buildYouTubeYtDlpArgs, parseInternalPoProviderUrl, YouTubeProvider, YOUTUBE_PO_PROVIDER_VERSION } from "../src/providers/YouTubeProvider";
+import { YtDlpProvider } from "../src/providers/YtDlpProvider";
 
 test("provider registry detects first-level providers and falls back to GenericProvider", () => {
   const cases = [
@@ -17,6 +19,112 @@ test("provider registry detects first-level providers and falls back to GenericP
     ["https://soundcloud.com/a/b", "soundcloud"], ["https://example.com/media", "generic"],
   ];
   for (const [url, expected] of cases) assert.equal(providerRegistry.find(url).platform, expected);
+});
+
+test("provider registry activates the dedicated YouTube provider only for YouTube", () => {
+  assert.ok(providerRegistry.find("https://youtube.com/watch?v=x") instanceof YouTubeProvider);
+  for (const url of ["https://tiktok.com/@a/video/1", "https://facebook.com/watch/x", "https://vimeo.com/1"]) {
+    const provider = providerRegistry.find(url);
+    assert.ok(provider instanceof YtDlpProvider);
+    assert.equal(provider instanceof YouTubeProvider, false);
+  }
+});
+
+test("YouTube PO provider URL accepts only private HTTP service addresses", () => {
+  for (const value of [
+    "http://youtube-pot-provider:4416",
+    "http://service.internal:4416",
+    "http://127.0.0.1:4416",
+    "http://[::1]:4416",
+  ]) assert.ok(parseInternalPoProviderUrl(value), value);
+
+  for (const value of [
+    "", "https://youtube-pot-provider:4416", "http://example.com:4416",
+    "http://8.8.8.8:4416", "http://user:pass@localhost:4416",
+    "http://localhost:4416/get_pot", "http://localhost:4416?token=secret",
+  ]) assert.equal(parseInternalPoProviderUrl(value), null, value);
+});
+
+test("YouTube arguments are isolated and identical for analysis and download builders", () => {
+  const providerUrl = parseInternalPoProviderUrl("http://youtube-pot-provider:4416");
+  assert.ok(providerUrl);
+  const youtubeArgs = buildYouTubeYtDlpArgs(providerUrl);
+  assert.deepEqual(youtubeArgs, [
+    "--extractor-args", "youtube:player-client=mweb",
+    "--extractor-args", "youtubepot-bgutilhttp:base_url=http://youtube-pot-provider:4416",
+  ]);
+  assert.equal(youtubeArgs.filter((value) => value === "--extractor-args").length, 2);
+  assert.equal(youtubeArgs.some((value) => value.includes(";")), false);
+  const analyzeArgs = buildAnalyzeArgs("https://youtube.com/watch?v=public-id", youtubeArgs);
+  const downloadArgs = buildDownloadArgs("https://youtube.com/watch?v=public-id", "18", "mp4", "video", "/tmp/output", youtubeArgs);
+  for (const value of youtubeArgs.filter((_, index) => index % 2 === 1)) {
+    assert.ok(analyzeArgs.includes(value));
+    assert.ok(downloadArgs.includes(value));
+  }
+  const otherProviderArgs = buildAnalyzeArgs("https://tiktok.com/@a/video/1");
+  assert.equal(otherProviderArgs.some((value) => value.includes("player-client") || value.includes("bgutil")), false);
+});
+
+test("YouTube provider fails closed before yt-dlp when the PO provider is unavailable", { concurrency: false }, async () => {
+  const originalUrl = ENV.YOUTUBE_PO_TOKEN_PROVIDER_URL;
+  const originalFetch = globalThis.fetch;
+  const originalAnalyze = ytDlpService.analyze;
+  let ytDlpCalled = false;
+  ENV.YOUTUBE_PO_TOKEN_PROVIDER_URL = "http://youtube-pot-provider:4416";
+  globalThis.fetch = (async () => { throw new Error("unavailable"); }) as typeof fetch;
+  ytDlpService.analyze = (async () => { ytDlpCalled = true; throw new Error("unexpected"); }) as typeof ytDlpService.analyze;
+  try {
+    await assert.rejects(
+      () => new YouTubeProvider().analyze("https://youtube.com/watch?v=public-id"),
+      (error: any) => error.code === "MEDIA_PROVIDER_RESTRICTED" && /interno/i.test(error.message),
+    );
+    assert.equal(ytDlpCalled, false);
+  } finally {
+    ENV.YOUTUBE_PO_TOKEN_PROVIDER_URL = originalUrl;
+    globalThis.fetch = originalFetch;
+    ytDlpService.analyze = originalAnalyze;
+  }
+});
+
+test("YouTube provider applies one strategy to analyze, revalidate and download", { concurrency: false }, async () => {
+  const originalUrl = ENV.YOUTUBE_PO_TOKEN_PROVIDER_URL;
+  const originalFetch = globalThis.fetch;
+  const originalAnalyze = ytDlpService.analyze;
+  const originalAssert = ytDlpService.assertFormatAvailable;
+  const originalDownload = ytDlpService.download;
+  const calls: Array<{ stage: string; args: readonly string[] }> = [];
+  ENV.YOUTUBE_PO_TOKEN_PROVIDER_URL = "http://youtube-pot-provider:4416";
+  globalThis.fetch = (async () => new Response(JSON.stringify({ version: YOUTUBE_PO_PROVIDER_VERSION }), {
+    status: 200, headers: { "content-type": "application/json" },
+  })) as typeof fetch;
+  ytDlpService.analyze = (async (_url, _platform, args) => {
+    calls.push({ stage: "analyze", args });
+    return { url: "https://youtube.com/watch?v=x", platform: "youtube", title: "x", formats: [], isDirectDownloadPossible: false, requiresExternalExtractor: true };
+  }) as typeof ytDlpService.analyze;
+  ytDlpService.assertFormatAvailable = (async (_url, _format, _platform, args) => { calls.push({ stage: "revalidate", args }); }) as typeof ytDlpService.assertFormatAvailable;
+  ytDlpService.download = (async (_url, _format, _container, _type, _stem, _signal, _progress, _platform, args) => {
+    calls.push({ stage: "download", args }); return "/tmp/output.mp4";
+  }) as typeof ytDlpService.download;
+  try {
+    const provider = new YouTubeProvider();
+    await provider.analyze("https://youtube.com/watch?v=x");
+    await provider.assertFormatAvailable("https://youtube.com/watch?v=x", "18");
+    await provider.download("https://youtube.com/watch?v=x", "18", "mp4", "video", "/tmp/output");
+    assert.deepEqual(calls.map(({ stage }) => stage), ["analyze", "revalidate", "download"]);
+    assert.deepEqual(calls[0].args, calls[1].args);
+    assert.deepEqual(calls[1].args, calls[2].args);
+    assert.equal(calls[0].args.filter((value) => value === "--extractor-args").length, 2);
+    assert.deepEqual(calls[0].args.filter((_, index) => index % 2 === 1), [
+      "youtube:player-client=mweb",
+      "youtubepot-bgutilhttp:base_url=http://youtube-pot-provider:4416",
+    ]);
+  } finally {
+    ENV.YOUTUBE_PO_TOKEN_PROVIDER_URL = originalUrl;
+    globalThis.fetch = originalFetch;
+    ytDlpService.analyze = originalAnalyze;
+    ytDlpService.assertFormatAvailable = originalAssert;
+    ytDlpService.download = originalDownload;
+  }
 });
 
 test("yt-dlp formats are normalized, deduplicated and include real MP3 conversion choices", () => {

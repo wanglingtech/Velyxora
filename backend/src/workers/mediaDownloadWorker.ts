@@ -3,7 +3,7 @@ import path from "path";
 import { InMemoryQueue } from "../jobs/InMemoryQueue";
 import { jobManager } from "../jobs/JobManager";
 import { ENV } from "../config/env";
-import { ytDlpService } from "../services/ytDlpService";
+import { providerRegistry } from "../providers/ProviderRegistry";
 import { probeMedia } from "../utils/mediaProbe";
 import { storageService } from "../services/storageService";
 import { sanitizeFilename } from "../utils/sanitize";
@@ -19,7 +19,9 @@ mediaDownloadQueue.process(async (jobId, data: { url: string; formatId: string; 
   try {
     jobManager.setStatus(jobId, "DOWNLOADING");
     jobManager.updateProgress(jobId, 0, "Descargando contenido público...");
-    const outputPath = await ytDlpService.download(data.url, data.formatId, data.container, data.type, stem, jobManager.getSignal(jobId), (progress) => jobManager.updateProgress(jobId, progress, "Descargando..."));
+    const provider = providerRegistry.find(data.url);
+    if (provider === providerRegistry.generic || !provider.download) throw new Error("Este proveedor no está admitido actualmente.");
+    const outputPath = await provider.download(data.url, data.formatId, data.container, data.type, stem, jobManager.getSignal(jobId), (progress) => jobManager.updateProgress(jobId, progress, "Descargando..."));
     if (jobManager.getJob(jobId)?.status === "CANCELLED") { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); return; }
     jobManager.setStatus(jobId, "PROCESSING");
     jobManager.updateProgress(jobId, 99, "Validando archivo...");

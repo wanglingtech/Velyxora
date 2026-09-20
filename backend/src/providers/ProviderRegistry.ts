@@ -1,11 +1,12 @@
 import { IMediaProvider } from "./MediaProvider";
 import { YtDlpProvider } from "./YtDlpProvider";
+import { YouTubeProvider } from "./YouTubeProvider";
 
 const domain = (name: string) => new RegExp(`(^|\\.)${name.replace(".", "\\.")}$`, "i");
 
 export class ProviderRegistry {
   readonly providers: IMediaProvider[] = [
-    new YtDlpProvider("youtube", "YouTube", [domain("youtube.com"), domain("youtu.be")]),
+    new YouTubeProvider(),
     new YtDlpProvider("tiktok", "TikTok", [domain("tiktok.com")]),
     new YtDlpProvider("instagram", "Instagram", [domain("instagram.com")]),
     new YtDlpProvider("facebook", "Facebook", [domain("facebook.com"), domain("fb.watch")]),

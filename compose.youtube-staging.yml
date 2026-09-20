@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16.10-bookworm
+    environment:
+      POSTGRES_DB: velyxora
+      POSTGRES_USER: velyxora
+      POSTGRES_PASSWORD: local-staging-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U velyxora -d velyxora"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [backend]
+
+  youtube-pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:2.0.0-node
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4416/ping').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks: [backend, egress]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.media-staging
+    environment:
+      DATABASE_URL: postgresql://velyxora:local-staging-only@postgres:5432/velyxora?schema=public
+      AUTH_PASSWORD_PEPPER: local-staging-only-change-before-shared-use
+      YOUTUBE_PO_TOKEN_PROVIDER_URL: http://youtube-pot-provider:4416
+    depends_on:
+      postgres:
+        condition: service_healthy
+      youtube-pot-provider:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks: [backend, egress]
+
+networks:
+  backend:
+    internal: true
+  egress: {}

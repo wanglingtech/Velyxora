@@ -79,8 +79,8 @@ export const shouldEnableTikTokStagingDiagnostics = (
 export const withTikTokStagingDiagnosticsArgs = (args: string[], enabled: boolean): string[] =>
   enabled ? ["--verbose", ...args] : args;
 
-export const buildAnalyzeExecutionPlan = (url: string, stagingDiagnostics: boolean): string[][] =>
-  [withTikTokStagingDiagnosticsArgs(buildAnalyzeArgs(url), stagingDiagnostics)];
+export const buildAnalyzeExecutionPlan = (url: string, stagingDiagnostics: boolean, providerArgs: readonly string[] = []): string[][] =>
+  [withTikTokStagingDiagnosticsArgs(buildAnalyzeArgs(url, providerArgs), stagingDiagnostics)];
 
 export function parseImpersonationTargetFamily(target: string): ImpersonationTargetFamily {
   const normalized = target.trim().toLowerCase();
@@ -304,8 +304,9 @@ export function assertUsableAnalysisFormats(platform: MediaPlatform, diagnostics
 
 const COMMON_ARGS = ["--ignore-config", "--no-playlist", "--js-runtimes", "node"];
 
-export const buildAnalyzeArgs = (url: string): string[] => [
+export const buildAnalyzeArgs = (url: string, providerArgs: readonly string[] = []): string[] => [
   ...COMMON_ARGS,
+  ...providerArgs,
   "--dump-single-json",
   "--skip-download",
   "--ignore-no-formats-error",
@@ -339,6 +340,23 @@ export function selectThumbnail(data: RawInfo): string | undefined {
 export const isRequestedFormatAvailable = (formats: MediaStreamFormat[], formatId: string): boolean =>
   formats.some((format) => format.formatId === formatId);
 
+export function buildDownloadArgs(
+  url: string,
+  formatId: string,
+  container: string,
+  type: "video" | "audio",
+  outputStem: string,
+  providerArgs: readonly string[] = [],
+): string[] {
+  const isMp3 = /^audio-mp3-(128|192|320)$/.exec(formatId);
+  const args = [...COMMON_ARGS, ...providerArgs, "--newline", "--progress-template", "download:%(progress._percent_str)s"];
+  if (isMp3) args.push("-x", "--audio-format", "mp3", "--audio-quality", `${isMp3[1]}K`);
+  else if (type === "video") args.push("-f", `${formatId}+bestaudio/${formatId}`, "--merge-output-format", container);
+  else args.push("-f", formatId);
+  args.push("-o", `${outputStem}.%(ext)s`, "--", url);
+  return args;
+}
+
 class YtDlpService {
   private version?: string;
   private stagingRuntimeDiagnostics?: Promise<StagingRuntimeDiagnostics>;
@@ -355,9 +373,9 @@ class YtDlpService {
     } catch { return null; }
   }
 
-  async analyze(url: string, platform: MediaPlatform): Promise<MediaAnalysisResult> {
+  async analyze(url: string, platform: MediaPlatform, providerArgs: readonly string[] = []): Promise<MediaAnalysisResult> {
     logger.info("YT_DLP_STAGE", { provider: platform, stage: "analyze" });
-    const { data, warningCategories, stagingTrace } = await this.extractInfo(url, "analyze", platform);
+    const { data, warningCategories, stagingTrace } = await this.extractInfo(url, "analyze", platform, providerArgs);
     const { diagnostics } = normalizeFormatsWithDiagnostics(data.formats);
     logger.info("MEDIA_ANALYZE_FORMATS", { provider: platform, ...diagnostics });
     if (stagingTrace) {
@@ -373,35 +391,29 @@ class YtDlpService {
     return parseAnalysis(data, url, platform);
   }
 
-  async assertFormatAvailable(url: string, formatId: string, platform: MediaPlatform): Promise<void> {
+  async assertFormatAvailable(url: string, formatId: string, platform: MediaPlatform, providerArgs: readonly string[] = []): Promise<void> {
     logger.info("YT_DLP_STAGE", { provider: platform, stage: "process", action: "revalidate-format" });
-    const { data } = await this.extractInfo(url, "process", platform);
+    const { data } = await this.extractInfo(url, "process", platform, providerArgs);
     const analysis = parseAnalysis(data, url, platform);
     if (!isRequestedFormatAvailable(analysis.formats, formatId)) {
       throw new YtDlpError("FORMAT_UNAVAILABLE", "El formato seleccionado ya no está disponible. Analiza el recurso nuevamente.");
     }
   }
 
-  private async extractInfo(url: string, stage: "analyze" | "process", platform: MediaPlatform): Promise<{ data: RawInfo; warningCategories: string[]; stagingTrace?: YtDlpRunResult["stagingTrace"] }> {
+  private async extractInfo(url: string, stage: "analyze" | "process", platform: MediaPlatform, providerArgs: readonly string[] = []): Promise<{ data: RawInfo; warningCategories: string[]; stagingTrace?: YtDlpRunResult["stagingTrace"] }> {
     const stagingEnabled = shouldEnableTikTokStagingDiagnostics(ENV.MEDIA_STAGING_DIAGNOSTICS, platform, stage);
-    const [args] = buildAnalyzeExecutionPlan(url, stagingEnabled);
+    const [args] = buildAnalyzeExecutionPlan(url, stagingEnabled, providerArgs);
     const result = await this.run(args, stage, undefined, 30_000, undefined, platform);
     return { data: JSON.parse(result.stdout) as RawInfo, warningCategories: result.warningCategories, stagingTrace: result.stagingTrace };
   }
 
-  async download(url: string, formatId: string, container: string, type: "video" | "audio", outputStem: string, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<string> {
-    const isMp3 = /^audio-mp3-(128|192|320)$/.exec(formatId);
-    const template = `${outputStem}.%(ext)s`;
-    const args = [...COMMON_ARGS, "--newline", "--progress-template", "download:%(progress._percent_str)s"];
-    if (isMp3) args.push("-x", "--audio-format", "mp3", "--audio-quality", `${isMp3[1]}K`);
-    else if (type === "video") args.push("-f", `${formatId}+bestaudio/${formatId}`, "--merge-output-format", container);
-    else args.push("-f", formatId);
-    args.push("-o", template, "--", url);
+  async download(url: string, formatId: string, container: string, type: "video" | "audio", outputStem: string, signal?: AbortSignal, onProgress?: (value: number) => void, platform?: MediaPlatform, providerArgs: readonly string[] = []): Promise<string> {
+    const args = buildDownloadArgs(url, formatId, container, type, outputStem, providerArgs);
     logger.info("YT_DLP_STAGE", { stage: "process" });
     await this.run(args, "process", signal, ENV.YT_DLP_TIMEOUT_MS, (line) => {
       const match = line.match(/download:\s*([\d.]+)%/);
       if (match) onProgress?.(Math.min(99, Number(match[1])));
-    });
+    }, platform);
     const files = fs.readdirSync(path.dirname(outputStem)).filter((name) => name.startsWith(`${path.basename(outputStem)}.`) && !name.endsWith(".part"));
     if (files.length !== 1) throw new YtDlpError("OUTPUT_MISSING", "La descarga no produjo un archivo válido.");
     return path.join(path.dirname(outputStem), files[0]);

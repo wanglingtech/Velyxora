@@ -2,10 +2,9 @@ import { randomUUID } from "crypto";
 import { jobManager } from "../jobs/JobManager";
 import { mediaDownloadQueue } from "../workers/mediaDownloadWorker";
 import { validateSafeUrl } from "../security/ssrfValidator";
-import { ytDlpService } from "./ytDlpService";
 import { creditLedgerService } from "./creditLedgerService";
 import { providerPolicyService } from "./providerPolicyService";
-import type { MediaPlatform } from "../types/media";
+import { providerRegistry } from "../providers/ProviderRegistry";
 
 export const mediaDownloadService = {
   async start(url: string, formatId: string, container: string, type: "video" | "audio", title: string, billing?: { userId: string; isAdmin: boolean }) {
@@ -14,8 +13,9 @@ export const mediaDownloadService = {
     if (!safety.valid) throw new Error(safety.error || "URL no permitida.");
     if (!/^[a-zA-Z0-9_.+-]{1,100}$/.test(formatId)) throw new Error("Formato seleccionado inválido.");
     if (!['mp4', 'webm', 'm4a', 'opus', 'mp3'].includes(container) || !['video', 'audio'].includes(type)) throw new Error("Formato seleccionado inválido.");
-    if (!await ytDlpService.isAvailable()) throw new Error("El motor de descargas no está disponible.");
-    await ytDlpService.assertFormatAvailable(url, formatId, provider as MediaPlatform);
+    const mediaProvider = providerRegistry.find(url);
+    if (mediaProvider === providerRegistry.generic || mediaProvider.platform !== provider || !mediaProvider.assertFormatAvailable) throw new Error("Este proveedor no está admitido actualmente.");
+    await mediaProvider.assertFormatAvailable(url, formatId);
     const id = `media-${randomUUID()}`;
     if (billing) await creditLedgerService.reserve(billing.userId, id, 'media-downloader', 0, billing.isAdmin);
     const job = jobManager.createJob({
