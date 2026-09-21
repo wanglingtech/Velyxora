@@ -182,6 +182,7 @@ Implementado en Mi cuenta para órdenes Yape propias con estado `PENDING_PAYMENT
 # Fase yt-dlp
 
 - `COMPLETE`: registry desacoplado, nueve providers de primer nivel y GenericProvider; DTO normalizado; validación SSRF; jobs, cancelación, timeout, cleanup, FFmpeg/FFprobe y descarga por ID opaco; UI y términos.
-- `YT-005A implemented`: YouTube bot verification inequívoco se normaliza como `PROVIDER_TEMPORARILY_RESTRICTED`; analyze/revalidate no crean jobs ni reservas y los fallos posteriores del job conservan el reembolso existente. Pendientes: YT-005B degradación/estado, YT-005C circuit breaker, YT-005D history/billing hardening, YT-005E observabilidad de producción y YT-005F canary de producción.
+- `YT-005A complete`: YouTube bot verification inequívoco se normaliza como `PROVIDER_TEMPORARILY_RESTRICTED`; analyze/revalidate no crean jobs ni reservas y los fallos posteriores del job conservan el reembolso existente.
+- `YT-005B implemented`: estado observacional `HEALTHY | DEGRADED | RESTRICTED` seguro y en memoria por proceso para YouTube. No bloquea solicitudes y se reinicia con el proceso. Pendientes: YT-005C circuit breaker distribuido, YT-005D history/billing hardening, YT-005E observabilidad de producción y YT-005F canary de producción.
 - `EXTERNAL_DEPENDENCY`: análisis y descarga requieren que `YT_DLP_PATH` resuelva un binario yt-dlp operativo.
 - `PARTIAL`: compatibilidad externa por proveedor; depende de cambios de cada plataforma y debe validarse periódicamente con contenido público autorizado.

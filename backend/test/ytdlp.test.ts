@@ -15,6 +15,7 @@ import { creditLedgerService } from "../src/services/creditLedgerService";
 import { jobManager } from "../src/jobs/JobManager";
 import { mediaDownloadQueue, processMediaDownloadJob } from "../src/workers/mediaDownloadWorker";
 import dns from "node:dns/promises";
+import { YouTubeProviderHealthService, youtubeProviderHealthService } from "../src/services/youtubeProviderHealthService";
 
 test("provider registry detects first-level providers and falls back to GenericProvider", () => {
   const cases = [
@@ -25,6 +26,86 @@ test("provider registry detects first-level providers and falls back to GenericP
     ["https://soundcloud.com/a/b", "soundcloud"], ["https://example.com/media", "generic"],
   ];
   for (const [url, expected] of cases) assert.equal(providerRegistry.find(url).platform, expected);
+});
+
+test("YT-005B starts healthy and exposes only the safe operational snapshot", () => {
+  const service = new YouTubeProviderHealthService(() => new Date("2026-09-21T00:00:00.000Z"), () => undefined);
+  assert.deepEqual(service.getSnapshot(), {
+    state: "HEALTHY", lastUpdatedAt: "2026-09-21T00:00:00.000Z", lastSuccessAt: null,
+    lastRestrictionAt: null, lastFailureAt: null, reason: null,
+  });
+  assert.deepEqual(Object.keys(service.getSnapshot()), ["state", "lastUpdatedAt", "lastSuccessAt", "lastRestrictionAt", "lastFailureAt", "reason"]);
+  assert.doesNotMatch(JSON.stringify(service.getSnapshot()), /url|videoId|title|channel|token|cookie|header|stderr|sidecar/i);
+});
+
+test("YT-005B applies conservative transitions and emits events only on state changes", () => {
+  let tick = 0;
+  const events: Array<{ event: string; fields: Record<string, unknown> }> = [];
+  const service = new YouTubeProviderHealthService(
+    () => new Date(Date.UTC(2026, 8, 21, 0, 0, tick++)),
+    (event, fields) => events.push({ event, fields }),
+  );
+  const healthy = service.beginOperation();
+  service.recordSuccess(healthy);
+  assert.equal(service.getSnapshot().state, "HEALTHY");
+  assert.equal(events.length, 0);
+
+  const restricted = service.beginOperation();
+  service.recordError(restricted, "PROVIDER_TEMPORARILY_RESTRICTED");
+  assert.equal(service.getSnapshot().state, "RESTRICTED");
+  assert.equal(service.getSnapshot().reason, "bot_verification");
+  assert.equal(events.length, 1);
+
+  for (const code of ["NOT_PUBLIC", "PROVIDER_UNAVAILABLE", "FORMAT_UNAVAILABLE"]) {
+    service.recordError(service.beginOperation(), code);
+  }
+  assert.equal(service.getSnapshot().state, "RESTRICTED");
+  assert.equal(events.length, 1);
+
+  const recovered = service.beginOperation();
+  service.recordSuccess(recovered);
+  assert.equal(service.getSnapshot().state, "HEALTHY");
+  assert.equal(service.getSnapshot().reason, null);
+  assert.equal(events.length, 2);
+
+  const failed = service.beginOperation();
+  service.recordError(failed, "YT_DLP_TIMEOUT");
+  assert.equal(service.getSnapshot().state, "DEGRADED");
+  assert.equal(service.getSnapshot().reason, "technical_failure");
+  assert.equal(events.length, 3);
+  for (const entry of events) {
+    assert.equal(entry.event, "YOUTUBE_PROVIDER_HEALTH_CHANGED");
+    assert.deepEqual(Object.keys(entry.fields), ["from", "to", "reason", "timestamp"]);
+  }
+});
+
+test("YT-005B ignores stale completions and never blocks a new operation while restricted", () => {
+  const service = new YouTubeProviderHealthService(() => new Date("2026-09-21T00:00:00.000Z"), () => undefined);
+  const older = service.beginOperation();
+  const newer = service.beginOperation();
+  service.recordRestriction(newer);
+  service.recordSuccess(older);
+  assert.equal(service.getSnapshot().state, "RESTRICTED");
+  const next = service.beginOperation();
+  assert.equal(next, newer + 1);
+  service.recordSuccess(next);
+  assert.equal(service.getSnapshot().state, "HEALTHY");
+});
+
+test("YT-005B operations from other providers do not modify YouTube health", { concurrency: false }, async () => {
+  const service = ytDlpService as any;
+  const originalExtractInfo = service.extractInfo;
+  const before = youtubeProviderHealthService.getSnapshot();
+  service.extractInfo = async () => ({
+    data: { title: "Public media", formats: [{ format_id: "18", ext: "mp4", vcodec: "avc1", acodec: "mp4a" }] },
+    warningCategories: [],
+  });
+  try {
+    await ytDlpService.analyze("https://facebook.com/watch/1", "facebook");
+    assert.deepEqual(youtubeProviderHealthService.getSnapshot(), before);
+  } finally {
+    service.extractInfo = originalExtractInfo;
+  }
 });
 
 test("provider registry activates the dedicated YouTube provider only for YouTube", () => {

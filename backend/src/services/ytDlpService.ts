@@ -4,6 +4,7 @@ import path from "path";
 import { ENV } from "../config/env";
 import { logger } from "../utils/logger";
 import { MediaAnalysisResult, MediaPlatform, MediaStreamFormat } from "../types/media";
+import { youtubeProviderHealthService } from "./youtubeProviderHealthService";
 
 export type RawFormat = {
   format_id?: string; ext?: string; vcodec?: string; acodec?: string;
@@ -542,6 +543,11 @@ export function buildDownloadArgs(
   return args;
 }
 
+function recordYouTubeHealthFailure(operationId: number | null, error: unknown): void {
+  if (operationId === null || !(error instanceof YtDlpError)) return;
+  youtubeProviderHealthService.recordError(operationId, error.code);
+}
+
 class YtDlpService {
   private version?: string;
   private stagingRuntimeDiagnostics?: Promise<StagingRuntimeDiagnostics>;
@@ -559,41 +565,56 @@ class YtDlpService {
   }
 
   async analyze(url: string, platform: MediaPlatform, providerArgs: readonly string[] = []): Promise<MediaAnalysisResult> {
+    const healthOperation = platform === "youtube" ? youtubeProviderHealthService.beginOperation() : null;
     logger.info("YT_DLP_STAGE", {
       provider: platform,
       stage: "analyze",
       ...(platform === "youtube" ? { youtubeDiagnosticsEnabled: ENV.YOUTUBE_DIAGNOSTICS_ENABLED } : {}),
     });
-    const { data, warningCategories, stagingTrace } = await this.extractInfo(url, "analyze", platform, providerArgs);
-    const { diagnostics } = normalizeFormatsWithDiagnostics(data.formats);
-    logger.info("MEDIA_ANALYZE_FORMATS", { provider: platform, ...diagnostics });
-    if (shouldEnableYouTubeDiagnostics(ENV.YOUTUBE_DIAGNOSTICS_ENABLED, platform)) {
-      for (const format of buildYouTubeRawFormatDiagnostics(data.formats)) {
-        logger.info("YOUTUBE_DIAGNOSTICS_FORMATS", { stage: "analyze", ...format });
+    try {
+      const { data, warningCategories, stagingTrace } = await this.extractInfo(url, "analyze", platform, providerArgs);
+      const { diagnostics } = normalizeFormatsWithDiagnostics(data.formats);
+      logger.info("MEDIA_ANALYZE_FORMATS", { provider: platform, ...diagnostics });
+      if (shouldEnableYouTubeDiagnostics(ENV.YOUTUBE_DIAGNOSTICS_ENABLED, platform)) {
+        for (const format of buildYouTubeRawFormatDiagnostics(data.formats)) {
+          logger.info("YOUTUBE_DIAGNOSTICS_FORMATS", { stage: "analyze", ...format });
+        }
       }
+      if (stagingTrace) {
+        logger.info("TIKTOK_STAGING_DIAGNOSTIC", buildTikTokStagingDiagnostic(
+          stagingTrace.runtime,
+          stagingTrace.stderr,
+          "success",
+          stagingTrace.durationMs,
+          { raw: diagnostics.rawFormatsCount, usable: diagnostics.afterDeduplication },
+        ));
+      }
+      assertUsableAnalysisFormats(platform, diagnostics, warningCategories);
+      const analysis = parseAnalysis(data, url, platform);
+      if (healthOperation !== null) youtubeProviderHealthService.recordSuccess(healthOperation);
+      return analysis;
+    } catch (error) {
+      recordYouTubeHealthFailure(healthOperation, error);
+      throw error;
     }
-    if (stagingTrace) {
-      logger.info("TIKTOK_STAGING_DIAGNOSTIC", buildTikTokStagingDiagnostic(
-        stagingTrace.runtime,
-        stagingTrace.stderr,
-        "success",
-        stagingTrace.durationMs,
-        { raw: diagnostics.rawFormatsCount, usable: diagnostics.afterDeduplication },
-      ));
-    }
-    assertUsableAnalysisFormats(platform, diagnostics, warningCategories);
-    return parseAnalysis(data, url, platform);
   }
 
   async assertFormatAvailable(url: string, formatId: string, platform: MediaPlatform, providerArgs: readonly string[] = []): Promise<void> {
+    const healthOperation = platform === "youtube" ? youtubeProviderHealthService.beginOperation() : null;
     logger.info("YT_DLP_STAGE", { provider: platform, stage: "process", action: "revalidate-format" });
-    const { data, warningCategories } = await this.extractInfo(url, "process", platform, providerArgs);
-    if (platform === "youtube" && warningCategories.includes("bot_verification")) {
-      assertUsableAnalysisFormats(platform, normalizeFormatsWithDiagnostics(data.formats).diagnostics, warningCategories);
-    }
-    const analysis = parseAnalysis(data, url, platform);
-    if (!isRequestedFormatAvailable(analysis.formats, formatId)) {
-      throw new YtDlpError("FORMAT_UNAVAILABLE", "El formato seleccionado ya no está disponible. Analiza el recurso nuevamente.");
+    try {
+      const { data, warningCategories } = await this.extractInfo(url, "process", platform, providerArgs);
+      if (platform === "youtube" && warningCategories.includes("bot_verification")) {
+        assertUsableAnalysisFormats(platform, normalizeFormatsWithDiagnostics(data.formats).diagnostics, warningCategories);
+      }
+      const analysis = parseAnalysis(data, url, platform);
+      if (!isRequestedFormatAvailable(analysis.formats, formatId)) {
+        throw new YtDlpError("FORMAT_UNAVAILABLE", "El formato seleccionado ya no está disponible. Analiza el recurso nuevamente.");
+      }
+      if (healthOperation !== null) youtubeProviderHealthService.recordSuccess(healthOperation);
+    } catch (error) {
+      recordYouTubeHealthFailure(healthOperation, error);
+      throw error;
     }
   }
 
@@ -612,15 +633,23 @@ class YtDlpService {
   }
 
   async download(url: string, formatId: string, container: string, type: "video" | "audio", outputStem: string, signal?: AbortSignal, onProgress?: (value: number) => void, platform?: MediaPlatform, providerArgs: readonly string[] = []): Promise<string> {
+    const healthOperation = platform === "youtube" ? youtubeProviderHealthService.beginOperation() : null;
     const args = buildDownloadArgs(url, formatId, container, type, outputStem, providerArgs);
     logger.info("YT_DLP_STAGE", { stage: "process" });
-    await this.run(args, "process", signal, ENV.YT_DLP_TIMEOUT_MS, (line) => {
-      const match = line.match(/download:\s*([\d.]+)%/);
-      if (match) onProgress?.(Math.min(99, Number(match[1])));
-    }, platform, "download");
-    const files = fs.readdirSync(path.dirname(outputStem)).filter((name) => name.startsWith(`${path.basename(outputStem)}.`) && !name.endsWith(".part"));
-    if (files.length !== 1) throw new YtDlpError("OUTPUT_MISSING", "La descarga no produjo un archivo válido.");
-    return path.join(path.dirname(outputStem), files[0]);
+    try {
+      await this.run(args, "process", signal, ENV.YT_DLP_TIMEOUT_MS, (line) => {
+        const match = line.match(/download:\s*([\d.]+)%/);
+        if (match) onProgress?.(Math.min(99, Number(match[1])));
+      }, platform, "download");
+      const files = fs.readdirSync(path.dirname(outputStem)).filter((name) => name.startsWith(`${path.basename(outputStem)}.`) && !name.endsWith(".part"));
+      if (files.length !== 1) throw new YtDlpError("OUTPUT_MISSING", "La descarga no produjo un archivo válido.");
+      const output = path.join(path.dirname(outputStem), files[0]);
+      if (healthOperation !== null) youtubeProviderHealthService.recordSuccess(healthOperation);
+      return output;
+    } catch (error) {
+      recordYouTubeHealthFailure(healthOperation, error);
+      throw error;
+    }
   }
 
   private runLocalDiagnostic(command: string, args: string[], timeoutMs = 5000): Promise<string> {
