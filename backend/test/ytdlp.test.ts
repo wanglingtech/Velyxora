@@ -2,13 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { providerRegistry } from "../src/providers/ProviderRegistry";
-import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildDownloadArgs, buildEffectiveYtDlpArgs, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, buildYouTubeRawFormatDiagnostics, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, parseYouTubeJscDiagnostics, parseYouTubePotDiagnostics, parseYouTubeRuntimeDiagnostic, parseYouTubeTraceDiagnostics, selectThumbnail, shouldEnableTikTokStagingDiagnostics, shouldEnableYouTubeDiagnostics, withYouTubeDiagnosticsArgs } from "../src/services/ytDlpService";
+import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildDownloadArgs, buildEffectiveYtDlpArgs, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, buildYouTubeRawFormatDiagnostics, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, parseYouTubeJscDiagnostics, parseYouTubePotDiagnostics, parseYouTubeRuntimeDiagnostic, parseYouTubeTraceDiagnostics, selectThumbnail, shouldEnableTikTokStagingDiagnostics, shouldEnableYouTubeDiagnostics, withYouTubeDiagnosticsArgs, YtDlpError, YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE } from "../src/services/ytDlpService";
 import { backendApp } from "../src/app";
 import { ytDlpService } from "../src/services/ytDlpService";
 import { ENV, parseBooleanFlag } from "../src/config/env";
 import { readFile } from "node:fs/promises";
 import { buildYouTubeYtDlpArgs, parseInternalPoProviderUrl, YouTubeProvider, YOUTUBE_PO_PROVIDER_VERSION } from "../src/providers/YouTubeProvider";
 import { YtDlpProvider } from "../src/providers/YtDlpProvider";
+import { mediaService } from "../src/services/mediaService";
+import { mediaDownloadService } from "../src/services/mediaDownloadService";
+import { creditLedgerService } from "../src/services/creditLedgerService";
+import { jobManager } from "../src/jobs/JobManager";
+import { mediaDownloadQueue, processMediaDownloadJob } from "../src/workers/mediaDownloadWorker";
+import dns from "node:dns/promises";
 
 test("provider registry detects first-level providers and falls back to GenericProvider", () => {
   const cases = [
@@ -280,12 +286,113 @@ test("YouTube bot verification is reported as provider restriction without affec
   const empty = normalizeFormatsWithDiagnostics([]).diagnostics;
   assert.throws(
     () => assertUsableAnalysisFormats("youtube", empty, ["bot_verification"]),
-    (error: any) => error.code === "MEDIA_PROVIDER_RESTRICTED" && /proveedor no permitió/i.test(error.message),
+    (error: any) => error.code === "PROVIDER_TEMPORARILY_RESTRICTED" && error.message === YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE,
   );
   assert.throws(
     () => assertUsableAnalysisFormats("vimeo", empty, ["bot_verification"]),
     (error: any) => error.code === "MEDIA_FORMATS_UNAVAILABLE",
   );
+});
+
+test("YT-005A classifies only unequivocal YouTube bot verification as temporarily restricted", () => {
+  for (const stderr of [
+    "ERROR: [youtube] Sign in to confirm you're not a bot",
+    "ERROR: [youtube] LOGIN_REQUIRED: Sign in to confirm you are not a bot",
+    "ERROR: [youtube] bot_verification",
+  ]) {
+    assert.equal(friendlyError(stderr, "analyze", "youtube").code, "PROVIDER_TEMPORARILY_RESTRICTED");
+  }
+  assert.equal(friendlyError("ERROR: [youtube] This video is private", "analyze", "youtube").code, "NOT_PUBLIC");
+  assert.equal(friendlyError("ERROR: [youtube] This video is private. Sign in to confirm you're not a bot", "analyze", "youtube").code, "NOT_PUBLIC");
+  assert.equal(friendlyError("ERROR: [youtube] This video is members-only. Sign in to confirm you're not a bot", "analyze", "youtube").code, "NOT_PUBLIC");
+  assert.equal(friendlyError("ERROR: [youtube] This video is age restricted. bot verification", "analyze", "youtube").code, "PROVIDER_UNAVAILABLE");
+  assert.equal(friendlyError("ERROR: [youtube] This video has been removed. bot_verification", "analyze", "youtube").code, "PROVIDER_UNAVAILABLE");
+  assert.equal(friendlyError("ERROR: [youtube] This video has been deleted. Sign in to confirm you're not a bot", "analyze", "youtube").code, "PROVIDER_UNAVAILABLE");
+  assert.equal(friendlyError("ERROR: [youtube] Video unavailable", "analyze", "youtube").code, "PROVIDER_UNAVAILABLE");
+  assert.equal(friendlyError("ERROR: [youtube] Video unavailable. Sign in to confirm you're not a bot", "analyze", "youtube").code, "PROVIDER_UNAVAILABLE");
+  assert.equal(friendlyError("ERROR: [youtube] This content is unavailable. bot verification", "analyze", "youtube").code, "PROVIDER_UNAVAILABLE");
+  assert.equal(friendlyError("ERROR: [youtube] LOGIN_REQUIRED", "analyze", "youtube").code, "NOT_PUBLIC");
+  for (const provider of ["tiktok", "facebook", "instagram", "twitter", "vimeo", "reddit", "twitch", "soundcloud"] as const) {
+    assert.notEqual(friendlyError("Sign in to confirm you're not a bot", "analyze", provider).code, "PROVIDER_TEMPORARILY_RESTRICTED");
+    assert.notEqual(friendlyError("Video unavailable. Login required", "analyze", provider).code, "PROVIDER_TEMPORARILY_RESTRICTED");
+  }
+});
+
+test("YT-005A analyze restriction returns a safe public error without creating jobs or credits", { concurrency: false }, async () => {
+  const originalAnalyze = mediaService.analyzeUrl;
+  const originalReserve = creditLedgerService.reserve;
+  const jobsBefore = jobManager.listJobs().length;
+  let reserveCalls = 0;
+  mediaService.analyzeUrl = (async () => { throw new YtDlpError("PROVIDER_TEMPORARILY_RESTRICTED", YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE); }) as typeof mediaService.analyzeUrl;
+  creditLedgerService.reserve = (async () => { reserveCalls += 1; throw new Error("unexpected"); }) as typeof creditLedgerService.reserve;
+  try {
+    const response = await request(backendApp).post("/api/media/analyze").send({ url: "https://youtube.com/watch?v=public-id" });
+    assert.equal(response.status, 422);
+    assert.equal(response.body.error.code, "PROVIDER_TEMPORARILY_RESTRICTED");
+    assert.equal(response.body.error.message, YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE);
+    assert.equal(reserveCalls, 0);
+    assert.equal(jobManager.listJobs().length, jobsBefore);
+    assert.doesNotMatch(JSON.stringify(response.body), /stderr|railway|sidecar|extractor-args|token=|authorization|cookie/i);
+  } finally {
+    mediaService.analyzeUrl = originalAnalyze;
+    creditLedgerService.reserve = originalReserve;
+  }
+});
+
+test("YT-005A revalidate restriction happens before job creation and credit reservation", { concurrency: false }, async () => {
+  const originalLookup = dns.lookup;
+  const originalFind = providerRegistry.find;
+  const originalReserve = creditLedgerService.reserve;
+  const jobsBefore = jobManager.listJobs().length;
+  let revalidateCalls = 0;
+  let reserveCalls = 0;
+  dns.lookup = (async () => [{ address: "142.250.0.1", family: 4 }]) as typeof dns.lookup;
+  providerRegistry.find = (() => ({
+    platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
+    assertFormatAvailable: async () => { revalidateCalls += 1; throw new YtDlpError("PROVIDER_TEMPORARILY_RESTRICTED", YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE); },
+  })) as typeof providerRegistry.find;
+  creditLedgerService.reserve = (async () => { reserveCalls += 1; throw new Error("unexpected"); }) as typeof creditLedgerService.reserve;
+  try {
+    await assert.rejects(
+      () => mediaDownloadService.start("https://youtube.com/watch?v=public-id", "18", "mp4", "video", "Public", { userId: "user", isAdmin: false }),
+      (error: any) => error.code === "PROVIDER_TEMPORARILY_RESTRICTED",
+    );
+    assert.equal(revalidateCalls, 1);
+    assert.equal(reserveCalls, 0);
+    assert.equal(jobManager.listJobs().length, jobsBefore);
+  } finally {
+    dns.lookup = originalLookup;
+    providerRegistry.find = originalFind;
+    creditLedgerService.reserve = originalReserve;
+  }
+});
+
+test("YT-005A download restriction fails once and settles the reservation as FAILED", { concurrency: false }, async () => {
+  const originalFind = providerRegistry.find;
+  const originalSettle = creditLedgerService.settle;
+  const id = "media-yt005a-download-test";
+  let downloadCalls = 0;
+  const settlements: string[] = [];
+  providerRegistry.find = (() => ({
+    platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
+    download: async () => { downloadCalls += 1; throw new YtDlpError("PROVIDER_TEMPORARILY_RESTRICTED", YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE); },
+  })) as typeof providerRegistry.find;
+  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof creditLedgerService.settle;
+  jobManager.createJob({ id, ownerId: "user", toolId: "media-downloader", input: { filename: "remote-media", originalName: "Public", mimeType: "application/octet-stream", size: 0, path: "" } });
+  try {
+    await processMediaDownloadJob(id, { url: "https://youtube.com/watch?v=public-id", formatId: "18", container: "mp4", type: "video", title: "Public", billingUserId: "user" });
+    const job = jobManager.getJob(id);
+    assert.equal(downloadCalls, 1);
+    assert.equal(job?.status, "FAILED");
+    assert.equal(job?.error, YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE);
+    assert.deepEqual(settlements, ["FAILED"]);
+    assert.doesNotMatch(job?.error || "", /stderr|railway|sidecar|token=|authorization|cookie/i);
+  } finally {
+    providerRegistry.find = originalFind;
+    creditLedgerService.settle = originalSettle;
+    jobManager.deleteJob(id);
+    await mediaDownloadQueue.close();
+  }
 });
 
 test("TikTok post access restriction is provider-specific and unknown failures remain generic", () => {

@@ -62,6 +62,9 @@ export async function processMedia(req: Request, res: Response): Promise<void> {
     res.status(HTTP_STATUS.ACCEPTED).json({ success: true, data: job, timestamp: new Date().toISOString() });
   } catch (error: any) {
     const message = error?.message === 'Ya tienes varios procesos en curso. Espera a que termine uno.' ? error.message : error instanceof YtDlpError ? error.message : 'No se pudo iniciar el procesamiento del recurso.';
-    res.status(HTTP_STATUS.UNPROCESSABLE_ENTITY).json({ success: false, error: { code: 'DOWNLOAD_REJECTED', message }, timestamp: new Date().toISOString() });
+    const code = error instanceof YtDlpError && error.code === 'PROVIDER_TEMPORARILY_RESTRICTED'
+      ? error.code
+      : 'DOWNLOAD_REJECTED';
+    res.status(HTTP_STATUS.UNPROCESSABLE_ENTITY).json({ success: false, error: { code, message }, timestamp: new Date().toISOString() });
   }
 }

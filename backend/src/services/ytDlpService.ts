@@ -400,6 +400,15 @@ export function friendlyError(stderr: string, stage: YtDlpStage, provider?: Medi
   if (provider === "tiktok" && value.includes("your ip address is blocked from accessing this post")) {
     return new YtDlpError("MEDIA_PROVIDER_RESTRICTED", "TikTok no permitió acceder a este contenido desde el servidor. Prueba con otra publicación pública o inténtalo más tarde.");
   }
+  if (provider === "youtube" && /(?:private video|video is private|members[ -]?only)/i.test(value)) {
+    return new YtDlpError("NOT_PUBLIC", "El contenido no está disponible públicamente.");
+  }
+  if (provider === "youtube" && /(?:age[ -]?restrict|video (?:has been )?(?:removed|deleted)|video unavailable|this content is unavailable)/i.test(value)) {
+    return new YtDlpError("PROVIDER_UNAVAILABLE", "El proveedor cambió su sistema o el contenido no está disponible temporalmente.");
+  }
+  if (provider === "youtube" && isYouTubeBotVerification(value)) {
+    return new YtDlpError("PROVIDER_TEMPORARILY_RESTRICTED", YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE);
+  }
   if (value.includes("requested format is not available") || value.includes("no video formats")) {
     return stage === "process"
       ? new YtDlpError("FORMAT_UNAVAILABLE", "El formato seleccionado ya no está disponible.")
@@ -421,17 +430,19 @@ export function normalizeFormatsWithDiagnostics(formats: RawFormat[] = []): { fo
   const withExtension = withId.filter((item) => typeof item.ext === "string" && item.ext.trim());
   const withCodec = withExtension.filter((item) => hasUsableCodec(item.vcodec) || hasUsableCodec(item.acodec));
   for (const item of withCodec) {
+    const formatId = item.format_id!;
+    const extension = item.ext!;
     const hasVideo = hasUsableCodec(item.vcodec);
     const hasAudio = hasUsableCodec(item.acodec);
     const type = hasVideo ? "video" : "audio";
     const resolution = hasVideo && item.height ? `${item.height}p` : undefined;
     const bitrate = Math.round(item.abr || item.tbr || 0) || undefined;
-    const key = `${item.format_id}:${type}:${item.ext}`;
+    const key = `${formatId}:${type}:${extension}`;
     if (seen.has(key)) continue;
     seen.add(key);
     normalized.push({
-      formatId: item.format_id, type, container: item.ext, extension: item.ext,
-      resolution, qualityLabel: item.format_note || resolution || (bitrate ? `${bitrate} kbps` : item.ext.toUpperCase()),
+      formatId, type, container: extension, extension,
+      resolution, qualityLabel: item.format_note || resolution || (bitrate ? `${bitrate} kbps` : extension.toUpperCase()),
       hasVideo, hasAudio, estimatedSize: item.filesize || item.filesize_approx,
       codec: hasVideo ? item.vcodec : item.acodec, fps: item.fps, bitrate,
     });
@@ -460,12 +471,20 @@ export const normalizeFormats = (formats: RawFormat[] = []): MediaStreamFormat[]
 export function assertUsableAnalysisFormats(platform: MediaPlatform, diagnostics: FormatDiagnostics, warningCategories: string[] = []): void {
   if (diagnostics.afterDeduplication > 0) return;
   if (platform === "youtube" && warningCategories.includes("bot_verification")) {
-    logger.warn("MEDIA_PROVIDER_RESTRICTED", { provider: platform, reason: "bot_verification" });
-    throw new YtDlpError("MEDIA_PROVIDER_RESTRICTED", "El proveedor no permitió obtener los formatos de este contenido desde el servidor. Inténtalo más tarde o utiliza otro contenido compatible.");
+    logger.warn("YOUTUBE_PROVIDER_RESTRICTED", { provider: platform, reason: "bot_verification" });
+    throw new YtDlpError("PROVIDER_TEMPORARILY_RESTRICTED", YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE);
   }
   const reason = diagnostics.rawFormatsCount === 0 ? "extractor_returned_no_formats" : "no_usable_audio_or_video_formats";
   logger.warn("MEDIA_FORMATS_UNAVAILABLE", { provider: platform, reason });
   throw new YtDlpError("MEDIA_FORMATS_UNAVAILABLE", "No fue posible obtener formatos descargables para este contenido.");
+}
+
+export const YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE = "No se pudo procesar este contenido porque YouTube restringió temporalmente las solicitudes desde nuestro servidor. Puedes intentarlo más tarde.";
+
+function isYouTubeBotVerification(stderr: string): boolean {
+  return /sign in to confirm you(?:'|’)?re not a bot/i.test(stderr)
+    || /sign in to confirm you are not a bot/i.test(stderr)
+    || /\bbot[ _-]?verification\b/i.test(stderr);
 }
 
 const COMMON_ARGS = ["--ignore-config", "--no-playlist", "--js-runtimes", "node"];
@@ -568,7 +587,10 @@ class YtDlpService {
 
   async assertFormatAvailable(url: string, formatId: string, platform: MediaPlatform, providerArgs: readonly string[] = []): Promise<void> {
     logger.info("YT_DLP_STAGE", { provider: platform, stage: "process", action: "revalidate-format" });
-    const { data } = await this.extractInfo(url, "process", platform, providerArgs);
+    const { data, warningCategories } = await this.extractInfo(url, "process", platform, providerArgs);
+    if (platform === "youtube" && warningCategories.includes("bot_verification")) {
+      assertUsableAnalysisFormats(platform, normalizeFormatsWithDiagnostics(data.formats).diagnostics, warningCategories);
+    }
     const analysis = parseAnalysis(data, url, platform);
     if (!isRequestedFormatAvailable(analysis.formats, formatId)) {
       throw new YtDlpError("FORMAT_UNAVAILABLE", "El formato seleccionado ya no está disponible. Analiza el recurso nuevamente.");

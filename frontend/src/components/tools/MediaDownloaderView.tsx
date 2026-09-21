@@ -20,6 +20,7 @@ import {
   completedMediaOutput,
   findMatchingMediaAdapter,
   mediaAnalyzeErrorMessage,
+  mediaDownloadStartErrorMessage,
   mediaFormatActionLabel,
   selectInitialMediaFormat,
   shouldShowMediaThumbnail,
@@ -122,8 +123,8 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
         if (job.status === "FAILED") { window.dispatchEvent(new Event('velyxora:credits-changed')); throw new Error(job.error || "El trabajo no pudo completarse."); }
       }
       throw new Error("La descarga excedió el tiempo de espera.");
-    } catch (error: any) {
-      toast.error("No fue posible descargar", error.message);
+    } catch (error: unknown) {
+      toast.error("No fue posible descargar", mediaDownloadStartErrorMessage(error));
     } finally { actionRef.current = false; setIsProcessing(false); }
   };
 

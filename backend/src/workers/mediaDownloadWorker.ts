@@ -12,7 +12,7 @@ import { creditLedgerService } from "../services/creditLedgerService";
 
 export const mediaDownloadQueue = new InMemoryQueue("media-downloads", 2);
 
-mediaDownloadQueue.process(async (jobId, data: { url: string; formatId: string; container: string; type: "video" | "audio"; title: string; billingUserId?: string }) => {
+export async function processMediaDownloadJob(jobId: string, data: { url: string; formatId: string; container: string; type: "video" | "audio"; title: string; billingUserId?: string }): Promise<void> {
   const job = jobManager.getJob(jobId);
   if (!job) return;
   const stem = path.join(ENV.STORAGE_DIR, `download-${jobId}`);
@@ -48,7 +48,9 @@ mediaDownloadQueue.process(async (jobId, data: { url: string; formatId: string; 
       if (data.billingUserId) await creditLedgerService.settle(jobId, 'FAILED');
     }
   }
-});
+}
+
+mediaDownloadQueue.process(processMediaDownloadJob);
 
 function mimeFor(extension: string): string {
   return ({ ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".opus": "audio/ogg", ".webm": "video/webm", ".mp4": "video/mp4" } as Record<string, string>)[extension.toLowerCase()] || "application/octet-stream";
