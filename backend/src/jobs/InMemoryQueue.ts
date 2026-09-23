@@ -28,8 +28,17 @@ export class InMemoryQueue extends EventEmitter implements IJobQueue {
 
   async add(jobId: string, data: any): Promise<void> {
     this.queue.push({ jobId, data });
-    logger.debug(`Queue [${this.name}] added job: ${jobId}. Queue length: ${this.queue.length}`);
-    this.tick();
+    try { logger.debug(`Queue [${this.name}] added job: ${jobId}. Queue length: ${this.queue.length}`); }
+    catch { /* Logging is best-effort after ownership transfer. */ }
+    try {
+      void this.tick().catch(() => {
+        try { logger.error("QUEUE_SCHEDULING_FAILED", { queue: this.name }); }
+        catch { /* Logging is best-effort. */ }
+      });
+    } catch {
+      try { logger.error("QUEUE_SCHEDULING_FAILED", { queue: this.name }); }
+      catch { /* Logging is best-effort. */ }
+    }
   }
 
   process(handler: (jobId: string, data: any) => Promise<void>): void {

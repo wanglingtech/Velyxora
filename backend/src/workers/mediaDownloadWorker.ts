@@ -12,18 +12,31 @@ import { creditLedgerService } from "../services/creditLedgerService";
 
 export const mediaDownloadQueue = new InMemoryQueue("media-downloads", 2);
 
+function safeWarn(message: string, meta?: Record<string, unknown>): void {
+  try { logger.warn(message, meta); } catch { /* Logging must never block financial settlement. */ }
+}
+
+function setStatusWithLoggerTolerance(jobId: string, status: "DOWNLOADING" | "PROCESSING" | "COMPLETED" | "FAILED", error?: string): void {
+  try {
+    jobManager.setStatus(jobId, status, error);
+  } catch (statusError) {
+    if (jobManager.getJob(jobId)?.status !== status) throw statusError;
+    safeWarn("MEDIA_DOWNLOAD_STATUS_LOG_FAILED", { jobId, status });
+  }
+}
+
 export async function processMediaDownloadJob(jobId: string, data: { url: string; formatId: string; container: string; type: "video" | "audio"; title: string; billingUserId?: string }): Promise<void> {
   const job = jobManager.getJob(jobId);
   if (!job) return;
   const stem = path.join(ENV.STORAGE_DIR, `download-${jobId}`);
   try {
-    jobManager.setStatus(jobId, "DOWNLOADING");
+    setStatusWithLoggerTolerance(jobId, "DOWNLOADING");
     jobManager.updateProgress(jobId, 0, "Descargando contenido público...");
     const provider = providerRegistry.find(data.url);
     if (provider === providerRegistry.generic || !provider.download) throw new Error("Este proveedor no está admitido actualmente.");
     const outputPath = await provider.download(data.url, data.formatId, data.container, data.type, stem, jobManager.getSignal(jobId), (progress) => jobManager.updateProgress(jobId, progress, "Descargando..."));
     if (jobManager.getJob(jobId)?.status === "CANCELLED") { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); return; }
-    jobManager.setStatus(jobId, "PROCESSING");
+    setStatusWithLoggerTolerance(jobId, "PROCESSING");
     jobManager.updateProgress(jobId, 99, "Validando archivo...");
     const probe = await probeMedia(outputPath);
     if (!probe.streams.length) throw new Error("El archivo descargado no contiene streams multimedia válidos.");
@@ -38,15 +51,31 @@ export async function processMediaDownloadJob(jobId: string, data: { url: string
       height: probe.streams.find((stream) => stream.codecType === "video")?.height,
     }, metadata: { probe } });
     jobManager.updateProgress(jobId, 100, "Descarga lista.");
-    jobManager.setStatus(jobId, "COMPLETED");
-    if (data.billingUserId) await creditLedgerService.settle(jobId, 'COMPLETED');
+    setStatusWithLoggerTolerance(jobId, "COMPLETED");
   } catch (error: any) {
-    for (const filename of fs.readdirSync(ENV.STORAGE_DIR)) if (filename.startsWith(`download-${jobId}.`)) fs.unlinkSync(path.join(ENV.STORAGE_DIR, filename));
-    if (jobManager.getJob(jobId)?.status !== "CANCELLED") {
-      logger.warn(`Media download ${jobId} failed: ${error.message}`);
-      jobManager.setStatus(jobId, "FAILED", error.message);
-      if (data.billingUserId) await creditLedgerService.settle(jobId, 'FAILED');
+    try {
+      for (const filename of fs.readdirSync(ENV.STORAGE_DIR)) {
+        if (!filename.startsWith(`download-${jobId}.`)) continue;
+        try { fs.unlinkSync(path.join(ENV.STORAGE_DIR, filename)); }
+        catch { safeWarn("MEDIA_DOWNLOAD_CLEANUP_FAILED", { jobId, operation: "unlink" }); }
+      }
+    } catch {
+      safeWarn("MEDIA_DOWNLOAD_CLEANUP_FAILED", { jobId, operation: "list" });
     }
+    if (jobManager.getJob(jobId)?.status !== "CANCELLED") {
+      safeWarn("MEDIA_DOWNLOAD_FAILED", { jobId });
+      try { setStatusWithLoggerTolerance(jobId, "FAILED", error.message); }
+      catch { safeWarn("MEDIA_DOWNLOAD_STATUS_UPDATE_FAILED", { jobId }); }
+      if (data.billingUserId) {
+        try { await creditLedgerService.settle(jobId, 'FAILED'); }
+        catch { safeWarn("MEDIA_DOWNLOAD_SETTLEMENT_FAILED", { jobId, outcome: "FAILED" }); }
+      }
+    }
+    return;
+  }
+  if (data.billingUserId) {
+    try { await creditLedgerService.settle(jobId, 'COMPLETED'); }
+    catch { safeWarn("MEDIA_DOWNLOAD_SETTLEMENT_FAILED", { jobId, outcome: "COMPLETED" }); }
   }
 }
 

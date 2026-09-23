@@ -17,14 +17,22 @@ export const mediaDownloadService = {
     if (mediaProvider === providerRegistry.generic || mediaProvider.platform !== provider || !mediaProvider.assertFormatAvailable) throw new Error("Este proveedor no está admitido actualmente.");
     await mediaProvider.assertFormatAvailable(url, formatId);
     const id = `media-${randomUUID()}`;
-    if (billing) await creditLedgerService.reserve(billing.userId, id, 'media-downloader', 0, billing.isAdmin);
-    const job = jobManager.createJob({
-      id, ownerId: billing?.userId, toolId: "media-downloader",
-      input: { filename: "remote-media", originalName: title || "Contenido multimedia", mimeType: "application/octet-stream", size: 0, path: "" },
-      options: { formatId },
-    });
-    try { await mediaDownloadQueue.add(id, { url, formatId, container, type, title, billingUserId: billing?.userId }); }
-    catch (error) { if (billing) await creditLedgerService.settle(id, 'FAILED'); throw error; }
-    return job;
+    let reserved = false;
+    if (billing) {
+      await creditLedgerService.reserve(billing.userId, id, 'media-downloader', 0, billing.isAdmin);
+      reserved = true;
+    }
+    try {
+      const job = jobManager.createJob({
+        id, ownerId: billing?.userId, toolId: "media-downloader",
+        input: { filename: "remote-media", originalName: title || "Contenido multimedia", mimeType: "application/octet-stream", size: 0, path: "" },
+        options: { formatId },
+      });
+      await mediaDownloadQueue.add(id, { url, formatId, container, type, title, billingUserId: billing?.userId });
+      return job;
+    } catch (error) {
+      if (reserved) await creditLedgerService.settle(id, 'FAILED');
+      throw error;
+    }
   },
 };

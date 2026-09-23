@@ -84,6 +84,12 @@ enum ProcessingType {
   EXTERNAL
 }
 
+enum YouTubeCircuitState {
+  CLOSED
+  OPEN
+  HALF_OPEN
+}
+
 enum ShortLinkStatus {
   ACTIVE
   DISABLED
@@ -307,6 +313,24 @@ model ProcessingUsage {
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ProviderCircuitBreaker {
+  provider                     String              @id
+  state                        YouTubeCircuitState @default(CLOSED)
+  version                      BigInt              @default(0)
+  nextOperationSequence        BigInt              @default(0)
+  lastAppliedOperationSequence BigInt              @default(0)
+  lastSuccessOperationSequence BigInt              @default(0)
+  consecutiveRestrictions      Int                 @default(0)
+  restrictionWindowStartedAt   DateTime?
+  openedAt                     DateTime?
+  cooldownUntil                DateTime?
+  cooldownLevel                Int                 @default(0)
+  probeToken                   String?             @db.Uuid
+  probeLeaseUntil              DateTime?
+  createdAt                    DateTime             @default(now())
+  updatedAt                    DateTime             @updatedAt
 }
 
 model PaymentOrder {

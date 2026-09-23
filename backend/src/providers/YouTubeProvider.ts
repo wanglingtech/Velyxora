@@ -1,7 +1,13 @@
 import { isIP } from "node:net";
 import { ENV } from "../config/env";
 import { MediaAnalysisResult } from "../types/media";
-import { YtDlpError, ytDlpService } from "../services/ytDlpService";
+import { YtDlpError, YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE, ytDlpService } from "../services/ytDlpService";
+import {
+  YouTubeCircuitBreakerService,
+  YouTubeCircuitBreakerRejectedError,
+  youtubeCircuitBreakerService,
+  type YouTubeCircuitPermit,
+} from "../services/youtubeCircuitBreakerService";
 import { YtDlpProvider } from "./YtDlpProvider";
 
 export const YOUTUBE_PO_PROVIDER_VERSION = "2.0.0";
@@ -28,7 +34,7 @@ export function buildYouTubeYtDlpArgs(providerUrl: URL): string[] {
 }
 
 export class YouTubeProvider extends YtDlpProvider {
-  constructor() {
+  constructor(private readonly circuitBreaker: YouTubeCircuitBreakerService = youtubeCircuitBreakerService) {
     super("youtube", "YouTube", [/(^|\.)youtube\.com$/i, /(^|\.)youtu\.be$/i]);
   }
 
@@ -64,12 +70,49 @@ export class YouTubeProvider extends YtDlpProvider {
     return buildYouTubeYtDlpArgs(providerUrl);
   }
 
+  private circuitError(): YtDlpError {
+    return new YtDlpError("PROVIDER_TEMPORARILY_RESTRICTED", YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE);
+  }
+
+  private async acquireCircuit(): Promise<YouTubeCircuitPermit> {
+    try {
+      return await this.circuitBreaker.acquire();
+    } catch (error) {
+      if (error instanceof YouTubeCircuitBreakerRejectedError) throw this.circuitError();
+      throw error;
+    }
+  }
+
+  private async recordCircuitResult(permit: YouTubeCircuitPermit, outcome: "success" | "restriction" | "neutral"): Promise<void> {
+    try {
+      if (outcome === "success") await this.circuitBreaker.recordSuccess(permit);
+      else if (outcome === "restriction") await this.circuitBreaker.recordRestriction(permit);
+      else await this.circuitBreaker.recordNeutral(permit);
+    } catch {
+      throw this.circuitError();
+    }
+  }
+
+  private async withCircuit<T>(operation: () => Promise<T>): Promise<T> {
+    const permit = await this.acquireCircuit();
+    let result: T;
+    try {
+      result = await operation();
+    } catch (error) {
+      const restricted = error instanceof YtDlpError && error.code === "PROVIDER_TEMPORARILY_RESTRICTED";
+      await this.recordCircuitResult(permit, restricted ? "restriction" : "neutral");
+      throw error;
+    }
+    await this.recordCircuitResult(permit, "success");
+    return result;
+  }
+
   async analyze(url: string): Promise<MediaAnalysisResult> {
-    return ytDlpService.analyze(url, this.platform, await this.invocationArgs());
+    return this.withCircuit(async () => ytDlpService.analyze(url, this.platform, await this.invocationArgs()));
   }
 
   async assertFormatAvailable(url: string, formatId: string): Promise<void> {
-    return ytDlpService.assertFormatAvailable(url, formatId, this.platform, await this.invocationArgs());
+    return this.withCircuit(async () => ytDlpService.assertFormatAvailable(url, formatId, this.platform, await this.invocationArgs()));
   }
 
   async download(
@@ -81,6 +124,6 @@ export class YouTubeProvider extends YtDlpProvider {
     signal?: AbortSignal,
     onProgress?: (value: number) => void,
   ): Promise<string> {
-    return ytDlpService.download(url, formatId, container, type, outputStem, signal, onProgress, this.platform, await this.invocationArgs());
+    return this.withCircuit(async () => ytDlpService.download(url, formatId, container, type, outputStem, signal, onProgress, this.platform, await this.invocationArgs()));
   }
 }
