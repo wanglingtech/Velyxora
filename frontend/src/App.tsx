@@ -12,6 +12,9 @@ import { FavoritesView } from './components/views/FavoritesView';
 import { SettingsView } from './components/views/SettingsView';
 import { LegalView } from './components/views/LegalView';
 import { SupportView } from './components/views/SupportView';
+import { SupportPromptModal } from './components/common/SupportPromptModal';
+import { FloatingSupportButton } from './components/common/FloatingSupportButton';
+import { shouldShowSupportPrompt, markSupportPromptShown } from './services/supportPromptService';
 import { CommandPalette } from './components/common/CommandPalette';
 import { ToastContainer, toast } from './components/common/ToastContainer';
 import { GlobalDropOverlay } from './components/common/GlobalDropOverlay';
@@ -45,6 +48,7 @@ export default function App() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isSupportPromptOpen, setIsSupportPromptOpen] = useState<boolean>(false);
   const [bootstrapReady, setBootstrapReady] = useState(false);
   const [progress, setProgress] = useState(12);
 
@@ -61,6 +65,17 @@ export default function App() {
     return () => window.clearInterval(interval);
   }, [authLoading]);
   useEffect(() => { historyService.setAuthenticated(Boolean(currentUser)); }, [currentUser]);
+  // Voluntary support notice: evaluated once per session, after boot, and never
+  // while the user is already on the support page.
+  const supportPromptEvaluated = React.useRef(false);
+  useEffect(() => {
+    if (!bootstrapReady || supportPromptEvaluated.current || activeView === 'support') return;
+    supportPromptEvaluated.current = true;
+    if (shouldShowSupportPrompt()) {
+      markSupportPromptShown();
+      setIsSupportPromptOpen(true);
+    }
+  }, [bootstrapReady, activeView]);
   const applyRoute = React.useCallback((path: string) => {
     const route = routeFromPath(path);
     const routeTool = route.view === 'tool' && route.param ? getToolById(route.param) || null : null;
@@ -286,6 +301,16 @@ export default function App() {
         onClose={() => setIsCommandPaletteOpen(false)}
         onSelectTool={handleSelectTool}
       />
+
+      {/* Voluntary support: first-visit notice + persistent entry point */}
+      <SupportPromptModal
+        isOpen={isSupportPromptOpen}
+        onClose={() => setIsSupportPromptOpen(false)}
+        onSupport={() => { setIsSupportPromptOpen(false); handleNavigate('support'); }}
+      />
+      {!isSupportPromptOpen && activeView !== 'support' && (
+        <FloatingSupportButton onClick={() => handleNavigate('support')} />
+      )}
 
       {/* Toast Notification Container */}
       <ToastContainer />

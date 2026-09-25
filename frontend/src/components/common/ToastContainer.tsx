@@ -68,7 +68,7 @@ export const ToastContainer: React.FC = () => {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+    <div className="fixed right-4 top-24 z-50 flex w-full max-w-sm flex-col gap-2 pointer-events-none px-4 sm:top-20 sm:px-0">
       {toasts.map((t) => {
         const icons = {
           success: <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />,
@@ -88,7 +88,7 @@ export const ToastContainer: React.FC = () => {
           <div
             key={t.id}
             id={t.id}
-            className={`pointer-events-auto flex items-start justify-between gap-3 p-3.5 rounded-xl bg-[#161922] border ${borderColors[t.type]} shadow-xl shadow-black/40 text-slate-100 transition-all duration-200 animate-in fade-in slide-in-from-bottom-2`}
+            className={`pointer-events-auto flex items-start justify-between gap-3 p-3.5 rounded-xl bg-[#161922] border ${borderColors[t.type]} shadow-xl shadow-black/40 text-slate-100 transition-all duration-200 animate-in fade-in slide-in-from-top-2`}
             role="alert"
           >
             <div className="flex items-start gap-3">

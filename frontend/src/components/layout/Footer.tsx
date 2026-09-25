@@ -17,68 +17,76 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
     { label: 'Discord WangLing Army', href: 'https://discord.gg/tkDPuxAXz', icon: MessagesSquare },
   ];
   return (
-    <footer className="w-full border-t border-white/[0.06] bg-[#08090D] py-8 px-4 sm:px-6 mt-16 pb-20 lg:pb-8">
-      <div className="max-w-6xl mx-auto flex flex-col items-center gap-5">
-        <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center justify-center gap-3 text-center sm:text-left">
-          <VelyxoraLogo variant="isotype" size="sm" />
-          <span className="text-xs text-slate-400">
-            VELYXORA © 2026 WangLing Tech. Todos los derechos reservados.
-          </span>
+    <footer className="mt-16 w-full min-w-0 border-t border-white/[0.06] bg-[#08090D] px-4 pb-28 pt-8 sm:px-6 lg:pb-24">
+      <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-start">
+        {/* Brand + credit line: centered on phones, left-aligned from large screens. */}
+        <div className="min-w-0 space-y-2 text-center lg:text-left">
+          <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+            <VelyxoraLogo variant="isotype" size="sm" />
+            <span className="min-w-0 text-xs text-slate-400 [overflow-wrap:anywhere]">
+              VELYXORA © 2026 WangLing Tech. Todos los derechos reservados.
+            </span>
+          </div>
+          <p className="text-xs text-slate-500">Hecho con <span aria-label="amor">❤️</span> por WangLing Tech</p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500">
+        {/* Site links: wrap naturally; right-aligned on large screens. */}
+        <nav
+          aria-label="Enlaces del sitio"
+          className="flex min-w-0 flex-wrap items-center justify-center gap-x-1 gap-y-0.5 lg:justify-end"
+        >
           <button
             onClick={() => onNavigate('category', 'all')}
-            className="min-h-11 rounded-lg px-2 hover:text-slate-300 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
+            className="min-h-11 rounded-lg px-2 text-xs text-slate-500 hover:text-slate-300 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
           >
             Herramientas
           </button>
           <button
             onClick={() => onNavigate('about')}
-            className="min-h-11 rounded-lg px-2 hover:text-slate-300 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
+            className="min-h-11 rounded-lg px-2 text-xs text-slate-500 hover:text-slate-300 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
           >
             Acerca de
           </button>
           <button
             onClick={() => onNavigate('support')}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-rose-300/90 hover:text-rose-200 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs text-rose-300/90 hover:text-rose-200 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
           >
             <Heart className="h-3.5 w-3.5" />
             Apoyar
           </button>
           <button
             onClick={() => onNavigate('complaints')}
-            className="min-h-11 rounded-lg px-2 hover:text-slate-300 transition-colors"
+            className="min-h-11 rounded-lg px-2 text-xs text-slate-500 hover:text-slate-300 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
           >Libro de Reclamaciones</button>
           <button
             onClick={() => onNavigate('suggestions')}
-            className="min-h-11 rounded-lg px-2 hover:text-slate-300 transition-colors"
+            className="min-h-11 rounded-lg px-2 text-xs text-slate-500 hover:text-slate-300 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
           >Sugerencias y mejoras</button>
           <button
             onClick={() => onNavigate('privacy')}
-            className="min-h-11 rounded-lg px-2 hover:text-slate-300 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
+            className="min-h-11 rounded-lg px-2 text-xs text-slate-500 hover:text-slate-300 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
           >
             Privacidad
           </button>
           <button
             onClick={() => onNavigate('terms')}
-            className="min-h-11 rounded-lg px-2 hover:text-slate-300 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
+            className="min-h-11 rounded-lg px-2 text-xs text-slate-500 hover:text-slate-300 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
           >
             Términos
           </button>
-        </div>
-        </div>
-
-        <nav aria-label="Redes sociales y comunidad" className="flex max-w-full flex-wrap items-center justify-center gap-2 border-t border-white/[0.06] pt-4">
-          {socialLinks.map(({ label, href, icon: Icon }) => (
-            <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label} title={label} className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-white/[0.08] text-slate-400 transition-colors hover:border-indigo-500/40 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400">
-              <Icon className="h-4 w-4" aria-hidden="true" />
-            </a>
-          ))}
         </nav>
-        <p className="text-center text-xs text-slate-500">Hecho con <span aria-label="amor">❤️</span> por WangLing Tech</p>
       </div>
+
+      <nav
+        aria-label="Redes sociales y comunidad"
+        className="mx-auto mt-8 flex max-w-6xl flex-wrap items-center justify-center gap-2 border-t border-white/[0.06] pt-6"
+      >
+        {socialLinks.map(({ label, href, icon: Icon }) => (
+          <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label} title={label} className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-white/[0.08] text-slate-400 transition-colors hover:border-indigo-500/40 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400">
+            <Icon className="h-4 w-4" aria-hidden="true" />
+          </a>
+        ))}
+      </nav>
     </footer>
   );
 };
