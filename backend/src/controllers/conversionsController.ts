@@ -3,7 +3,7 @@ import { conversionService } from '../services/conversionService';
 import { jobService } from '../services/jobService';
 import { validateConversionDto } from '../schemas/validation';
 import { HTTP_STATUS } from '../config/constants';
-import { creditLedgerService } from '../services/creditLedgerService';
+import { processingUsageService } from '../services/processingUsageService';
 
 export async function createConversion(req: Request, res: Response): Promise<void> {
   const validation = validateConversionDto(req.body);
@@ -80,7 +80,7 @@ export async function cancelConversion(req: Request, res: Response): Promise<voi
     return;
   }
 
-  if (process.env.NODE_ENV !== 'test') await creditLedgerService.settle(id, 'CANCELLED');
+  if (process.env.NODE_ENV !== 'test') await processingUsageService.settle(id, 'CANCELLED');
 
   res.status(HTTP_STATUS.OK).json({
     success: true,

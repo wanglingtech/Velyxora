@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { jobManager } from "../jobs/JobManager";
 import { mediaDownloadQueue } from "../workers/mediaDownloadWorker";
 import { validateSafeUrl } from "../security/ssrfValidator";
-import { creditLedgerService } from "./creditLedgerService";
+import { processingUsageService } from "./processingUsageService";
 import { providerPolicyService } from "./providerPolicyService";
 import { providerRegistry } from "../providers/ProviderRegistry";
 
@@ -19,7 +19,7 @@ export const mediaDownloadService = {
     const id = `media-${randomUUID()}`;
     let reserved = false;
     if (billing) {
-      await creditLedgerService.reserve(billing.userId, id, 'media-downloader', 0, billing.isAdmin);
+      await processingUsageService.reserve(billing.userId, id, 'media-downloader', 0, billing.isAdmin);
       reserved = true;
     }
     try {
@@ -31,7 +31,7 @@ export const mediaDownloadService = {
       await mediaDownloadQueue.add(id, { url, formatId, container, type, title, billingUserId: billing?.userId });
       return job;
     } catch (error) {
-      if (reserved) await creditLedgerService.settle(id, 'FAILED');
+      if (reserved) await processingUsageService.settle(id, 'FAILED');
       throw error;
     }
   },

@@ -11,7 +11,7 @@ import { buildYouTubeYtDlpArgs, parseInternalPoProviderUrl, YouTubeProvider, YOU
 import { YtDlpProvider } from "../src/providers/YtDlpProvider";
 import { mediaService } from "../src/services/mediaService";
 import { mediaDownloadService } from "../src/services/mediaDownloadService";
-import { creditLedgerService } from "../src/services/creditLedgerService";
+import { processingUsageService } from "../src/services/processingUsageService";
 import { jobManager } from "../src/jobs/JobManager";
 import { mediaDownloadQueue, processMediaDownloadJob } from "../src/workers/mediaDownloadWorker";
 import dns from "node:dns/promises";
@@ -401,11 +401,11 @@ test("YT-005A classifies only unequivocal YouTube bot verification as temporaril
 
 test("YT-005A analyze restriction returns a safe public error without creating jobs or credits", { concurrency: false }, async () => {
   const originalAnalyze = mediaService.analyzeUrl;
-  const originalReserve = creditLedgerService.reserve;
+  const originalReserve = processingUsageService.reserve;
   const jobsBefore = jobManager.listJobs().length;
   let reserveCalls = 0;
   mediaService.analyzeUrl = (async () => { throw new YtDlpError("PROVIDER_TEMPORARILY_RESTRICTED", YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE); }) as typeof mediaService.analyzeUrl;
-  creditLedgerService.reserve = (async () => { reserveCalls += 1; throw new Error("unexpected"); }) as typeof creditLedgerService.reserve;
+  processingUsageService.reserve = (async () => { reserveCalls += 1; throw new Error("unexpected"); }) as typeof processingUsageService.reserve;
   try {
     const response = await request(backendApp).post("/api/media/analyze").send({ url: "https://youtube.com/watch?v=public-id" });
     assert.equal(response.status, 422);
@@ -416,14 +416,14 @@ test("YT-005A analyze restriction returns a safe public error without creating j
     assert.doesNotMatch(JSON.stringify(response.body), /stderr|railway|sidecar|extractor-args|token=|authorization|cookie/i);
   } finally {
     mediaService.analyzeUrl = originalAnalyze;
-    creditLedgerService.reserve = originalReserve;
+    processingUsageService.reserve = originalReserve;
   }
 });
 
 test("YT-005A revalidate restriction happens before job creation and credit reservation", { concurrency: false }, async () => {
   const originalLookup = dns.lookup;
   const originalFind = providerRegistry.find;
-  const originalReserve = creditLedgerService.reserve;
+  const originalReserve = processingUsageService.reserve;
   const jobsBefore = jobManager.listJobs().length;
   let revalidateCalls = 0;
   let reserveCalls = 0;
@@ -432,7 +432,7 @@ test("YT-005A revalidate restriction happens before job creation and credit rese
     platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
     assertFormatAvailable: async () => { revalidateCalls += 1; throw new YtDlpError("PROVIDER_TEMPORARILY_RESTRICTED", YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE); },
   })) as typeof providerRegistry.find;
-  creditLedgerService.reserve = (async () => { reserveCalls += 1; throw new Error("unexpected"); }) as typeof creditLedgerService.reserve;
+  processingUsageService.reserve = (async () => { reserveCalls += 1; throw new Error("unexpected"); }) as typeof processingUsageService.reserve;
   try {
     await assert.rejects(
       () => mediaDownloadService.start("https://youtube.com/watch?v=public-id", "18", "mp4", "video", "Public", { userId: "user", isAdmin: false }),
@@ -444,13 +444,13 @@ test("YT-005A revalidate restriction happens before job creation and credit rese
   } finally {
     dns.lookup = originalLookup;
     providerRegistry.find = originalFind;
-    creditLedgerService.reserve = originalReserve;
+    processingUsageService.reserve = originalReserve;
   }
 });
 
 test("YT-005A download restriction fails once and settles the reservation as FAILED", { concurrency: false }, async () => {
   const originalFind = providerRegistry.find;
-  const originalSettle = creditLedgerService.settle;
+  const originalSettle = processingUsageService.settle;
   const id = "media-yt005a-download-test";
   let downloadCalls = 0;
   const settlements: string[] = [];
@@ -458,7 +458,7 @@ test("YT-005A download restriction fails once and settles the reservation as FAI
     platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
     download: async () => { downloadCalls += 1; throw new YtDlpError("PROVIDER_TEMPORARILY_RESTRICTED", YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE); },
   })) as typeof providerRegistry.find;
-  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof creditLedgerService.settle;
+  processingUsageService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof processingUsageService.settle;
   jobManager.createJob({ id, ownerId: "user", toolId: "media-downloader", input: { filename: "remote-media", originalName: "Public", mimeType: "application/octet-stream", size: 0, path: "" } });
   try {
     await processMediaDownloadJob(id, { url: "https://youtube.com/watch?v=public-id", formatId: "18", container: "mp4", type: "video", title: "Public", billingUserId: "user" });
@@ -470,7 +470,7 @@ test("YT-005A download restriction fails once and settles the reservation as FAI
     assert.doesNotMatch(job?.error || "", /stderr|railway|sidecar|token=|authorization|cookie/i);
   } finally {
     providerRegistry.find = originalFind;
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.settle = originalSettle;
     jobManager.deleteJob(id);
     await mediaDownloadQueue.close();
   }

@@ -62,7 +62,7 @@ export function StickerMakerTool({ tool, initialFile }: { tool: ToolDefinition; 
     try {
       const next = await generateSticker(image, edit);
       setResult(next); setPhase(next.compatible ? "compatible" : "oversize");
-      historyService.addItem({ toolId: tool.id, toolName: tool.name, inputName: sourceFile.name, inputSize: sourceFile.size, outputName: STICKER_FILENAME, outputSize: next.blob.size, category: "image", status: "COMPLETED", processingLocation: "local", creditsCost: 0 });
+      historyService.addItem({ toolId: tool.id, toolName: tool.name, inputName: sourceFile.name, inputSize: sourceFile.size, outputName: STICKER_FILENAME, outputSize: next.blob.size, category: "image", status: "COMPLETED", processingLocation: "local" });
     } catch {
       setError("No fue posible generar un WebP válido en este navegador."); setPhase("error");
     }

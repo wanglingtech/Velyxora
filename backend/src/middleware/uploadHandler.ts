@@ -9,14 +9,14 @@ import { getUploadPolicy, validateUploadMetadata } from '../security/uploadPolic
 import { storageService } from '../services/storageService';
 
 export const effectiveUploadLimit = (
-  planLimit: number,
+  baseLimit: number,
   isAdmin: boolean,
   hardLimit: number,
   nodeEnv: string,
   localAdminHardLimit: number,
 ) => isAdmin
   ? (nodeEnv === 'production' ? hardLimit : localAdminHardLimit)
-  : Math.min(planLimit, hardLimit);
+  : Math.min(baseLimit, hardLimit);
 
 // Ensure temp dir exists
 if (!fs.existsSync(ENV.TEMP_DIR)) {
@@ -37,14 +37,14 @@ const storage = multer.diskStorage({
 export async function prepareUpload(req: Request, res: Response, next: NextFunction) {
   const toolId = typeof req.query.toolId === 'string' ? req.query.toolId : '';
   if (!getUploadPolicy(toolId)) { res.status(400).json({ success: false, error: { code: 'INVALID_TOOL', message: 'Selecciona una herramienta de archivo válida.' } }); return; }
-  if (process.env.NODE_ENV === 'test') { req.uploadContext = { toolId, effectiveLimit: ENV.MAX_UPLOAD_SIZE_BYTES, planCode: 'FREE', maxConcurrentJobs: FREE_SERVICE_LIMITS.maxConcurrentServerJobs, commercialBypass: true }; next(); return; }
+  if (process.env.NODE_ENV === 'test') { req.uploadContext = { toolId, effectiveLimit: ENV.MAX_UPLOAD_SIZE_BYTES }; next(); return; }
   // Authentication is already enforced by requireProcessingAuth. Server
-  // execution is free: no active UserPlan or credit balance is required.
+  // execution is free: no plan or credit entitlement is required.
   const commercialBypass = req.auth!.role === 'ADMIN';
   const effectiveLimit = effectiveUploadLimit(FREE_SERVICE_LIMITS.maxUploadSizeBytes, commercialBypass, ENV.MAX_UPLOAD_SIZE_BYTES, ENV.NODE_ENV, ENV.LOCAL_ADMIN_MAX_UPLOAD_SIZE_BYTES);
   const pendingLimit = FREE_SERVICE_LIMITS.pendingFileLimit + (commercialBypass ? 1 : 0);
   if (storageService.countFilesForOwner(req.auth!.userId) >= pendingLimit) { res.status(429).json({ success: false, error: { code: 'PENDING_UPLOAD_LIMIT', message: 'Ya tienes varios archivos pendientes. Espera a que termine uno.' } }); return; }
-  req.uploadContext = { toolId, effectiveLimit, planCode: 'FREE', maxConcurrentJobs: commercialBypass ? FREE_SERVICE_LIMITS.adminMaxConcurrentServerJobs : FREE_SERVICE_LIMITS.maxConcurrentServerJobs, commercialBypass };
+  req.uploadContext = { toolId, effectiveLimit };
   next();
 }
 

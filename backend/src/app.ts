@@ -20,7 +20,7 @@ export function createBackendApp(): Express {
     res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
     res.setHeader('X-Frame-Options', 'DENY');
     if (ENV.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    if (/^\/api\/(auth|account|admin|payments|credits|history|jobs|download|conversions|media)(\/|$)/.test(req.path)) res.setHeader('Cache-Control', 'no-store, private');
+    if (/^\/api\/(auth|account|admin|history|jobs|download|conversions|media)(\/|$)/.test(req.path)) res.setHeader('Cache-Control', 'no-store, private');
     next();
   });
 

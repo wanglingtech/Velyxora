@@ -1,5 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import { PLAN_CONFIG } from "../config/plans";
 import { hashPassword, verifyPassword } from "../security/password";
 import { normalizeEmail } from "./authService";
 import { logger } from "../utils/logger";
@@ -23,13 +22,6 @@ export async function seedInitialData(
   prisma: PrismaClient,
   admin?: AdminSeedConfig,
 ): Promise<AdminSeedResult> {
-  for (const [code, config] of Object.entries(PLAN_CONFIG)) {
-    await prisma.plan.upsert({
-      where: { code: code as any },
-      update: config,
-      create: { code: code as any, ...config },
-    });
-  }
   if (!admin?.email || !admin.password) {
     logger.info("ADMIN_SEED_RESULT", { adminConfigured: false, action: "SKIPPED" });
     return { adminConfigured: false, adminSeeded: false, action: "SKIPPED" };
@@ -53,14 +45,6 @@ export async function seedInitialData(
     passwordMatches = true;
     action = "PASSWORD_UPDATED_EXPLICITLY";
   }
-  const plan = await prisma.plan.findUniqueOrThrow({ where: { code: "FREE" } });
-  const activePlan = await prisma.userPlan.findFirst({
-    where: { userId: user.id, active: true },
-  });
-  if (!activePlan)
-    await prisma.userPlan.create({
-      data: { userId: user.id, planId: plan.id },
-    });
   const result = {
     adminConfigured: true,
     adminSeeded: true,

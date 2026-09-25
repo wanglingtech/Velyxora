@@ -8,7 +8,7 @@ import { probeMedia } from "../utils/mediaProbe";
 import { storageService } from "../services/storageService";
 import { sanitizeFilename } from "../utils/sanitize";
 import { logger } from "../utils/logger";
-import { creditLedgerService } from "../services/creditLedgerService";
+import { processingUsageService } from "../services/processingUsageService";
 
 export const mediaDownloadQueue = new InMemoryQueue("media-downloads", 2);
 
@@ -67,14 +67,14 @@ export async function processMediaDownloadJob(jobId: string, data: { url: string
       try { setStatusWithLoggerTolerance(jobId, "FAILED", error.message); }
       catch { safeWarn("MEDIA_DOWNLOAD_STATUS_UPDATE_FAILED", { jobId }); }
       if (data.billingUserId) {
-        try { await creditLedgerService.settle(jobId, 'FAILED'); }
+        try { await processingUsageService.settle(jobId, 'FAILED'); }
         catch { safeWarn("MEDIA_DOWNLOAD_SETTLEMENT_FAILED", { jobId, outcome: "FAILED" }); }
       }
     }
     return;
   }
   if (data.billingUserId) {
-    try { await creditLedgerService.settle(jobId, 'COMPLETED'); }
+    try { await processingUsageService.settle(jobId, 'COMPLETED'); }
     catch { safeWarn("MEDIA_DOWNLOAD_SETTLEMENT_FAILED", { jobId, outcome: "COMPLETED" }); }
   }
 }

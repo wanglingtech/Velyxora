@@ -27,8 +27,8 @@ try {
   }
   console.log(
     result.adminSeeded
-      ? "Planes y admin inicial verificados desde variables de entorno."
-      : "Planes creados. Admin omitido: define INITIAL_ADMIN_EMAIL e INITIAL_ADMIN_PASSWORD.",
+      ? "Admin inicial verificado desde variables de entorno."
+      : "Admin omitido: define INITIAL_ADMIN_EMAIL e INITIAL_ADMIN_PASSWORD.",
   );
 } finally {
   await prisma.$disconnect();

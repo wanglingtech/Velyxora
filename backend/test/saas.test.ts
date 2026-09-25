@@ -4,11 +4,8 @@ import request from 'supertest';
 import { readFile } from 'node:fs/promises';
 import { createBackendApp } from '../src/app';
 import { hashPassword, verifyPassword } from '../src/security/password';
-import { PLAN_CONFIG } from '../src/config/plans';
-import { creditCostService } from '../src/services/creditCostService';
 import { providerPolicyService } from '../src/services/providerPolicyService';
 import { requireRole } from '../src/middleware/auth';
-import { normalizePeruPhone, paymentService } from '../src/services/paymentService';
 import { prisma } from '../src/db/prisma';
 import { authService, identityHash, SESSION_COOKIE } from '../src/services/authService';
 import { randomUUID } from 'node:crypto';
@@ -16,9 +13,8 @@ import { seedInitialData } from '../src/services/seedService';
 import { isSafeRedirectTarget, validateShortLinkTarget } from '../src/services/shortLinkService';
 import { validateUploadMetadata } from '../src/security/uploadPolicy';
 import { effectiveUploadLimit } from '../src/middleware/uploadHandler';
-import { creditLedgerService } from '../src/services/creditLedgerService';
+import { processingUsageService } from '../src/services/processingUsageService';
 import { FREE_SERVICE_LIMITS } from '../src/config/freeServiceLimits';
-import { normalizeWhatsAppPhoneE164 } from '../src/config/whatsapp';
 
 test('anon en endpoint USER protegido recibe 401', async () => {
   const response = await request(createBackendApp()).get('/api/auth/me');
@@ -30,9 +26,7 @@ test('login real reutiliza la cookie en auth/me, account, payments y media analy
   const email = `session-flow-${suffix}@example.invalid`;
   const password = 'Session-flow-seguro-123';
   await seedInitialData(prisma);
-  const plan = await prisma.plan.findUniqueOrThrow({ where: { code: 'FREE' } });
   const user = await prisma.user.create({ data: { email, passwordHash: await hashPassword(password), displayName: 'Session Flow' } });
-  await prisma.userPlan.create({ data: { userId: user.id, planId: plan.id } });
   try {
     const agent = request.agent(createBackendApp());
     const login = await agent.post('/api/auth/login').send({ email, password });
@@ -44,7 +38,6 @@ test('login real reutiliza la cookie en auth/me, account, payments y media analy
     assert.equal(me.status, 200);
     assert.equal(me.body.data.user.email, email);
     assert.equal((await agent.get('/api/account')).status, 200);
-    assert.equal((await agent.get('/api/payments/config')).status, 200);
 
     const analyze = await agent
       .post('/api/media/analyze')
@@ -54,7 +47,6 @@ test('login real reutiliza la cookie en auth/me, account, payments y media analy
     assert.equal(analyze.body.error.code, 'ANALYSIS_FAILED');
   } finally {
     await prisma.session.deleteMany({ where: { userId: user.id } });
-    await prisma.userPlan.deleteMany({ where: { userId: user.id } });
     await prisma.user.delete({ where: { id: user.id } });
   }
 });
@@ -100,22 +92,8 @@ test('seed admin crea, diagnostica mismatch y solo rota password con opt-in expl
   } finally {
     const user = await prisma.user.findUnique({ where: { email } });
     if (user) {
-      await prisma.userPlan.deleteMany({ where: { userId: user.id } });
       await prisma.user.delete({ where: { id: user.id } });
     }
-  }
-});
-
-test('referencia Yape Perú acepta solo nueve dígitos y normaliza bordes', () => {
-  assert.equal(normalizePeruPhone(' 968555200 '), '968555200');
-  for (const value of ['968 555 200', '+51968555200', '96855520', '9685552000', 'abcdefghi', '<script>1']) assert.throws(() => normalizePeruPhone(value), /9 dígitos/);
-});
-
-test('WhatsApp admin exige E.164 y expone solo los dígitos para Click-to-Chat', () => {
-  assert.equal(normalizeWhatsAppPhoneE164(undefined), null);
-  assert.equal(normalizeWhatsAppPhoneE164('  +51968555200  '), '51968555200');
-  for (const value of ['51968555200', '+51 968555200', '+51-968555200', '+012345678', '+123']) {
-    assert.throws(() => normalizeWhatsAppPhoneE164(value), /E\.164/);
   }
 });
 
@@ -213,12 +191,10 @@ test('reclamo, sugerencia, ownership, respuesta admin y ban persisten con seguri
     const mine = await request(app).get('/api/feedback/suggestions/mine').set('Cookie', cookie(userSession.token)); assert.equal(mine.status, 200); assert.equal(mine.body.data.some((item: any) => item.id === suggestion.body.data.id), true);
     const anonAdmin = await request(app).get('/api/admin/suggestions'); assert.equal(anonAdmin.status, 401);
     const responded = await request(app).patch(`/api/admin/suggestions/${suggestion.body.data.id}`).set('Cookie', cookie(adminSession.token)).set('X-CSRF-Token', adminSession.csrf).send({ status: 'REVIEWING', response: 'La revisaremos.', reaction: '💡' }); assert.equal(responded.status, 200); assert.equal(responded.body.data.reaction, '💡');
-    const order = await prisma.paymentOrder.create({ data: { userId: user.id, credits: 25, amountMinor: 500, currency: 'PEN', status: 'PENDING_REVIEW', reference: '968555200', idempotencyKey: `test:${suffix}` } }); await paymentService.review(admin.id, order.id, true, 'Pago validado en prueba'); await paymentService.review(admin.id, order.id, true, 'Segundo intento'); assert.equal(await prisma.creditLedger.count({ where: { idempotencyKey: `payment:${order.id}` } }), 1);
-    const cancellable = await prisma.paymentOrder.create({ data: { userId: user.id, credits: 10, amountMinor: 200, currency: 'PEN', idempotencyKey: `cancel:${suffix}` } }); const cancelled = await paymentService.cancelOrder(user.id, cancellable.id); assert.equal(cancelled.status, 'CANCELLED_BY_USER'); assert.equal((await paymentService.cancelOrder(user.id, cancellable.id)).status, 'CANCELLED_BY_USER');
     const banned = await request(app).post(`/api/admin/users/${user.id}/moderate`).set('Cookie', cookie(adminSession.token)).set('X-CSRF-Token', adminSession.csrf).send({ action: 'BAN', reason: 'Prueba automatizada de moderación beta' }); assert.equal(banned.status, 200);
     assert.equal(await authService.resolve(userSession.token), null); assert.ok(await prisma.deniedIdentity.findUnique({ where: { emailHash: identityHash(userEmail) } })); await assert.rejects(() => authService.register(userEmail, 'Una-clave-segura-123', 'Duplicado vetado'), /identificador/);
   } finally {
-    await prisma.adminAuditLog.deleteMany({ where: { OR: [{ adminId: admin.id }, { targetUserId: user.id }] } }); await prisma.creditLedger.deleteMany({ where: { userId: user.id } }); await prisma.payment.deleteMany({ where: { order: { userId: user.id } } }); await prisma.paymentOrder.deleteMany({ where: { userId: user.id } }); await prisma.suggestion.deleteMany({ where: { userId: user.id } }); await prisma.complaint.deleteMany({ where: { userId: user.id } }); await prisma.deniedIdentity.deleteMany({ where: { emailHash: identityHash(userEmail) } }); await prisma.session.deleteMany({ where: { userId: { in: [user.id, admin.id] } } }); await prisma.user.deleteMany({ where: { id: { in: [user.id, admin.id] } } });
+    await prisma.adminAuditLog.deleteMany({ where: { OR: [{ adminId: admin.id }, { targetUserId: user.id }] } }); await prisma.suggestion.deleteMany({ where: { userId: user.id } }); await prisma.complaint.deleteMany({ where: { userId: user.id } }); await prisma.deniedIdentity.deleteMany({ where: { emailHash: identityHash(userEmail) } }); await prisma.session.deleteMany({ where: { userId: { in: [user.id, admin.id] } } }); await prisma.user.deleteMany({ where: { id: { in: [user.id, admin.id] } } });
   }
 });
 
@@ -228,23 +204,15 @@ test('rate limit de feedback bloquea spam con 429', async () => {
   assert.equal(limited, true);
 });
 
-test('planes y costos: FREE existe, LOCAL cero y SERVER escala por tamaño', () => {
-  assert.equal(PLAN_CONFIG.FREE.maxConcurrentJobs, 1);
-  assert.equal(creditCostService.estimate('json-formatter', 10).estimatedCredits, 0);
-  assert.equal(creditCostService.estimate('video-to-mp3', 1).estimatedCredits, 2);
-  assert.equal(creditCostService.estimate('video-to-mp3', 60 * 1024 * 1024).estimatedCredits, 4);
-});
-
-test('límites efectivos separan ADMIN local de ADMIN producción sin alterar planes', () => {
-  const productionHardLimit = 100 * 1024 * 1024;
-  const localAdminHardLimit = 1024 * 1024 * 1024;
-  assert.equal(PLAN_CONFIG.FREE.monthlyCredits, 25);
-  assert.equal(PLAN_CONFIG.PLUS.monthlyCredits, 300);
-  assert.equal(PLAN_CONFIG.PRO.monthlyCredits, 1200);
-  assert.equal(effectiveUploadLimit(PLAN_CONFIG.FREE.maxUploadSize, false, productionHardLimit, 'development', localAdminHardLimit), PLAN_CONFIG.FREE.maxUploadSize);
-  assert.equal(effectiveUploadLimit(PLAN_CONFIG.PRO.maxUploadSize, false, productionHardLimit, 'development', localAdminHardLimit), productionHardLimit);
-  assert.equal(effectiveUploadLimit(PLAN_CONFIG.FREE.maxUploadSize, true, productionHardLimit, 'development', localAdminHardLimit), localAdminHardLimit);
-  assert.equal(effectiveUploadLimit(PLAN_CONFIG.FREE.maxUploadSize, true, productionHardLimit, 'production', localAdminHardLimit), productionHardLimit);
+test('el límite efectivo de subida parte de FREE_SERVICE_LIMITS y separa ADMIN local de producción', () => {
+  const base = FREE_SERVICE_LIMITS.maxUploadSizeBytes;
+  const largerHardLimit = base * 2;
+  const productionHardLimit = Math.floor(base / 2);
+  const localAdminHardLimit = base * 10;
+  assert.equal(effectiveUploadLimit(base, false, largerHardLimit, 'development', localAdminHardLimit), base);
+  assert.equal(effectiveUploadLimit(base, false, productionHardLimit, 'development', localAdminHardLimit), productionHardLimit);
+  assert.equal(effectiveUploadLimit(base, true, largerHardLimit, 'development', localAdminHardLimit), localAdminHardLimit);
+  assert.equal(effectiveUploadLimit(base, true, largerHardLimit, 'production', localAdminHardLimit), largerHardLimit);
 });
 
 test('política backend vincula formato a herramienta sin depender de accept', () => {
@@ -267,11 +235,31 @@ test('policy permite allowlist y bloquea adulto, desconocido y subdominio engañ
   for (const url of ['https://xvideos.com/a', 'https://example.com/a', 'https://youtube.com.attacker.example/a']) assert.throws(() => providerPolicyService.assertAllowed(url), /no está admitido/);
 });
 
-test('schema y migración contienen persistencia e idempotencia requeridas', async () => {
+test('schema contiene la persistencia necesaria y retiró los modelos comerciales', async () => {
   const [schema, migration] = await Promise.all([readFile('prisma/schema.prisma', 'utf8'), readFile('prisma/migrations/20260913000100_auth_credits_beta/migration.sql', 'utf8')]);
-  for (const model of ['User','Session','Plan','UserPlan','CreditLedger','ProcessingUsage','ProcessingHistory','PaymentOrder','Payment','AdminAuditLog','DeniedIdentity','Complaint','Suggestion']) assert.match(schema, new RegExp(`model ${model}`));
+  for (const model of ['User','Session','ProcessingUsage','ProcessingHistory','AdminAuditLog','DeniedIdentity','Complaint','Suggestion','ShortLink','ShortLinkReport','ProviderCircuitBreaker','ServiceStatus']) assert.match(schema, new RegExp(`model ${model}`));
+  for (const removed of ['Plan','UserPlan','CreditLedger','PaymentOrder','Payment']) assert.doesNotMatch(schema, new RegExp(`model ${removed}\\b`), `el schema no debe definir el modelo ${removed}`);
+  for (const removedEnum of ['PlanCode','LedgerType','PaymentOrderStatus','PaymentStatus']) assert.doesNotMatch(schema, new RegExp(`enum ${removedEnum}\\b`), `el schema no debe definir el enum ${removedEnum}`);
   assert.match(migration, /idempotencyKey.*UNIQUE/); assert.match(schema, /ADMIN_TEST/);
   assert.match(schema, /BANNED/); assert.match(schema, /ANONYMIZED/); assert.match(schema, /onDelete: Restrict/);
+});
+
+test('existe la migración destructiva que retira el esquema comercial en orden FK-safe', async () => {
+  const sql = await readFile('prisma/migrations/20260926000100_retire_commercial_models/migration.sql', 'utf8');
+  for (const table of ['CreditLedger', 'Payment', 'PaymentOrder', 'UserPlan', 'Plan']) {
+    assert.match(sql, new RegExp(`DROP TABLE "${table}"`), `la migración debe retirar la tabla ${table}`);
+  }
+  for (const type of ['LedgerType', 'PaymentStatus', 'PaymentOrderStatus', 'PlanCode']) {
+    assert.match(sql, new RegExp(`DROP TYPE "${type}"`), `la migración debe retirar el enum ${type}`);
+  }
+  for (const column of ['creditsCost', 'estimatedCredits', 'reservedCredits', 'consumedCredits']) {
+    assert.match(sql, new RegExp(`DROP COLUMN "${column}"`), `la migración debe retirar la columna ${column}`);
+  }
+  assert.ok(sql.indexOf('DROP TABLE "CreditLedger"') < sql.indexOf('DROP TABLE "Payment"'));
+  assert.ok(sql.indexOf('DROP TABLE "Payment"') < sql.indexOf('DROP TABLE "PaymentOrder"'));
+  assert.ok(sql.indexOf('DROP TABLE "PaymentOrder"') < sql.indexOf('DROP TABLE "UserPlan"'));
+  assert.ok(sql.indexOf('DROP TABLE "UserPlan"') < sql.indexOf('DROP TABLE "Plan"'));
+  assert.doesNotMatch(sql, /"ServiceStatus"/, 'la migración comercial no debe tocar ServiceStatus');
 });
 
 test('SERVER_REQUIRED exige sesión antes de procesar y la vista pública no la exige', async () => {
@@ -299,20 +287,15 @@ test('la ejecución de servidor es sin créditos y sin plan activo', async () =>
   const user = await prisma.user.create({ data: { email, passwordHash: 'test-only', displayName: 'Creditless' } });
   const jobId = `job-creditless-${suffix}`;
   try {
-    // No UserPlan is created on purpose.
-    const ledgerBefore = await prisma.creditLedger.count({ where: { userId: user.id } });
-    const usage = await creditLedgerService.reserve(user.id, jobId, 'video-to-mp3', 2048, false);
+    // Server execution is free: no plan or credit records are involved.
+    const usage = await processingUsageService.reserve(user.id, jobId, 'video-to-mp3', 2048, false);
     assert.equal(usage.status, 'RESERVED');
-    assert.equal(usage.estimatedCredits, 0);
-    assert.equal(usage.reservedCredits, 0);
+    assert.equal(usage.inputBytes, BigInt(2048));
     assert.equal(await prisma.processingUsage.count({ where: { jobId } }), 1);
-    assert.equal(await prisma.creditLedger.count({ where: { userId: user.id } }), ledgerBefore, 'no debe crear movimientos de crédito');
 
-    await creditLedgerService.settle(jobId, 'COMPLETED');
+    await processingUsageService.settle(jobId, 'COMPLETED');
     const settled = await prisma.processingUsage.findUniqueOrThrow({ where: { jobId } });
     assert.equal(settled.status, 'COMPLETED');
-    assert.equal(settled.consumedCredits, 0);
-    assert.equal(await prisma.creditLedger.count({ where: { userId: user.id } }), ledgerBefore, 'el asentamiento no debe crear movimientos de crédito');
   } finally {
     await prisma.processingUsage.deleteMany({ where: { jobId } });
     await prisma.user.delete({ where: { id: user.id } });
@@ -326,19 +309,204 @@ test('los límites de servicio gratuito protegen concurrencia y tamaño sin plan
   const base = `job-limits-${suffix}`;
   try {
     for (let index = 0; index < FREE_SERVICE_LIMITS.maxConcurrentServerJobs; index += 1) {
-      await creditLedgerService.reserve(user.id, `${base}-${index}`, 'video-to-mp3', 1024, false);
+      await processingUsageService.reserve(user.id, `${base}-${index}`, 'video-to-mp3', 1024, false);
     }
     await assert.rejects(
-      () => creditLedgerService.reserve(user.id, `${base}-overflow`, 'video-to-mp3', 1024, false),
+      () => processingUsageService.reserve(user.id, `${base}-overflow`, 'video-to-mp3', 1024, false),
       /procesos en curso/,
     );
     await assert.rejects(
-      () => creditLedgerService.reserve(user.id, `${base}-big`, 'video-to-mp3', FREE_SERVICE_LIMITS.maxUploadSizeBytes + 1, false),
+      () => processingUsageService.reserve(user.id, `${base}-big`, 'video-to-mp3', FREE_SERVICE_LIMITS.maxUploadSizeBytes + 1, false),
       /límite de tamaño/,
     );
   } finally {
     await prisma.processingUsage.deleteMany({ where: { jobId: { startsWith: base } } });
     await prisma.user.delete({ where: { id: user.id } });
+  }
+});
+
+test('el registro crea solo la cuenta y el schema ya no define modelos comerciales', async () => {
+  const email = `register-free-${randomUUID()}@example.invalid`;
+  const user = await authService.register(email, 'Registro-gratuito-123', 'Free User');
+  try {
+    assert.equal(user.email, email);
+    assert.equal(user.role, 'USER');
+    assert.equal(user.status, 'ACTIVE');
+    const schema = await readFile('prisma/schema.prisma', 'utf8');
+    for (const model of ['Plan', 'UserPlan', 'CreditLedger', 'PaymentOrder', 'Payment']) {
+      assert.doesNotMatch(schema, new RegExp(`model ${model}\\b`), `el schema no debe definir el modelo ${model}`);
+    }
+  } finally {
+    await prisma.session.deleteMany({ where: { userId: user.id } });
+    await prisma.user.delete({ where: { id: user.id } });
+  }
+});
+
+test('el seed bootstrap no crea registros comerciales', async () => {
+  const email = `seed-free-${randomUUID()}@example.invalid`;
+  const result = await seedInitialData(prisma, { email, password: 'Admin-free-seguro-123' });
+  assert.equal(result.adminSeeded, true);
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email } });
+  try {
+    assert.equal(admin.role, 'ADMIN');
+    const seedSource = await readFile('backend/src/services/seedService.ts', 'utf8');
+    assert.doesNotMatch(seedSource, /prisma\.(plan|userPlan|creditLedger|paymentOrder|payment)\b/);
+  } finally {
+    await prisma.session.deleteMany({ where: { userId: admin.id } });
+    await prisma.user.delete({ where: { id: admin.id } });
+  }
+});
+
+test('las rutas de ejecución ya no importan el servicio legacy de créditos', async () => {
+  const runtimeFiles = [
+    'backend/src/services/conversionService.ts',
+    'backend/src/services/mediaDownloadService.ts',
+    'backend/src/workers/conversionWorker.ts',
+    'backend/src/workers/mediaDownloadWorker.ts',
+    'backend/src/controllers/conversionsController.ts',
+  ];
+  for (const relative of runtimeFiles) {
+    const source = await readFile(relative, 'utf8');
+    assert.doesNotMatch(source, /creditLedgerService/, `${relative} no debe usar el servicio legacy`);
+    assert.match(source, /processingUsageService/, `${relative} debe usar processingUsageService`);
+  }
+});
+
+test('el uso neutral se crea y se asienta en cancelación', async () => {
+  const email = `cancel-usage-${randomUUID()}@example.invalid`;
+  const user = await prisma.user.create({ data: { email, passwordHash: 'test-only', displayName: 'Cancel Usage' } });
+  const jobId = `job-cancel-usage-${randomUUID()}`;
+  try {
+    const reserved = await processingUsageService.reserve(user.id, jobId, 'video-to-mp3', 1024, false);
+    assert.equal(reserved.status, 'RESERVED');
+    await processingUsageService.settle(jobId, 'CANCELLED');
+    const usage = await prisma.processingUsage.findUniqueOrThrow({ where: { jobId } });
+    assert.equal(usage.status, 'CANCELLED');
+    assert.equal(usage.userId, user.id);
+    assert.equal(usage.toolId, 'video-to-mp3');
+    assert.equal(usage.inputBytes, BigInt(1024));
+  } finally {
+    await prisma.processingUsage.deleteMany({ where: { jobId } });
+    await prisma.user.delete({ where: { id: user.id } });
+  }
+});
+
+test('el estado del servicio sigue siendo público e independiente del uso', async () => {
+  const response = await request(createBackendApp()).get('/api/status');
+  assert.equal(response.status, 200);
+  assert.ok(['OPERATIONAL', 'LIMITED', 'MAINTENANCE', 'UNAVAILABLE'].includes(response.body.data.state));
+  const source = await readFile('backend/src/services/serviceStatusService.ts', 'utf8');
+  assert.doesNotMatch(source, /processingUsage|creditLedger/);
+});
+
+test('las APIs legacy de créditos y pagos ya no están montadas', async () => {
+  const app = createBackendApp();
+  assert.equal((await request(app).post('/api/credits/estimate').send({ toolId: 'video-to-mp3', inputBytes: 1 })).status, 404);
+  assert.equal((await request(app).get('/api/payments/config')).status, 404);
+  assert.equal((await request(app).get('/api/payments/orders')).status, 404);
+  assert.equal((await request(app).post('/api/payments/orders').send({ packageId: 'PLUS_BETA' })).status, 404);
+});
+
+test('la cuenta no expone campos comerciales legacy', async () => {
+  const email = `account-free-${randomUUID()}@example.invalid`;
+  const user = await prisma.user.create({ data: { email, passwordHash: 'test-only', displayName: 'Account Free' } });
+  const session = await authService.createSession(user.id);
+  try {
+    const response = await request(createBackendApp()).get('/api/account').set('Cookie', `${SESSION_COOKIE}=${session.token}`);
+    assert.equal(response.status, 200);
+    const data = response.body.data;
+    for (const forbidden of ['plan', 'credits', 'balance', 'ledger', 'payments', 'nextResetAt']) {
+      assert.equal(Object.prototype.hasOwnProperty.call(data, forbidden), false, `la cuenta no debe exponer ${forbidden}`);
+    }
+    assert.equal(data.email, email);
+    assert.ok(Array.isArray(data.jobs));
+    assert.ok(Array.isArray(data.history));
+    assert.ok(data.capabilities && typeof data.capabilities.effectiveMaxUploadSize === 'number');
+  } finally {
+    await prisma.session.deleteMany({ where: { userId: user.id } });
+    await prisma.user.delete({ where: { id: user.id } });
+  }
+});
+
+test('el dashboard admin no expone métricas de créditos ni pagos', async () => {
+  const email = `admin-dashboard-${randomUUID()}@example.invalid`;
+  const admin = await prisma.user.create({ data: { email, passwordHash: 'test-only', role: 'ADMIN' } });
+  const session = await authService.createSession(admin.id);
+  try {
+    const response = await request(createBackendApp()).get('/api/admin/dashboard').set('Cookie', `${SESSION_COOKIE}=${session.token}`);
+    assert.equal(response.status, 200);
+    const data = response.body.data;
+    for (const forbidden of ['netCredits', 'payments']) {
+      assert.equal(Object.prototype.hasOwnProperty.call(data, forbidden), false, `dashboard no debe exponer ${forbidden}`);
+    }
+    for (const required of ['users', 'activeUsers', 'jobs', 'pendingComplaints', 'newSuggestions']) {
+      assert.equal(typeof data[required], 'number', `dashboard debe conservar ${required}`);
+    }
+  } finally {
+    await prisma.session.deleteMany({ where: { userId: admin.id } });
+    await prisma.user.delete({ where: { id: admin.id } });
+  }
+});
+
+test('admin ya no ofrece endpoints de créditos, planes ni pagos', async () => {
+  const email = `admin-legacy-${randomUUID()}@example.invalid`;
+  const admin = await prisma.user.create({ data: { email, passwordHash: 'test-only', role: 'ADMIN' } });
+  const session = await authService.createSession(admin.id);
+  const cookie = `${SESSION_COOKIE}=${session.token}`;
+  try {
+    const app = createBackendApp();
+    const cases: Array<[string, string]> = [
+      ['get', '/api/admin/plans'],
+      ['patch', '/api/admin/plans/FREE'],
+      ['get', '/api/admin/payments'],
+      ['post', '/api/admin/payments/00000000-0000-0000-0000-000000000000/review'],
+      ['patch', `/api/admin/users/${admin.id}/plan`],
+      ['post', `/api/admin/users/${admin.id}/credits`],
+    ];
+    for (const [method, path] of cases) {
+      const response = await (request(app) as any)[method](path).set('Cookie', cookie).set('X-CSRF-Token', session.csrf).send({});
+      assert.equal(response.status, 404, `${method.toUpperCase()} ${path} debe estar retirado`);
+    }
+  } finally {
+    await prisma.session.deleteMany({ where: { userId: admin.id } });
+    await prisma.user.delete({ where: { id: admin.id } });
+  }
+});
+
+test('no queda código runtime importando servicios comerciales legacy', async () => {
+  const retired = ['creditLedgerService', 'creditCostService', 'paymentService', 'paymentProvider', 'config/plans', 'config/betaPayments'];
+  const files = [
+    'backend/src/routes/account.routes.ts',
+    'backend/src/routes/admin.routes.ts',
+    'backend/src/routes/api.router.ts',
+    'backend/src/services/conversionService.ts',
+    'backend/src/services/mediaDownloadService.ts',
+    'backend/src/workers/conversionWorker.ts',
+    'backend/src/workers/mediaDownloadWorker.ts',
+    'backend/src/controllers/conversionsController.ts',
+    'backend/src/middleware/uploadHandler.ts',
+  ];
+  for (const relative of files) {
+    const source = await readFile(relative, 'utf8');
+    for (const symbol of retired) {
+      assert.equal(source.includes(symbol), false, `${relative} no debe referenciar ${symbol}`);
+    }
+  }
+});
+
+test('los archivos backend legacy retirados ya no existen', async () => {
+  const removed = [
+    'backend/src/routes/credits.routes.ts',
+    'backend/src/routes/payments.routes.ts',
+    'backend/src/services/paymentService.ts',
+    'backend/src/services/paymentProvider.ts',
+    'backend/src/services/creditLedgerService.ts',
+    'backend/src/services/creditCostService.ts',
+    'backend/src/config/plans.ts',
+    'backend/src/config/betaPayments.ts',
+  ];
+  for (const relative of removed) {
+    await assert.rejects(() => readFile(relative, 'utf8'), `${relative} debe haberse retirado`);
   }
 });
 

@@ -15,7 +15,7 @@ import { ytDlpService, YtDlpError, YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE } from
 import { ENV } from "../src/config/env";
 import { mediaDownloadService } from "../src/services/mediaDownloadService";
 import { mediaService } from "../src/services/mediaService";
-import { creditLedgerService } from "../src/services/creditLedgerService";
+import { processingUsageService } from "../src/services/processingUsageService";
 import { jobManager } from "../src/jobs/JobManager";
 import { mediaDownloadQueue, processMediaDownloadJob } from "../src/workers/mediaDownloadWorker";
 import { storageService } from "../src/services/storageService";
@@ -117,14 +117,14 @@ test("YT-005C OPEN fails before sidecar and yt-dlp and preserves public error", 
   const originalFetch = globalThis.fetch;
   const originalAnalyze = ytDlpService.analyze;
   const originalLookup = dns.lookup;
-  const originalReserve = creditLedgerService.reserve;
+  const originalReserve = processingUsageService.reserve;
   let sidecarCalls = 0;
   let ytDlpCalls = 0;
   let reserveCalls = 0;
   const jobsBefore = jobManager.listJobs().length;
   const usagesBefore = await prisma.processingUsage.count();
   dns.lookup = (async () => [{ address: "142.250.0.1", family: 4 }]) as typeof dns.lookup;
-  creditLedgerService.reserve = (async () => { reserveCalls += 1; throw new Error("unexpected"); }) as typeof creditLedgerService.reserve;
+  processingUsageService.reserve = (async () => { reserveCalls += 1; throw new Error("unexpected"); }) as typeof processingUsageService.reserve;
   globalThis.fetch = (async () => { sidecarCalls += 1; throw new Error("unexpected"); }) as typeof fetch;
   ytDlpService.analyze = (async () => { ytDlpCalls += 1; throw new Error("unexpected"); }) as typeof ytDlpService.analyze;
   try {
@@ -142,23 +142,23 @@ test("YT-005C OPEN fails before sidecar and yt-dlp and preserves public error", 
     globalThis.fetch = originalFetch;
     ytDlpService.analyze = originalAnalyze;
     dns.lookup = originalLookup;
-    creditLedgerService.reserve = originalReserve;
+    processingUsageService.reserve = originalReserve;
   }
 });
 
 test("YT-005C blocked revalidate creates no job, reservation or enqueue", { concurrency: false }, async () => {
   await prisma.providerCircuitBreaker.create({ data: { provider: "youtube", state: "OPEN", cooldownUntil: new Date(Date.now() + 60_000), openedAt: new Date() } });
   const originalLookup = dns.lookup;
-  const originalReserve = creditLedgerService.reserve;
-  const originalSettle = creditLedgerService.settle;
+  const originalReserve = processingUsageService.reserve;
+  const originalSettle = processingUsageService.settle;
   const originalAdd = mediaDownloadQueue.add;
   let reserves = 0;
   let settlements = 0;
   let enqueues = 0;
   const jobsBefore = jobManager.listJobs().length;
   dns.lookup = (async () => [{ address: "142.250.0.1", family: 4 }]) as typeof dns.lookup;
-  creditLedgerService.reserve = (async () => { reserves += 1; throw new Error("unexpected"); }) as typeof creditLedgerService.reserve;
-  creditLedgerService.settle = (async () => { settlements += 1; throw new Error("unexpected"); }) as typeof creditLedgerService.settle;
+  processingUsageService.reserve = (async () => { reserves += 1; throw new Error("unexpected"); }) as typeof processingUsageService.reserve;
+  processingUsageService.settle = (async () => { settlements += 1; throw new Error("unexpected"); }) as typeof processingUsageService.settle;
   mediaDownloadQueue.add = (async () => { enqueues += 1; }) as typeof mediaDownloadQueue.add;
   try {
     await assert.rejects(
@@ -171,18 +171,18 @@ test("YT-005C blocked revalidate creates no job, reservation or enqueue", { conc
     assert.equal(jobManager.listJobs().length, jobsBefore);
   } finally {
     dns.lookup = originalLookup;
-    creditLedgerService.reserve = originalReserve;
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.reserve = originalReserve;
+    processingUsageService.settle = originalSettle;
     mediaDownloadQueue.add = originalAdd;
   }
 });
 
 test("YT-005C worker rejection fails and settles exactly once", { concurrency: false }, async () => {
   await prisma.providerCircuitBreaker.create({ data: { provider: "youtube", state: "OPEN", cooldownUntil: new Date(Date.now() + 60_000), openedAt: new Date() } });
-  const originalSettle = creditLedgerService.settle;
+  const originalSettle = processingUsageService.settle;
   const id = `media-yt005c-${Date.now()}`;
   const settlements: string[] = [];
-  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof creditLedgerService.settle;
+  processingUsageService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof processingUsageService.settle;
   jobManager.createJob({ id, ownerId: "user", toolId: "media-downloader", input: { filename: "remote", originalName: "Public", mimeType: "application/octet-stream", size: 0, path: "" } });
   try {
     await processMediaDownloadJob(id, { url: "https://youtube.com/watch?v=public", formatId: "18", container: "mp4", type: "video", title: "Public", billingUserId: "user" });
@@ -190,7 +190,7 @@ test("YT-005C worker rejection fails and settles exactly once", { concurrency: f
     assert.equal(jobManager.getJob(id)?.error, YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE);
     assert.deepEqual(settlements, ["FAILED"]);
   } finally {
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.settle = originalSettle;
     jobManager.deleteJob(id);
   }
 });
@@ -198,8 +198,8 @@ test("YT-005C worker rejection fails and settles exactly once", { concurrency: f
 test("YT-005C FIX-01 service settles exactly once when createJob fails after reserve", { concurrency: false }, async () => {
   const originalLookup = dns.lookup;
   const originalFind = providerRegistry.find;
-  const originalReserve = creditLedgerService.reserve;
-  const originalSettle = creditLedgerService.settle;
+  const originalReserve = processingUsageService.reserve;
+  const originalSettle = processingUsageService.settle;
   const originalCreateJob = jobManager.createJob;
   const originalAdd = mediaDownloadQueue.add;
   const settlements: string[] = [];
@@ -210,8 +210,8 @@ test("YT-005C FIX-01 service settles exactly once when createJob fails after res
     platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
     assertFormatAvailable: async () => undefined,
   })) as typeof providerRegistry.find;
-  creditLedgerService.reserve = (async () => { reserves += 1; return {} as never; }) as typeof creditLedgerService.reserve;
-  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof creditLedgerService.settle;
+  processingUsageService.reserve = (async () => { reserves += 1; return {} as never; }) as typeof processingUsageService.reserve;
+  processingUsageService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof processingUsageService.settle;
   jobManager.createJob = (() => { throw new Error("create failed"); }) as typeof jobManager.createJob;
   mediaDownloadQueue.add = (async () => { enqueues += 1; }) as typeof mediaDownloadQueue.add;
   try {
@@ -225,8 +225,8 @@ test("YT-005C FIX-01 service settles exactly once when createJob fails after res
   } finally {
     dns.lookup = originalLookup;
     providerRegistry.find = originalFind;
-    creditLedgerService.reserve = originalReserve;
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.reserve = originalReserve;
+    processingUsageService.settle = originalSettle;
     jobManager.createJob = originalCreateJob;
     mediaDownloadQueue.add = originalAdd;
   }
@@ -235,8 +235,8 @@ test("YT-005C FIX-01 service settles exactly once when createJob fails after res
 test("YT-005C FIX-01 service owns settlement until enqueue succeeds", { concurrency: false }, async () => {
   const originalLookup = dns.lookup;
   const originalFind = providerRegistry.find;
-  const originalReserve = creditLedgerService.reserve;
-  const originalSettle = creditLedgerService.settle;
+  const originalReserve = processingUsageService.reserve;
+  const originalSettle = processingUsageService.settle;
   const originalCreateJob = jobManager.createJob;
   const originalAdd = mediaDownloadQueue.add;
   const settlements: string[] = [];
@@ -246,8 +246,8 @@ test("YT-005C FIX-01 service owns settlement until enqueue succeeds", { concurre
     platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
     assertFormatAvailable: async () => undefined,
   })) as typeof providerRegistry.find;
-  creditLedgerService.reserve = (async () => ({} as never)) as typeof creditLedgerService.reserve;
-  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof creditLedgerService.settle;
+  processingUsageService.reserve = (async () => ({} as never)) as typeof processingUsageService.reserve;
+  processingUsageService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof processingUsageService.settle;
   jobManager.createJob = ((params) => {
     createdIds.push(params.id);
     return originalCreateJob.call(jobManager, params);
@@ -268,8 +268,8 @@ test("YT-005C FIX-01 service owns settlement until enqueue succeeds", { concurre
   } finally {
     dns.lookup = originalLookup;
     providerRegistry.find = originalFind;
-    creditLedgerService.reserve = originalReserve;
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.reserve = originalReserve;
+    processingUsageService.settle = originalSettle;
     jobManager.createJob = originalCreateJob;
     mediaDownloadQueue.add = originalAdd;
     for (const id of createdIds) jobManager.deleteJob(id);
@@ -278,7 +278,7 @@ test("YT-005C FIX-01 service owns settlement until enqueue succeeds", { concurre
 
 test("YT-005C FIX-01 worker settles when cleanup listing fails", { concurrency: false }, async () => {
   const originalFind = providerRegistry.find;
-  const originalSettle = creditLedgerService.settle;
+  const originalSettle = processingUsageService.settle;
   const originalReaddir = fs.readdirSync;
   const id = `media-yt005c-list-${Date.now()}`;
   const settlements: string[] = [];
@@ -286,7 +286,7 @@ test("YT-005C FIX-01 worker settles when cleanup listing fails", { concurrency: 
     platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
     download: async () => { throw new Error("operation failed"); },
   })) as typeof providerRegistry.find;
-  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof creditLedgerService.settle;
+  processingUsageService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof processingUsageService.settle;
   fs.readdirSync = (() => { throw new Error("cleanup list failed"); }) as typeof fs.readdirSync;
   jobManager.createJob({ id, ownerId: "user", toolId: "media-downloader", input: { filename: "remote", originalName: "Public", mimeType: "application/octet-stream", size: 0, path: "" } });
   try {
@@ -295,7 +295,7 @@ test("YT-005C FIX-01 worker settles when cleanup listing fails", { concurrency: 
     assert.deepEqual(settlements, ["FAILED"]);
   } finally {
     providerRegistry.find = originalFind;
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.settle = originalSettle;
     fs.readdirSync = originalReaddir;
     jobManager.deleteJob(id);
   }
@@ -303,7 +303,7 @@ test("YT-005C FIX-01 worker settles when cleanup listing fails", { concurrency: 
 
 test("YT-005C FIX-01 worker settles when cleanup unlink fails", { concurrency: false }, async () => {
   const originalFind = providerRegistry.find;
-  const originalSettle = creditLedgerService.settle;
+  const originalSettle = processingUsageService.settle;
   const originalReaddir = fs.readdirSync;
   const originalUnlink = fs.unlinkSync;
   const id = `media-yt005c-unlink-${Date.now()}`;
@@ -312,7 +312,7 @@ test("YT-005C FIX-01 worker settles when cleanup unlink fails", { concurrency: f
     platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
     download: async () => { throw new Error("operation failed"); },
   })) as typeof providerRegistry.find;
-  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof creditLedgerService.settle;
+  processingUsageService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof processingUsageService.settle;
   fs.readdirSync = (() => [`download-${id}.part`]) as typeof fs.readdirSync;
   fs.unlinkSync = (() => { throw new Error("cleanup unlink failed"); }) as typeof fs.unlinkSync;
   jobManager.createJob({ id, ownerId: "user", toolId: "media-downloader", input: { filename: "remote", originalName: "Public", mimeType: "application/octet-stream", size: 0, path: "" } });
@@ -322,7 +322,7 @@ test("YT-005C FIX-01 worker settles when cleanup unlink fails", { concurrency: f
     assert.deepEqual(settlements, ["FAILED"]);
   } finally {
     providerRegistry.find = originalFind;
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.settle = originalSettle;
     fs.readdirSync = originalReaddir;
     fs.unlinkSync = originalUnlink;
     jobManager.deleteJob(id);
@@ -330,18 +330,18 @@ test("YT-005C FIX-01 worker settles when cleanup unlink fails", { concurrency: f
 });
 
 test("YT-005C FIX-01 worker attempts settlement when FAILED status update throws", { concurrency: false }, async () => {
-  const originalSettle = creditLedgerService.settle;
+  const originalSettle = processingUsageService.settle;
   const originalSetStatus = jobManager.setStatus;
   const id = `media-yt005c-status-${Date.now()}`;
   const settlements: string[] = [];
-  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof creditLedgerService.settle;
+  processingUsageService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof processingUsageService.settle;
   jobManager.setStatus = (() => { throw new Error("status failed"); }) as typeof jobManager.setStatus;
   jobManager.createJob({ id, ownerId: "user", toolId: "media-downloader", input: { filename: "remote", originalName: "Public", mimeType: "application/octet-stream", size: 0, path: "" } });
   try {
     await processMediaDownloadJob(id, { url: "https://youtube.com/watch?v=public", formatId: "18", container: "mp4", type: "video", title: "Public", billingUserId: "user" });
     assert.deepEqual(settlements, ["FAILED"]);
   } finally {
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.settle = originalSettle;
     jobManager.setStatus = originalSetStatus;
     jobManager.deleteJob(id);
   }
@@ -369,7 +369,7 @@ function writeSilentWav(filePath: string): void {
 
 test("YT-005C FIX-02 successful processing settles COMPLETED exactly once", { concurrency: false }, async () => {
   const originalFind = providerRegistry.find;
-  const originalSettle = creditLedgerService.settle;
+  const originalSettle = processingUsageService.settle;
   const id = `media-yt005c-success-${Date.now()}`;
   const outputPath = path.join(ENV.STORAGE_DIR, `download-${id}.wav`);
   const settlements: string[] = [];
@@ -377,7 +377,7 @@ test("YT-005C FIX-02 successful processing settles COMPLETED exactly once", { co
     platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
     download: async () => { writeSilentWav(outputPath); return outputPath; },
   })) as typeof providerRegistry.find;
-  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof creditLedgerService.settle;
+  processingUsageService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof processingUsageService.settle;
   jobManager.createJob({ id, ownerId: "user", toolId: "media-downloader", input: { filename: "remote", originalName: "Public", mimeType: "application/octet-stream", size: 0, path: "" } });
   try {
     await processMediaDownloadJob(id, { url: "https://youtube.com/watch?v=public", formatId: "18", container: "m4a", type: "audio", title: "Public", billingUserId: "user" });
@@ -388,14 +388,14 @@ test("YT-005C FIX-02 successful processing settles COMPLETED exactly once", { co
     if (fileId) storageService.deleteFile(fileId);
     else if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
     providerRegistry.find = originalFind;
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.settle = originalSettle;
     jobManager.deleteJob(id);
   }
 });
 
 test("YT-005C FIX-02 COMPLETED settlement failure never becomes FAILED", { concurrency: false }, async () => {
   const originalFind = providerRegistry.find;
-  const originalSettle = creditLedgerService.settle;
+  const originalSettle = processingUsageService.settle;
   const originalWarn = logger.warn;
   const originalSetStatus = jobManager.setStatus;
   const id = `media-yt005c-completed-settle-${Date.now()}`;
@@ -406,7 +406,7 @@ test("YT-005C FIX-02 COMPLETED settlement failure never becomes FAILED", { concu
     platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
     download: async () => { writeSilentWav(outputPath); return outputPath; },
   })) as typeof providerRegistry.find;
-  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); throw new Error("settlement unavailable"); }) as typeof creditLedgerService.settle;
+  processingUsageService.settle = (async (_jobId, outcome) => { settlements.push(outcome); throw new Error("settlement unavailable"); }) as typeof processingUsageService.settle;
   logger.warn = (() => { throw new Error("logger unavailable"); }) as typeof logger.warn;
   jobManager.setStatus = ((jobId, status, error) => {
     statuses.push(status);
@@ -423,7 +423,7 @@ test("YT-005C FIX-02 COMPLETED settlement failure never becomes FAILED", { concu
     if (fileId) storageService.deleteFile(fileId);
     else if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
     providerRegistry.find = originalFind;
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.settle = originalSettle;
     logger.warn = originalWarn;
     jobManager.setStatus = originalSetStatus;
     jobManager.deleteJob(id);
@@ -433,7 +433,7 @@ test("YT-005C FIX-02 COMPLETED settlement failure never becomes FAILED", { concu
 
 test("YT-005C FIX-02 status logger failure cannot turn successful processing into FAILED", { concurrency: false }, async () => {
   const originalFind = providerRegistry.find;
-  const originalSettle = creditLedgerService.settle;
+  const originalSettle = processingUsageService.settle;
   const originalInfo = logger.info;
   const id = `media-yt005c-info-${Date.now()}`;
   const outputPath = path.join(ENV.STORAGE_DIR, `download-${id}.wav`);
@@ -442,7 +442,7 @@ test("YT-005C FIX-02 status logger failure cannot turn successful processing int
     platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
     download: async () => { writeSilentWav(outputPath); return outputPath; },
   })) as typeof providerRegistry.find;
-  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof creditLedgerService.settle;
+  processingUsageService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof processingUsageService.settle;
   jobManager.createJob({ id, ownerId: "user", toolId: "media-downloader", input: { filename: "remote", originalName: "Public", mimeType: "application/octet-stream", size: 0, path: "" } });
   logger.info = (() => { throw new Error("logger unavailable"); }) as typeof logger.info;
   try {
@@ -455,13 +455,13 @@ test("YT-005C FIX-02 status logger failure cannot turn successful processing int
     if (fileId) storageService.deleteFile(fileId);
     else if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
     providerRegistry.find = originalFind;
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.settle = originalSettle;
     jobManager.deleteJob(id);
   }
 });
 test("YT-005C FIX-02 logger failure cannot block FAILED settlement", { concurrency: false }, async () => {
   const originalFind = providerRegistry.find;
-  const originalSettle = creditLedgerService.settle;
+  const originalSettle = processingUsageService.settle;
   const originalWarn = logger.warn;
   const id = `media-yt005c-logger-${Date.now()}`;
   const settlements: string[] = [];
@@ -469,7 +469,7 @@ test("YT-005C FIX-02 logger failure cannot block FAILED settlement", { concurren
     platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
     download: async () => { throw new Error("processing failed"); },
   })) as typeof providerRegistry.find;
-  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof creditLedgerService.settle;
+  processingUsageService.settle = (async (_jobId, outcome) => { settlements.push(outcome); return {} as never; }) as typeof processingUsageService.settle;
   logger.warn = (() => { throw new Error("logger unavailable"); }) as typeof logger.warn;
   jobManager.createJob({ id, ownerId: "user", toolId: "media-downloader", input: { filename: "remote", originalName: "Public", mimeType: "application/octet-stream", size: 0, path: "" } });
   try {
@@ -478,7 +478,7 @@ test("YT-005C FIX-02 logger failure cannot block FAILED settlement", { concurren
     assert.deepEqual(settlements, ["FAILED"]);
   } finally {
     providerRegistry.find = originalFind;
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.settle = originalSettle;
     logger.warn = originalWarn;
     jobManager.deleteJob(id);
   }
@@ -486,7 +486,7 @@ test("YT-005C FIX-02 logger failure cannot block FAILED settlement", { concurren
 
 test("YT-005C FIX-02 FAILED settlement and logging failures do not retry or loop", { concurrency: false }, async () => {
   const originalFind = providerRegistry.find;
-  const originalSettle = creditLedgerService.settle;
+  const originalSettle = processingUsageService.settle;
   const originalWarn = logger.warn;
   const id = `media-yt005c-failed-settle-${Date.now()}`;
   const settlements: string[] = [];
@@ -494,7 +494,7 @@ test("YT-005C FIX-02 FAILED settlement and logging failures do not retry or loop
     platform: "youtube", name: "YouTube", canHandle: () => true, analyze: async () => { throw new Error("unused"); },
     download: async () => { throw new Error("processing failed"); },
   })) as typeof providerRegistry.find;
-  creditLedgerService.settle = (async (_jobId, outcome) => { settlements.push(outcome); throw new Error("settlement unavailable"); }) as typeof creditLedgerService.settle;
+  processingUsageService.settle = (async (_jobId, outcome) => { settlements.push(outcome); throw new Error("settlement unavailable"); }) as typeof processingUsageService.settle;
   logger.warn = (() => { throw new Error("logger unavailable"); }) as typeof logger.warn;
   jobManager.createJob({ id, ownerId: "user", toolId: "media-downloader", input: { filename: "remote", originalName: "Public", mimeType: "application/octet-stream", size: 0, path: "" } });
   try {
@@ -503,7 +503,7 @@ test("YT-005C FIX-02 FAILED settlement and logging failures do not retry or loop
     assert.deepEqual(settlements, ["FAILED"]);
   } finally {
     providerRegistry.find = originalFind;
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.settle = originalSettle;
     logger.warn = originalWarn;
     jobManager.deleteJob(id);
   }
@@ -561,8 +561,8 @@ test("YT-005C FIX-03 synchronous scheduling failure cannot contradict accepted e
 test("YT-005C FIX-03 accepted enqueue transfers settlement ownership to worker", { concurrency: false }, async () => {
   const originalLookup = dns.lookup;
   const originalFind = providerRegistry.find;
-  const originalReserve = creditLedgerService.reserve;
-  const originalSettle = creditLedgerService.settle;
+  const originalReserve = processingUsageService.reserve;
+  const originalSettle = processingUsageService.settle;
   const originalDebug = logger.debug;
   const settlements: string[] = [];
   let resolveSettlement!: () => void;
@@ -573,12 +573,12 @@ test("YT-005C FIX-03 accepted enqueue transfers settlement ownership to worker",
     assertFormatAvailable: async () => undefined,
     download: async () => { throw new Error("worker processing failed"); },
   })) as typeof providerRegistry.find;
-  creditLedgerService.reserve = (async () => ({} as never)) as typeof creditLedgerService.reserve;
-  creditLedgerService.settle = (async (_jobId, outcome) => {
+  processingUsageService.reserve = (async () => ({} as never)) as typeof processingUsageService.reserve;
+  processingUsageService.settle = (async (_jobId, outcome) => {
     settlements.push(outcome);
     resolveSettlement();
     return {} as never;
-  }) as typeof creditLedgerService.settle;
+  }) as typeof processingUsageService.settle;
   logger.debug = (() => { throw new Error("logger unavailable"); }) as typeof logger.debug;
   let id: string | undefined;
   try {
@@ -590,8 +590,8 @@ test("YT-005C FIX-03 accepted enqueue transfers settlement ownership to worker",
   } finally {
     dns.lookup = originalLookup;
     providerRegistry.find = originalFind;
-    creditLedgerService.reserve = originalReserve;
-    creditLedgerService.settle = originalSettle;
+    processingUsageService.reserve = originalReserve;
+    processingUsageService.settle = originalSettle;
     logger.debug = originalDebug;
     if (id) jobManager.deleteJob(id);
   }

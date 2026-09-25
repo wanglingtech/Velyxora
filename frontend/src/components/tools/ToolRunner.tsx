@@ -323,10 +323,9 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
           jobService.updateStatus(job.id, state.status, state.progressMessage || "Procesando en backend...", state.progress);
           if (state.status === "COMPLETED" && state.output) {
             jobService.completeJob(job.id, { ...state.output });
-            window.dispatchEvent(new Event('velyxora:credits-changed'));
             return;
           }
-          if (state.status === "FAILED" || state.status === "CANCELLED") { window.dispatchEvent(new Event('velyxora:credits-changed')); throw new Error(state.error || `Trabajo ${state.status}.`); }
+          if (state.status === "FAILED" || state.status === "CANCELLED") { throw new Error(state.error || `Trabajo ${state.status}.`); }
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
         if (pollingCancelledRef.current) return;
@@ -721,7 +720,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
           job={activeJob}
           onCancel={() => {
             pollingCancelledRef.current = true;
-            if (backendJobIdRef.current) void apiClient.cancelJob(backendJobIdRef.current).finally(()=>window.dispatchEvent(new Event('velyxora:credits-changed')));
+            if (backendJobIdRef.current) void apiClient.cancelJob(backendJobIdRef.current);
             if (activeJob) jobService.cancelJob(activeJob.id);
           }}
           onReset={() => setActiveJob(null)}

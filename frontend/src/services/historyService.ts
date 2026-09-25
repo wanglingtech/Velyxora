@@ -27,14 +27,14 @@ export class ApiHistoryRepository {
       outputName: item.outputFileName || undefined,
       outputSize: item.outputSize == null ? undefined : Number(item.outputSize),
       timestamp: new Date(item.createdAt).getTime(), status: item.status,
-      processingLocation: String(item.processingType).toLowerCase(), creditsCost: item.creditsCost ?? undefined,
+      processingLocation: String(item.processingType).toLowerCase(),
     })) as HistoryItem[];
   }
   async save(item: HistoryItem): Promise<void> {
     await apiClient.history.create({
       toolId: item.toolId, status: item.status, processingType: item.processingLocation.toUpperCase(),
       inputFileName: item.inputName, inputSize: item.inputSize, inputMime: item.inputMime,
-      outputFileName: item.outputName, outputSize: item.outputSize, creditsCost: item.creditsCost,
+      outputFileName: item.outputName, outputSize: item.outputSize,
       jobId: item.processingLocation === "local" ? undefined : item.id,
     });
   }

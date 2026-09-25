@@ -35,12 +35,11 @@ router.post('/', async (req, res) => {
   }
   const text = (value: unknown, max: number) => typeof value === 'string' && value.length <= max ? value : undefined;
   const size = (value: unknown) => Number.isSafeInteger(Number(value)) && Number(value) >= 0 ? BigInt(Number(value)) : undefined;
-  const creditsCost = Number.isInteger(body.creditsCost) && body.creditsCost >= 0 ? body.creditsCost : undefined;
   const jobId = text(body.jobId, 128);
   const data = {
     toolId: body.toolId, status: body.status, processingType: body.processingType,
     inputFileName: text(body.inputFileName, 255), inputSize: size(body.inputSize), inputMime: text(body.inputMime, 150),
-    outputFileName: text(body.outputFileName, 255), outputSize: size(body.outputSize), creditsCost, jobId,
+    outputFileName: text(body.outputFileName, 255), outputSize: size(body.outputSize), jobId,
   };
   const item = jobId
     ? await prisma.processingHistory.upsert({ where: { userId_jobId: { userId: req.auth!.userId, jobId } }, update: data as any, create: { userId: req.auth!.userId, ...data } as any })

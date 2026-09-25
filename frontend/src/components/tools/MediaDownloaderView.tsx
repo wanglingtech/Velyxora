@@ -122,11 +122,10 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
         if (job.status === "COMPLETED") {
           const output = completedMediaOutput(job)!;
           await downloadService.downloadBackendFile(output.fileId, output.filename);
-          window.dispatchEvent(new Event('velyxora:credits-changed'));
           return;
         }
-        if (job.status === "CANCELLED") { window.dispatchEvent(new Event('velyxora:credits-changed')); return; }
-        if (job.status === "FAILED") { window.dispatchEvent(new Event('velyxora:credits-changed')); throw new Error(job.error || "El trabajo no pudo completarse."); }
+        if (job.status === "CANCELLED") { return; }
+        if (job.status === "FAILED") { throw new Error(job.error || "El trabajo no pudo completarse."); }
       }
       throw new Error("La descarga excedió el tiempo de espera.");
     } catch (error: unknown) {
@@ -137,7 +136,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
   const handleCancel = async () => {
     if (!downloadJob || cancelRef.current || !['QUEUED', 'DOWNLOADING', 'PROCESSING'].includes(downloadJob.status)) return;
     cancelRef.current = true;
-    try { await apiClient.cancelJob(downloadJob.id); setDownloadJob({ ...downloadJob, status: "CANCELLED" }); window.dispatchEvent(new Event('velyxora:credits-changed')); }
+    try { await apiClient.cancelJob(downloadJob.id); setDownloadJob({ ...downloadJob, status: "CANCELLED" }); }
     catch (error: any) { toast.error('No se pudo cancelar', error.message); }
     finally { cancelRef.current = false; }
   };

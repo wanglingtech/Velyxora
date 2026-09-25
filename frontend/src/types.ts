@@ -96,7 +96,6 @@ export interface HistoryItem {
   outputName?: string;
   completedAt?: number;
   processingLocation: "local" | "server" | "external";
-  creditsCost?: number;
   outputFileId?: string;
   [key: string]: unknown;
 }

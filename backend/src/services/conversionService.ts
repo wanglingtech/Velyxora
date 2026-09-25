@@ -7,7 +7,7 @@ import { JobRecord } from '../types/jobs';
 import { serverFFmpegEngine } from '../engines/ServerFFmpegEngine';
 import { libreOfficeEngine } from '../engines/LibreOfficeEngine';
 import { serverImageEngine } from '../engines/ServerImageEngine';
-import { creditLedgerService } from './creditLedgerService';
+import { processingUsageService } from './processingUsageService';
 
 class ConversionService {
   async startConversion(dto: ConversionRequestDto, billing?: { userId: string; isAdmin: boolean }): Promise<JobRecord> {
@@ -61,7 +61,7 @@ class ConversionService {
     // 3. Create Job
     const jobId = `job-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     if (billing) {
-      try { await creditLedgerService.reserve(billing.userId, jobId, dto.toolId, size, billing.isAdmin, dto.options); }
+      try { await processingUsageService.reserve(billing.userId, jobId, dto.toolId, size, billing.isAdmin, dto.options); }
       catch (error) { if (dto.fileId) storageService.deleteFile(dto.fileId); throw error; }
     }
 

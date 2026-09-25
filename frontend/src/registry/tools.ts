@@ -148,7 +148,6 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     keywords: ['sticker', 'pegatina', 'webp', '512', 'cuadrado', 'whatsapp', 'imagen'],
     popular: true,
     isClientReady: true,
-    creditsCost: 0,
   },
   {
     id: 'image-to-base64',

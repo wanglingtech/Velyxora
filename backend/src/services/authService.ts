@@ -20,14 +20,7 @@ export class AuthService {
     if (!normalizedName) throw new Error('El nombre es obligatorio.');
     if (normalizedName.length > 80) throw new Error('El nombre no puede superar 80 caracteres.');
     const passwordHash = await hashPassword(password);
-    return prisma.$transaction(async (tx) => {
-      const plan = await tx.plan.findUniqueOrThrow({ where: { code: 'FREE' } });
-      const user = await tx.user.create({ data: { email: normalized, passwordHash, displayName: normalizedName } });
-      const nextResetAt = new Date(); nextResetAt.setUTCMonth(nextResetAt.getUTCMonth() + 1);
-      await tx.userPlan.create({ data: { userId: user.id, planId: plan.id, nextResetAt } });
-      await tx.creditLedger.create({ data: { userId: user.id, amount: plan.monthlyCredits, type: 'MONTHLY_GRANT', reason: 'Créditos iniciales del plan FREE', idempotencyKey: `signup:${user.id}` } });
-      return user;
-    });
+    return prisma.user.create({ data: { email: normalized, passwordHash, displayName: normalizedName } });
   }
 
   async login(email: string, password: string) {
