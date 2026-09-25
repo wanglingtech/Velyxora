@@ -6,6 +6,7 @@ import { paymentService } from "../services/paymentService";
 import { randomUUID } from "node:crypto";
 import { identityHash } from "../services/authService";
 import { adminMutationLimit } from '../security/routeLimits';
+import { getAdminServiceStatus, updateServiceStatus } from '../controllers/serviceStatusController';
 const router = Router();
 router.use(requireAuth, requireRole("ADMIN"));
 router.use((req, res, next) => ['POST','PUT','PATCH','DELETE'].includes(req.method) ? adminMutationLimit(req, res, next) : next());
@@ -414,4 +415,6 @@ router.patch('/short-links/reports/:id', async (req, res) => {
   await prisma.adminAuditLog.create({ data: { adminId: req.auth!.userId, action: 'SHORT_LINK_REPORT_REVIEWED', reason: `Reporte ${status}`, metadata: { reportId: report.id, shortLinkId: report.shortLinkId } } });
   res.json({ success: true, data: report });
 });
+router.get('/service-status', getAdminServiceStatus);
+router.put('/service-status', updateServiceStatus);
 export default router;

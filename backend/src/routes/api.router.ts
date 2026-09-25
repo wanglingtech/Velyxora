@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import healthRoutes from './health.routes';
+import statusRoutes from './status.routes';
 import toolsRoutes from './tools.routes';
 import formatsRoutes from './formats.routes';
 import uploadsRoutes from './uploads.routes';
@@ -20,6 +21,7 @@ import linksRoutes from './links.routes';
 const router = Router();
 
 router.use('/health', healthRoutes);
+router.use('/status', statusRoutes);
 router.use('/auth', authRoutes);
 router.use('/credits', creditsRoutes);
 router.use('/account', accountRoutes);

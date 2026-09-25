@@ -25,5 +25,5 @@ test('refrescos de cuenta y admin usan API sin recargar la SPA', async () => {
   assert.match(source, /["']Recargar["']/);
   assert.match(source, /disabled=\{refreshing\}/);
   assert.doesNotMatch(source, /window\.location\.reload/);
-  for (const call of ['adminDashboard()', 'adminUsers()', 'adminPayments()', 'adminComplaints()', 'adminSuggestions()', 'account()']) assert.ok(source.includes(call), call);
+  for (const call of ['adminDashboard()', 'adminUsers()', 'adminComplaints()', 'adminSuggestions()', 'account()']) assert.ok(source.includes(call), call);
 });

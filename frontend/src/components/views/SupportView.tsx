@@ -80,7 +80,7 @@ export const SupportView: React.FC<SupportViewProps> = ({ onBack }) => {
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 pt-2 text-[11px] font-mono uppercase tracking-wider">
             <span className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-300">Gratuito</span>
-            <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-slate-400">Sin créditos</span>
+            <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-slate-400">Sin compras</span>
             <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-slate-400">Sin prioridad</span>
           </div>
         </div>
@@ -94,7 +94,7 @@ export const SupportView: React.FC<SupportViewProps> = ({ onBack }) => {
           </div>
           <p className="mt-2 text-xs text-slate-400">
             Puedes usar todas las herramientas sin donar. Apoyar no desbloquea
-            funciones, no añade créditos ni aumenta la prioridad de proceso.
+            funciones ni aumenta la prioridad de proceso.
           </p>
         </article>
         <article className="rounded-2xl border border-white/10 bg-[#101218] p-4">
@@ -103,8 +103,8 @@ export const SupportView: React.FC<SupportViewProps> = ({ onBack }) => {
             <h2 className="font-mono font-bold text-white">SEPARADO DEL PRODUCTO</h2>
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            El apoyo es distinto de cualquier compra o crédito. Esta página no
-            procesa pagos ni recopila datos financieros.
+            El apoyo es independiente del acceso a las herramientas. Esta página
+            no procesa pagos ni recopila datos financieros.
           </p>
         </article>
       </div>

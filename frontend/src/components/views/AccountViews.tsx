@@ -10,10 +10,17 @@ import {
   Sparkles,
   UserRound,
   Zap,
-  MessageCircle,
 } from "lucide-react";
 import { CurrentUser, useAuth } from "../../auth/AuthContext";
-import { buildPaymentWhatsAppUrl, isPaymentWhatsAppStatus } from "../../services/paymentWhatsappService";
+import { ACCOUNT_SERVICE_SUMMARY } from "../../config/freeService";
+import {
+  SERVICE_OPERATIONAL_STATES,
+  SERVICE_STATE_DOTS,
+  SERVICE_STATE_LABELS,
+  SERVICE_STATE_TONES,
+  isServiceOperationalState,
+  type ServiceOperationalState,
+} from "../../config/serviceStatus";
 
 const shell =
   "mx-auto max-w-3xl rounded-2xl border border-white/10 bg-[#101218] p-5 sm:p-8";
@@ -243,23 +250,13 @@ export function AuthView({
 
 export function AccountView({ onBack }: { onBack: () => void }) {
   const [data, setData] = useState<any>();
-  const [paymentConfig, setPaymentConfig] = useState<any>();
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [reference, setReference] = useState<Record<string, string>>({});
-  const [copied, setCopied] = useState(false);
   const refreshLock = useRef(false);
-  const [paymentNotice, setPaymentNotice] = useState("");
   const load = async () => {
-    const [account, config] = await Promise.all([
-      apiClient.auth.account(),
-      apiClient.payments.config(),
-    ]);
+    const account = await apiClient.auth.account();
     setData(account);
-    setPaymentConfig(config);
     setError("");
-    window.dispatchEvent(new Event("velyxora:credits-changed"));
   };
   const refresh = async () => {
     if (refreshLock.current) return;
@@ -277,62 +274,6 @@ export function AccountView({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     load().catch((e) => setError(e.message));
   }, []);
-  const createOrder = async (packageId: string) => {
-    if (busy) return;
-    setBusy(packageId);
-    setError("");
-    setPaymentNotice("");
-    try {
-      const order = await apiClient.payments.createOrder(
-        packageId,
-        crypto.randomUUID(),
-      );
-      setPaymentNotice(
-        order.reused
-          ? "Ya tenías una orden pendiente reciente. Puedes continuarla abajo."
-          : "Orden creada correctamente. Completa el pago y registra tu celular.",
-      );
-      await load();
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setBusy("");
-    }
-  };
-  const cancelOrder = async (orderId: string) => {
-    if (
-      !window.confirm(
-        "¿Cancelar esta operación pendiente? El registro se conservará para trazabilidad.",
-      )
-    )
-      return;
-    setBusy(orderId);
-    try {
-      await apiClient.payments.cancelOrder(orderId);
-      await load();
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setBusy("");
-    }
-  };
-  const submitReference = async (orderId: string) => {
-    const phone = reference[orderId] || "";
-    setError("");
-    if (!/^\d{9}$/.test(phone)) {
-      setError("Ingresa exactamente 9 dígitos del celular peruano.");
-      return;
-    }
-    setBusy(orderId);
-    try {
-      await apiClient.payments.submitReference(orderId, phone);
-      await load();
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setBusy("");
-    }
-  };
   return (
     <section className={`${shell} max-w-5xl`}>
       <button onClick={onBack} className="mb-5 min-h-11 text-sm text-slate-400">
@@ -362,59 +303,16 @@ export function AccountView({ onBack }: { onBack: () => void }) {
           {error}
         </p>
       )}
-      {paymentNotice && (
-        <p
-          role="status"
-          className="mt-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3 text-sm text-indigo-200"
-        >
-          {paymentNotice}
-        </p>
-      )}
       {data && (
         <div className="mt-6 space-y-8">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric label="Plan" value={data.plan?.code || "FREE"} />
-            <Metric label="Créditos disponibles" value={data.credits} />
             <Metric label="Estado" value="Activa" />
-            <Metric
-              label="Próximo reset"
-              value={
-                data.nextResetAt
-                  ? new Date(data.nextResetAt).toLocaleDateString()
-                  : "—"
-              }
-            />
+            {ACCOUNT_SERVICE_SUMMARY.map((item) => (
+              <Metric key={item.label} label={item.label} value={item.value} />
+            ))}
           </div>
           <p className="break-all text-sm text-slate-400">{data.email}</p>
-          {data.capabilities?.localAdminMode && <p className="rounded-xl border border-indigo-400/20 bg-indigo-400/5 p-3 text-sm text-indigo-200">Modo administrador local: los límites comerciales y el consumo de créditos están desactivados; las protecciones técnicas y de formato permanecen activas.</p>}
-          {data.plan && <details className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
-            <summary className="cursor-pointer font-semibold text-white">Ver beneficios y límites del plan {data.plan.code}</summary>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <span>✓ {data.capabilities?.localAdminMode ? 'Sin consumo comercial de créditos' : `${data.plan.monthlyCredits} créditos mensuales`}</span>
-              <span>✓ Hasta {data.plan.maxConcurrentJobs} {data.plan.maxConcurrentJobs === 1 ? 'proceso' : 'procesos'} simultáneos</span>
-              <span>✓ Tamaño máximo actual: {formatBytes(data.capabilities?.effectiveMaxUploadSize ?? data.plan.maxUploadSize)}</span>
-              <span>✓ Historial: {data.plan.historyRetention == null ? 'sin vencimiento configurado' : `${data.plan.historyRetention} días`}</span>
-            </div>
-            {!data.capabilities?.localAdminMode && data.plan.maxUploadSize > (data.capabilities?.effectiveMaxUploadSize ?? data.plan.maxUploadSize) && <p className="mt-3 text-xs text-amber-300">La capacidad del plan es {formatBytes(data.plan.maxUploadSize)}; el tamaño máximo disponible actualmente es {formatBytes(data.capabilities?.effectiveMaxUploadSize)}.</p>}
-          </details>}
-          <AccountList
-            title="Ledger reciente"
-            empty="No hay movimientos de créditos."
-            items={data.ledger}
-            render={(entry: any) => (
-              <>
-                <span>{entry.reason}</span>
-                <span
-                  className={
-                    entry.amount < 0 ? "text-amber-300" : "text-emerald-300"
-                  }
-                >
-                  {entry.amount > 0 ? "+" : ""}
-                  {entry.amount}
-                </span>
-              </>
-            )}
-          />
+          {data.capabilities?.localAdminMode && <p className="rounded-xl border border-indigo-400/20 bg-indigo-400/5 p-3 text-sm text-indigo-200">Modo administrador local: no se aplican límites de uso adicionales; las protecciones técnicas y de formato permanecen activas.</p>}
           <AccountList
             title="Jobs recientes"
             empty="No hay jobs recientes."
@@ -424,9 +322,7 @@ export function AccountView({ onBack }: { onBack: () => void }) {
                 <span>
                   {job.toolId} · {new Date(job.createdAt).toLocaleString()}
                 </span>
-                <span>
-                  {job.status} · {job.consumedCredits ?? 0} créditos
-                </span>
+                <span>{job.status}</span>
               </>
             )}
           />
@@ -442,95 +338,10 @@ export function AccountView({ onBack }: { onBack: () => void }) {
                 <span>
                   {item.status} · {item.processingType}
                   {item.inputSize ? ` · ${formatBytes(item.inputSize)}` : ""}
-                  {item.creditsCost != null
-                    ? ` · ${item.creditsCost} créditos`
-                    : ""}
                 </span>
               </>
             )}
           />
-          {paymentConfig?.enabled && (
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-fuchsia-400/20 bg-gradient-to-br from-fuchsia-500/10 to-indigo-500/10 p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-bold tracking-widest text-fuchsia-300">
-                      YAPE VELYXORA
-                    </p>
-                    <p className="mt-1 text-sm text-slate-300">
-                      {paymentConfig.displayName}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs">
-                    🇵🇪 Perú
-                  </span>
-                </div>
-                <p className="mt-4 font-mono text-2xl font-bold tracking-wider sm:text-3xl">
-                  {paymentConfig.phone}
-                </p>
-                <button
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(paymentConfig.phone);
-                    setCopied(true);
-                    window.setTimeout(() => setCopied(false), 1800);
-                  }}
-                  className="mt-3 min-h-11 rounded-xl border border-white/10 px-4 text-sm text-indigo-200"
-                >
-                  {copied ? "Número copiado" : "Copiar número"}
-                </button>
-                <p className="mt-3 text-xs leading-relaxed text-slate-400">
-                  Realiza el pago manualmente en Yape y luego registra tu número
-                  celular. VELYXORA revisará la operación; la acreditación no es
-                  automática.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {Object.entries(paymentConfig.packages || {}).map(
-                  ([id, pack]: any) => (
-                    <button
-                      key={id}
-                      disabled={Boolean(busy)}
-                      onClick={() => createOrder(id)}
-                      className="min-h-11 rounded-xl border border-indigo-500/30 p-4 text-left disabled:opacity-50"
-                    >
-                      <strong>{pack.planCode} beta</strong>
-                      <span className="block text-xs text-slate-400">
-                        {pack.credits} créditos ·{" "}
-                        {(pack.amountMinor / 100).toFixed(2)} {pack.currency}
-                      </span>
-                    </button>
-                  ),
-                )}
-              </div>
-            </div>
-          )}
-          <div className="space-y-3">
-            <h2 className="font-semibold">Pagos Yape</h2>
-            {!data.payments?.length ? (
-              <p className="rounded-xl bg-black/20 p-4 text-sm text-slate-400">
-                No hay órdenes de pago.
-              </p>
-            ) : (
-              data.payments.map((order: any) => (
-                <PaymentCard
-                  key={order.id}
-                  order={order}
-                  value={reference[order.id] || ""}
-                  busy={busy === order.id}
-                  onChange={(value) =>
-                    setReference((old) => ({
-                      ...old,
-                      [order.id]: value.replace(/\D/g, "").slice(0, 9),
-                    }))
-                  }
-                  onSubmit={() => submitReference(order.id)}
-                  onCancel={() => cancelOrder(order.id)}
-                  email={data.email}
-                  whatsappPhone={paymentConfig?.whatsapp?.enabled ? paymentConfig.whatsapp.phone : null}
-                />
-              ))
-            )}
-          </div>
           <AccountList
             title="Mis reclamos"
             empty="No has presentado reclamos."
@@ -568,158 +379,17 @@ export function AccountView({ onBack }: { onBack: () => void }) {
     </section>
   );
 }
-function PaymentCard({
-  order,
-  value,
-  busy,
-  onChange,
-  onSubmit,
-  onCancel,
-  email,
-  whatsappPhone,
-}: {
-  order: any;
-  value: string;
-  busy: boolean;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-  onCancel: () => void;
-  email: string;
-  whatsappPhone?: string | null;
-}) {
-  const steps = [
-    "Orden creada",
-    "Esperando pago",
-    "Referencia enviada",
-    "En revisión por VELYXORA",
-    order.status === "REJECTED" ? "Pago rechazado" : "Pago aprobado",
-    ...(order.status === "APPROVED" ? ["Créditos acreditados"] : []),
-  ];
-  const reached =
-    order.status === "PENDING_PAYMENT"
-      ? 1
-      : order.status === "PENDING_REVIEW"
-        ? 3
-        : steps.length - 1;
-  let whatsappUrl: string | null = null;
-  if (whatsappPhone && isPaymentWhatsAppStatus(order.status)) {
-    try {
-      whatsappUrl = buildPaymentWhatsAppUrl({ phone: whatsappPhone, email, order });
-    } catch {
-      whatsappUrl = null;
-    }
-  }
-  return (
-    <article className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm">
-      <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
-        <strong>
-          {order.plan?.code || "Paquete"} · {order.credits} créditos ·{" "}
-          {(order.amountMinor / 100).toFixed(2)} {order.currency}
-        </strong>
-        <StatusBadge value={order.status} />
-      </div>
-      <p className="mt-2 break-all text-xs text-slate-500">
-        Orden {order.id} · {new Date(order.createdAt).toLocaleString()}
-      </p>
-      <ol className="mt-4 grid gap-2 sm:grid-cols-3">
-        {steps.map((step, index) => (
-          <li
-            key={step}
-            className={`rounded-lg border p-2 text-xs ${index <= reached ? "border-indigo-500/30 bg-indigo-500/5 text-slate-200" : "border-white/5 text-slate-600"}`}
-          >
-            {index <= reached ? "✓" : "○"} {step}
-            {index === 0 && (
-              <small className="block text-slate-500">
-                {new Date(order.createdAt).toLocaleString()}
-              </small>
-            )}
-            {index === reached && index > 0 && (
-              <small className="block text-slate-500">
-                {new Date(order.updatedAt).toLocaleString()}
-              </small>
-            )}
-          </li>
-        ))}
-      </ol>
-      {order.status === "PENDING_REVIEW" && (
-        <p className="mt-3 text-indigo-200">
-          Tu referencia fue recibida. Ya está en revisión y no puede cancelarse.
-        </p>
-      )}
-      {order.status === "APPROVED" && (
-        <p className="mt-3 text-emerald-300">
-          Pago aprobado. Tus créditos fueron acreditados.
-        </p>
-      )}
-      {order.status === "REJECTED" && (
-        <p className="mt-3 text-rose-300">
-          Pago rechazado.
-          {order.payment?.reviewReason ? ` ${order.payment.reviewReason}` : ""}
-        </p>
-      )}
-      {order.status === "PENDING_PAYMENT" && (
-        <div className="mt-4 space-y-2">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="flex min-h-11 flex-1 overflow-hidden rounded-xl border border-white/10">
-              <span className="grid place-items-center bg-white/5 px-3 text-slate-400">
-                +51
-              </span>
-              <input
-                aria-label="Número celular peruano"
-                inputMode="numeric"
-                pattern="[0-9]{9}"
-                maxLength={9}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="min-w-0 flex-1 bg-transparent px-3 outline-none"
-                placeholder="968555200"
-              />
-            </div>
-            <button
-              disabled={busy || value.length !== 9}
-              onClick={onSubmit}
-              className="min-h-11 rounded-xl bg-indigo-600 px-4 disabled:opacity-50"
-            >
-              Enviar referencia
-            </button>
-          </div>
-          <button
-            disabled={busy}
-            onClick={onCancel}
-            className="min-h-11 text-xs text-rose-300"
-          >
-            Cancelar operación
-          </button>
-        </div>
-      )}
-      {whatsappUrl && (
-        <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={order.status === "PENDING_REVIEW" ? "Contactar por WhatsApp sobre esta orden" : "Consultar por WhatsApp sobre esta orden"}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/30 px-4 font-semibold text-emerald-200 sm:w-auto"
-          >
-            <MessageCircle className="h-4 w-4" aria-hidden="true" />
-            {order.status === "PENDING_REVIEW" ? "Contactar por WhatsApp" : "Consultar por WhatsApp"}
-          </a>
-          <p className="mt-2 text-xs leading-relaxed text-slate-400">
-            Abre WhatsApp con un mensaje prellenado. Puedes revisarlo o modificarlo; VELYXORA no lo envía automáticamente.
-          </p>
-        </div>
-      )}
-    </article>
-  );
-}
-
 export function AdminView({ onBack }: { onBack: () => void }) {
   const [dashboard, setDashboard] = useState<any>();
   const [users, setUsers] = useState<any[]>([]);
-  const [payments, setPayments] = useState<any[]>([]);
   const [complaints, setComplaints] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [shortLinkReports, setShortLinkReports] = useState<any[]>([]);
+  const [serviceStatus, setServiceStatus] = useState<any>();
+  const [draftState, setDraftState] = useState<ServiceOperationalState>("OPERATIONAL");
+  const [draftMessage, setDraftMessage] = useState("");
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusFeedback, setStatusFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [query, setQuery] = useState("");
@@ -730,17 +400,19 @@ export function AdminView({ onBack }: { onBack: () => void }) {
     Promise.all([
       apiClient.auth.adminDashboard(),
       apiClient.auth.adminUsers(),
-      apiClient.auth.adminPayments(),
       apiClient.auth.adminComplaints(),
       apiClient.auth.adminSuggestions(),
       apiClient.auth.adminShortLinkReports(),
-    ]).then(([d, u, p, c, s, reports]) => {
+      apiClient.auth.adminServiceStatus(),
+    ]).then(([d, u, c, s, reports, status]) => {
       setDashboard(d);
       setUsers(u);
-      setPayments(p);
       setComplaints(c);
       setSuggestions(s);
       setShortLinkReports(reports);
+      setServiceStatus(status);
+      setDraftState(isServiceOperationalState(status?.state) ? status.state : "OPERATIONAL");
+      setDraftMessage(status?.message ?? "");
       setError("");
     });
   const refresh = async () => {
@@ -759,20 +431,26 @@ export function AdminView({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     load().catch((e) => setError(e.message));
   }, []);
-  const review = async (order: any, decision: "APPROVE" | "REJECT") => {
-    const reason = window.prompt(
-      decision === "APPROVE" ? "Razón de aprobación" : "Razón de rechazo",
-    );
-    if (!reason) return;
-    setBusy(order.id);
-    setError("");
+  const saveServiceStatus = async () => {
+    if (statusSaving) return;
+    setStatusSaving(true);
+    setStatusFeedback(null);
     try {
-      await apiClient.auth.reviewPayment(order.id, decision, reason);
-      await load();
+      const saved = await apiClient.auth.updateServiceStatus(draftState, draftMessage);
+      setServiceStatus((previous: any) => ({
+        ...(previous || {}),
+        state: saved.state,
+        message: saved.message,
+        persisted: true,
+        updatedAt: saved.updatedAt,
+      }));
+      setDraftState(isServiceOperationalState(saved.state) ? saved.state : draftState);
+      setDraftMessage(saved.message ?? "");
+      setStatusFeedback({ kind: "success", text: "Estado del servicio actualizado." });
     } catch (e: any) {
-      setError(e.message);
+      setStatusFeedback({ kind: "error", text: e?.message || "No se pudo guardar el estado del servicio." });
     } finally {
-      setBusy("");
+      setStatusSaving(false);
     }
   };
   const moderate = async (user: any, action: string) => {
@@ -849,9 +527,13 @@ export function AdminView({ onBack }: { onBack: () => void }) {
       ),
     [users, query, statusFilter],
   );
-  const pendingPayments = payments.filter(
-    (order) => order.status === "PENDING_REVIEW",
-  );
+  const effectiveServiceState: ServiceOperationalState = isServiceOperationalState(serviceStatus?.state)
+    ? serviceStatus.state
+    : "UNAVAILABLE";
+  const statusDirty =
+    Boolean(serviceStatus) &&
+    (draftState !== serviceStatus.state ||
+      draftMessage.trim() !== (serviceStatus.message ?? ""));
   return (
     <section className="mx-auto max-w-6xl overflow-hidden rounded-3xl border border-white/10 bg-[#0d1018] shadow-2xl">
       <header className="border-b border-white/10 bg-gradient-to-r from-indigo-500/10 to-cyan-500/5 p-5 sm:p-8">
@@ -867,13 +549,10 @@ export function AdminView({ onBack }: { onBack: () => void }) {
               Panel administrativo
             </h1>
             <p className="mt-1 text-sm text-slate-400">
-              Supervisión segura de usuarios, créditos y pagos.
+              Supervisión segura de usuarios, uso y comunidad.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="w-fit rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
-              ● Sistema operativo
-            </span>
             <button
               disabled={refreshing}
               onClick={refresh}
@@ -901,8 +580,85 @@ export function AdminView({ onBack }: { onBack: () => void }) {
             <Metric label="Usuarios totales" value={dashboard.users} />
             <Metric label="Usuarios activos" value={dashboard.activeUsers} />
             <Metric label="Procesamientos" value={dashboard.jobs} />
-            <Metric label="Créditos netos" value={dashboard.netCredits} />
+            <Metric label="Reclamos pendientes" value={dashboard.pendingComplaints} />
           </div>
+        )}
+        {serviceStatus && (
+          <section className="mt-9" aria-labelledby="admin-service-status-title">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 id="admin-service-status-title" className="font-semibold">
+                  Estado del servicio
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Estado de producto que se muestra públicamente en la cabecera.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500">Actual</span>
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${SERVICE_STATE_TONES[effectiveServiceState]}`}
+                >
+                  <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${SERVICE_STATE_DOTS[effectiveServiceState]}`} />
+                  {SERVICE_STATE_LABELS[effectiveServiceState]}
+                </span>
+                {!serviceStatus.persisted && (
+                  <span className="text-[11px] text-slate-500">automático (sin configuración manual)</span>
+                )}
+              </div>
+            </div>
+            <div className="mt-3 rounded-2xl border border-white/5 bg-black/20 p-4">
+              <fieldset disabled={statusSaving}>
+                <legend className="text-xs font-medium text-slate-400">Nuevo estado</legend>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {SERVICE_OPERATIONAL_STATES.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={draftState === value}
+                      onClick={() => setDraftState(value)}
+                      className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-colors ${draftState === value ? "border-indigo-500 bg-indigo-600/20 text-white" : "border-white/10 text-slate-300 hover:border-indigo-500/40"}`}
+                    >
+                      <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${SERVICE_STATE_DOTS[value]}`} />
+                      {SERVICE_STATE_LABELS[value]}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              <label htmlFor="admin-service-status-message" className="mt-4 block text-xs font-medium text-slate-400">
+                Mensaje público (opcional)
+              </label>
+              <textarea
+                id="admin-service-status-message"
+                className={`${input} mt-2 min-h-20 resize-y`}
+                maxLength={200}
+                value={draftMessage}
+                disabled={statusSaving}
+                onChange={(e) => setDraftMessage(e.target.value)}
+                placeholder="Estamos realizando mantenimiento temporal."
+              />
+              <p className="mt-1 text-[11px] text-slate-500">
+                {draftMessage.trim().length}/200 · texto plano
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  disabled={statusSaving || !statusDirty}
+                  onClick={saveServiceStatus}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-medium disabled:opacity-50"
+                >
+                  {statusSaving && <RefreshCw className="h-4 w-4 animate-spin" />}
+                  {statusSaving ? "Guardando…" : "Guardar estado"}
+                </button>
+                {statusFeedback?.kind === "success" && (
+                  <span role="status" className="text-xs text-emerald-300">{statusFeedback.text}</span>
+                )}
+                {statusFeedback?.kind === "error" && (
+                  <span role="alert" className="text-xs text-rose-300">{statusFeedback.text}</span>
+                )}
+              </div>
+            </div>
+          </section>
         )}
         <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -936,8 +692,6 @@ export function AdminView({ onBack }: { onBack: () => void }) {
             <thead>
               <tr className="border-b border-white/10 text-xs text-slate-500">
                 <th className="p-3">Usuario</th>
-                <th>Plan</th>
-                <th>Créditos</th>
                 <th>Estado</th>
                 <th>Registro</th>
               </tr>
@@ -948,9 +702,7 @@ export function AdminView({ onBack }: { onBack: () => void }) {
                   key={user.id}
                   className="border-b border-white/5 transition hover:bg-white/[.025]"
                 >
-                  <td className="p-3 font-medium">{user.email}</td>
-                  <td>{user.plan}</td>
-                  <td>{user.credits}</td>
+                  <td className="p-3 font-medium break-all">{user.email}</td>
                   <td>
                     <StatusBadge value={user.status} />
                   </td>
@@ -972,19 +724,7 @@ export function AdminView({ onBack }: { onBack: () => void }) {
                 <p className="break-all text-sm font-semibold">{user.email}</p>
                 <StatusBadge value={user.status} />
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-                <span className="text-slate-500">
-                  Plan
-                  <strong className="mt-1 block text-slate-200">
-                    {user.plan}
-                  </strong>
-                </span>
-                <span className="text-slate-500">
-                  Créditos
-                  <strong className="mt-1 block text-slate-200">
-                    {user.credits}
-                  </strong>
-                </span>
+              <div className="mt-3 text-xs">
                 <span className="text-slate-500">
                   Registro
                   <strong className="mt-1 block text-slate-200">
@@ -994,46 +734,6 @@ export function AdminView({ onBack }: { onBack: () => void }) {
               </div>
             </article>
           ))}
-        </div>
-        <h2 className="mt-10 font-semibold">Pagos pendientes de revisión</h2>
-        <div className="mt-3 space-y-3">
-          {pendingPayments.length ? (
-            pendingPayments.map((order) => (
-              <article
-                key={order.id}
-                className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm"
-              >
-                <p className="font-medium">
-                  {order.credits} créditos ·{" "}
-                  {(order.amountMinor / 100).toFixed(2)} {order.currency}
-                </p>
-                <p className="mt-1 break-all text-xs text-slate-400">
-                  Referencia: {order.reference || "—"} ·{" "}
-                  {new Date(order.createdAt).toLocaleString()}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    disabled={Boolean(busy)}
-                    onClick={() => review(order, "APPROVE")}
-                    className="min-h-11 rounded-xl bg-emerald-700 px-4 disabled:opacity-50"
-                  >
-                    Aprobar
-                  </button>
-                  <button
-                    disabled={Boolean(busy)}
-                    onClick={() => review(order, "REJECT")}
-                    className="min-h-11 rounded-xl border border-rose-500/40 px-4 text-rose-300 disabled:opacity-50"
-                  >
-                    Rechazar
-                  </button>
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="rounded-xl bg-black/20 p-4 text-sm text-slate-400">
-              No hay pagos pendientes de revisión.
-            </p>
-          )}
         </div>
         <h2 className="mt-10 font-semibold">Moderación de usuarios</h2>
         <div className="mt-3 grid gap-3">
@@ -1143,19 +843,15 @@ export function AdminView({ onBack }: { onBack: () => void }) {
   );
 }
 function StatusBadge({ value }: { value: string }) {
-  const positive = ["ACTIVE", "APPROVED", "COMPLETED", "RESPONDED"].includes(
+  const positive = ["ACTIVE", "COMPLETED", "RESPONDED"].includes(
     value,
   );
-  const danger = ["BANNED", "ANONYMIZED", "REJECTED"].includes(value);
+  const danger = ["BANNED", "ANONYMIZED"].includes(value);
   const labels: Record<string, string> = {
     ACTIVE: "ACTIVO",
     SUSPENDED: "SUSPENDIDO",
     BANNED: "BANEADO",
     ANONYMIZED: "ANONIMIZADO",
-    PENDING_PAYMENT: "ESPERANDO PAGO",
-    PENDING_REVIEW: "EN REVISIÓN",
-    APPROVED: "APROBADO",
-    REJECTED: "RECHAZADO",
     RECEIVED: "RECIBIDO",
     IN_REVIEW: "EN REVISIÓN",
     RESPONDED: "RESPONDIDO",

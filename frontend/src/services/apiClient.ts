@@ -199,7 +199,6 @@ export class ApiClient {
     account: () => this.deduped('account', () => this.request<any>('/account')),
     adminDashboard: () => this.deduped('admin:dashboard', () => this.request<any>('/admin/dashboard')),
     adminUsers: () => this.deduped('admin:users', () => this.request<any[]>('/admin/users')),
-    adminPayments: () => this.deduped('admin:payments', () => this.request<any[]>('/admin/payments')),
     adminComplaints: () => this.request<any[]>('/admin/complaints'),
     adminSuggestions: () => this.request<any[]>('/admin/suggestions'),
     adminShortLinkReports: () => this.request<any[]>('/admin/short-links/reports'),
@@ -208,21 +207,19 @@ export class ApiClient {
     moderateUser: (userId: string, action: string, reason: string) => this.request<any>(`/admin/users/${encodeURIComponent(userId)}/moderate`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
     updateComplaint: (id: string, status: string, response: string) => this.request<any>(`/admin/complaints/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status, response }) }),
     updateSuggestion: (id: string, status: string, response: string, reaction: string) => this.request<any>(`/admin/suggestions/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status, response, reaction }) }),
-    reviewPayment: (orderId: string, decision: 'APPROVE' | 'REJECT', reason: string) => this.request<any>(`/admin/payments/${encodeURIComponent(orderId)}/review`, { method: 'POST', body: JSON.stringify({ decision, reason }) }),
+    adminServiceStatus: () => this.deduped('admin:service-status', () => this.request<any>('/admin/service-status')),
+    updateServiceStatus: (state: string, message: string) => this.request<any>('/admin/service-status', { method: 'PUT', body: JSON.stringify({ state, message }) }),
+  };
+
+  // Public product operational status (separate from component health).
+  status = {
+    get: () => this.request<{ state: string; message: string | null }>('/status'),
   };
 
   history = {
     list: (limit = 50) => this.request<{ items: any[]; nextCursor: string | null }>(`/history?limit=${limit}`),
     create: (item: Record<string, unknown>) => this.request<any>('/history', { method: 'POST', body: JSON.stringify(item) }),
     remove: (id: string) => this.request<void>(`/history/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  };
-
-  payments = {
-    config: () => this.deduped('payments:config', () => this.request<any>('/payments/config')),
-    orders: () => this.request<any[]>('/payments/orders'),
-    createOrder: (packageId: string, idempotencyKey: string) => this.request<any>('/payments/orders', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ packageId }) }),
-    submitReference: (orderId: string, reference: string) => this.request<any>(`/payments/orders/${encodeURIComponent(orderId)}/reference`, { method: 'POST', body: JSON.stringify({ reference }) }),
-    cancelOrder: (orderId: string) => this.request<any>(`/payments/orders/${encodeURIComponent(orderId)}/cancel`, { method: 'POST' }),
   };
 
   feedback = {
@@ -239,10 +236,6 @@ export class ApiClient {
 
   probeMedia(fileId: string) {
     return this.request<{ format: string; duration?: number; bitRate?: number; streams: Array<{ codecType?: string; codecName?: string; width?: number; height?: number; sampleRate?: number; channels?: number; bitRate?: number; avg_frame_rate?: string; r_frame_rate?: string }> }>('/tools/probe', { method: 'POST', body: JSON.stringify({ fileId }) }, 30000);
-  }
-
-  estimateCredits(toolId: string, inputBytes: number, options: Record<string, unknown> = {}) {
-    return this.request<{ estimatedCredits: number; currentBalance: number; balanceAfter: number; processingClass: string }>('/credits/estimate', { method: 'POST', body: JSON.stringify({ toolId, inputBytes, options }) });
   }
 
   /**

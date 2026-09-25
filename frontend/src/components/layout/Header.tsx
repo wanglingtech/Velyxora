@@ -8,16 +8,20 @@ import {
   X,
   Command,
   DownloadCloud,
-  Server,
-  CheckCircle2,
   UserCircle,
   LogOut,
-  CreditCard,
-  Coins,
   MessageSquare,
 } from "lucide-react";
 import { VelyxoraLogo } from "../logo/VelyxoraLogo";
 import { apiClient, BackendHealth } from "../../services/apiClient";
+import {
+  SERVICE_STATE_DOTS,
+  SERVICE_STATE_LABELS,
+  SERVICE_STATE_TONES,
+  isServiceOperationalState,
+  resolveServiceOperationalState,
+  type ServiceOperationalState,
+} from "../../config/serviceStatus";
 
 interface HeaderProps {
   onOpenCommandPalette: () => void;
@@ -43,25 +47,31 @@ export const Header: React.FC<HeaderProps> = ({
   const [backendHealth, setBackendHealth] = useState<BackendHealth | null>(
     null,
   );
+  const [productStatus, setProductStatus] = useState<{
+    state: ServiceOperationalState;
+    message: string | null;
+  } | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [credits, setCredits] = useState<number | null>(null);
-  const [creditCapacity, setCreditCapacity] = useState(0);
 
   useEffect(() => {
-    apiClient.checkHealth().then((health) => {
-      setBackendHealth(health);
-    });
-  }, []);
-  useEffect(() => {
     let active = true;
-    const refresh = () => {
-      if (!currentUser) { setCredits(null); return; }
-      apiClient.auth.account().then((account) => { if (active) { setCredits(Number(account.credits)); setCreditCapacity(Number(account.plan?.monthlyCredits || 0)); } }).catch(() => { if (active) setCredits(null); });
+    // Persisted admin product status first; the technical-health snapshot is
+    // kept only as a fallback when the public status request is unavailable.
+    apiClient.status
+      .get()
+      .then((status) => {
+        if (active && isServiceOperationalState(status?.state)) {
+          setProductStatus({ state: status.state, message: status.message ?? null });
+        }
+      })
+      .catch(() => {});
+    apiClient.checkHealth().then((health) => {
+      if (active) setBackendHealth(health);
+    });
+    return () => {
+      active = false;
     };
-    refresh();
-    window.addEventListener('velyxora:credits-changed', refresh);
-    return () => { active = false; window.removeEventListener('velyxora:credits-changed', refresh); };
-  }, [currentUser]);
+  }, []);
   return (
     <header className="sticky top-0 z-40 h-16 w-full min-w-0 bg-[#08090D]/90 px-3 backdrop-blur-md border-b border-white/[0.08] flex items-center justify-between gap-2 sm:px-6 sm:gap-4">
       {/* Brand Logo & Sidebar Toggle */}
@@ -83,8 +93,8 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => onNavigate("home")}
           className="cursor-pointer transition-opacity hover:opacity-95 shrink-0"
         >
-          <VelyxoraLogo variant="full" size="md" className="max-[379px]:hidden" />
-          <VelyxoraLogo variant="isotype" size="md" className="hidden max-[379px]:inline-flex" />
+          <VelyxoraLogo variant="full" size="md" className="max-[479px]:hidden" />
+          <VelyxoraLogo variant="isotype" size="md" className="hidden max-[479px]:inline-flex" />
         </div>
       </div>
 
@@ -113,26 +123,26 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right Actions */}
       <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-        {currentUser && (()=>{const ratio=creditCapacity>0?(credits||0)/creditCapacity:1;const state=credits===0?'EMPTY':ratio<=.1?'CRITICAL':ratio<=.25?'LOW':'AVAILABLE';const tone=state==='EMPTY'||state==='CRITICAL'?'border-rose-400/30 bg-rose-400/10 text-rose-200':state==='LOW'?'border-amber-400/30 bg-amber-400/10 text-amber-200':'border-emerald-400/20 bg-emerald-400/5 text-emerald-200';return <button onClick={()=>onNavigate('account')} aria-label={currentUser.role==='ADMIN'?'Modo administrativo de prueba':`${credits??0} créditos, estado ${state}`} title={currentUser.role==='ADMIN'?'ADMIN_TEST: los jobs administrativos no consumen saldo':`${state} · Obtener créditos`} className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border px-2 max-[379px]:px-0 text-xs ${currentUser.role==='ADMIN'?'border-indigo-400/30 bg-indigo-400/10 text-indigo-200':tone}`}><Coins className="h-4 w-4 shrink-0"/><span className="font-mono font-semibold max-[379px]:hidden">{currentUser.role==='ADMIN'?'ADMIN_TEST':`${credits??'—'} · ${state}`}</span><span className="hidden xl:inline">{currentUser.role==='ADMIN'?'Modo de prueba':'Obtener créditos'}</span></button>})()}
         {currentUser?.role === 'ADMIN' && <button onClick={() => onNavigate('admin')} className="hidden sm:inline-flex min-h-11 items-center rounded-xl px-3 text-xs text-indigo-300">Administración</button>}
-        <div className="relative"><button onClick={() => setAccountOpen(!accountOpen)} className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-2 text-xs text-slate-300 hover:bg-white/5" aria-expanded={accountOpen} aria-label="Menú de cuenta"><UserCircle className="h-5 w-5"/><span className="hidden lg:inline">{currentUser?'Mi cuenta':'Entrar'}</span></button>{accountOpen&&<div className="absolute right-0 top-12 z-50 w-56 rounded-2xl border border-white/10 bg-[#11141d] p-2 shadow-2xl">{currentUser?<><button onClick={()=>{onNavigate('account');setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-white/5"><UserCircle className="h-4 w-4"/>Mi cuenta</button><button onClick={()=>{onNavigate('history');setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-white/5"><History className="h-4 w-4"/>Historial</button><button onClick={()=>{onNavigate('account');setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-white/5"><CreditCard className="h-4 w-4"/>Pagos</button><button onClick={()=>{onNavigate('suggestions');setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-white/5"><MessageSquare className="h-4 w-4"/>Sugerencias</button><button onClick={()=>{onLogout();setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm text-rose-300 hover:bg-rose-500/10"><LogOut className="h-4 w-4"/>Salir</button></>:<><button onClick={()=>{onNavigate('auth');setAccountOpen(false)}} className="min-h-11 w-full rounded-xl px-3 text-left text-sm hover:bg-white/5">Iniciar sesión</button><button onClick={()=>{onNavigate('auth');setAccountOpen(false)}} className="min-h-11 w-full rounded-xl bg-indigo-600 px-3 text-left text-sm">Crear cuenta</button></>}</div>}</div>
-        {/* Backend Engine Status Badge */}
-        {backendHealth && (
-          <div
-            className={`hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono border ${
-              backendHealth.status === "ok"
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-            }`}
-            title={`Backend Velyxora Activo | FFmpeg: ${backendHealth.services.ffmpeg ? "Conectado" : "No disponible"} | LibreOffice: ${backendHealth.services.libreOffice ? "Conectado" : "Pendiente"}`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>
-              Backend:{" "}
-              {backendHealth.services.ffmpeg ? "FFmpeg Activo" : "Online"}
-            </span>
-          </div>
-        )}
+        <div className="relative"><button onClick={() => setAccountOpen(!accountOpen)} className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-2 text-xs text-slate-300 hover:bg-white/5" aria-expanded={accountOpen} aria-label="Menú de cuenta"><UserCircle className="h-5 w-5"/><span className="hidden lg:inline">{currentUser?'Mi cuenta':'Entrar'}</span></button>{accountOpen&&<div className="absolute right-0 top-12 z-50 w-56 rounded-2xl border border-white/10 bg-[#11141d] p-2 shadow-2xl">{currentUser?<><button onClick={()=>{onNavigate('account');setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-white/5"><UserCircle className="h-4 w-4"/>Mi cuenta</button><button onClick={()=>{onNavigate('history');setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-white/5"><History className="h-4 w-4"/>Historial</button><button onClick={()=>{onNavigate('suggestions');setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-white/5"><MessageSquare className="h-4 w-4"/>Sugerencias</button><button onClick={()=>{onLogout();setAccountOpen(false)}} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm text-rose-300 hover:bg-rose-500/10"><LogOut className="h-4 w-4"/>Salir</button></>:<><button onClick={()=>{onNavigate('auth');setAccountOpen(false)}} className="min-h-11 w-full rounded-xl px-3 text-left text-sm hover:bg-white/5">Iniciar sesión</button><button onClick={()=>{onNavigate('auth');setAccountOpen(false)}} className="min-h-11 w-full rounded-xl bg-indigo-600 px-3 text-left text-sm">Crear cuenta</button></>}</div>}</div>
+        {/* Product service status (persisted admin state, health fallback) */}
+        {(backendHealth || productStatus) && (() => {
+          const state = resolveServiceOperationalState(productStatus?.state ?? null, backendHealth);
+          const description = productStatus?.message
+            ? `Estado del servicio: ${SERVICE_STATE_LABELS[state]}. ${productStatus.message}`
+            : `Estado del servicio: ${SERVICE_STATE_LABELS[state]}`;
+          return (
+            <div
+              role="status"
+              aria-label={description}
+              title={description}
+              className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium ${SERVICE_STATE_TONES[state]}`}
+            >
+              <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${SERVICE_STATE_DOTS[state]}`} />
+              <span>{SERVICE_STATE_LABELS[state]}</span>
+            </div>
+          );
+        })()}
 
         {/* Mobile Search trigger */}
         <button

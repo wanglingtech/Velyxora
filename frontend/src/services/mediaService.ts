@@ -120,14 +120,14 @@ export const mediaAnalyzeErrorMessage = (error: unknown): string =>
   error instanceof ApiError && (error.status === 401 || error.code === 'AUTH_REQUIRED')
     ? 'Tu sesión no está disponible. Inicia sesión nuevamente.'
     : error instanceof ApiError && error.code === 'PROVIDER_TEMPORARILY_RESTRICTED'
-      ? `${error.message} No se consumieron créditos.`
+      ? `${error.message} No se realizó ningún cargo.`
     : error instanceof Error
       ? error.message
       : 'No fue posible analizar esta URL.';
 
 export const mediaDownloadStartErrorMessage = (error: unknown): string =>
   error instanceof ApiError && error.code === 'PROVIDER_TEMPORARILY_RESTRICTED'
-    ? `${error.message} No se consumieron créditos.`
+    ? `${error.message} No se realizó ningún cargo.`
     : error instanceof Error
       ? error.message
       : 'No fue posible iniciar la descarga.';

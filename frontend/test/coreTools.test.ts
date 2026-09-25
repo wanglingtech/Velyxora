@@ -43,12 +43,12 @@ test('media downloader convierte AUTH_REQUIRED en un mensaje humano sin romper e
   assert.equal(mediaAnalyzeErrorMessage(new Error('Proveedor no compatible')), 'Proveedor no compatible');
 });
 
-test('media downloader comunica restricción temporal y limita la garantía de créditos a rechazos previos al job', () => {
+test('media downloader comunica restricción temporal con un mensaje neutral y estable', () => {
   const error = new ApiError('No se pudo procesar este contenido porque YouTube restringió temporalmente las solicitudes desde nuestro servidor. Puedes intentarlo más tarde.', 422, 'PROVIDER_TEMPORARILY_RESTRICTED');
-  assert.match(mediaAnalyzeErrorMessage(error), /No se consumieron créditos\.$/);
-  assert.match(mediaDownloadStartErrorMessage(error), /No se consumieron créditos\.$/);
+  assert.match(mediaAnalyzeErrorMessage(error), /No se realizó ningún cargo\.$/);
+  assert.match(mediaDownloadStartErrorMessage(error), /No se realizó ningún cargo\.$/);
   assert.equal(mediaDownloadStartErrorMessage(new Error(error.message)), error.message);
-  assert.doesNotMatch(mediaDownloadStartErrorMessage(new Error(error.message)), /No se consumieron créditos/);
+  assert.doesNotMatch(mediaDownloadStartErrorMessage(new Error(error.message)), /cargo/);
 });
 
 test('media downloader no inicia otro análisis mientras analiza o procesa', () => {

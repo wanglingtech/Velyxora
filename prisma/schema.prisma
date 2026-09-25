@@ -111,6 +111,13 @@ enum ShortLinkReportStatus {
   DISMISSED
 }
 
+enum ServiceStatusState {
+  OPERATIONAL
+  LIMITED
+  MAINTENANCE
+  UNAVAILABLE
+}
+
 model User {
   id           String     @id @default(uuid()) @db.Uuid
   email        String     @unique
@@ -361,6 +368,19 @@ model Payment {
   order PaymentOrder @relation(fields: [orderId], references: [id])
   reviewer User @relation("PaymentReviewer", fields: [reviewedBy], references: [id])
   ledger CreditLedger[]
+}
+
+// Single current product operational status. `singleton` is a unique sentinel
+// column: normal application code only ever upserts the fixed "current" key, so
+// the unique constraint makes it impossible for the app to persist more than one
+// active row. No row is seeded; an empty table means "no explicit admin state".
+model ServiceStatus {
+  id          String             @id @default(uuid()) @db.Uuid
+  singleton   String             @unique @default("current")
+  state       ServiceStatusState
+  message     String?
+  updatedAt   DateTime           @updatedAt
+  updatedById String?            @db.Uuid
 }
 
 model AdminAuditLog {
