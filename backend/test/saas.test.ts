@@ -16,6 +16,8 @@ import { seedInitialData } from '../src/services/seedService';
 import { isSafeRedirectTarget, validateShortLinkTarget } from '../src/services/shortLinkService';
 import { validateUploadMetadata } from '../src/security/uploadPolicy';
 import { effectiveUploadLimit } from '../src/middleware/uploadHandler';
+import { creditLedgerService } from '../src/services/creditLedgerService';
+import { FREE_SERVICE_LIMITS } from '../src/config/freeServiceLimits';
 import { normalizeWhatsAppPhoneE164 } from '../src/config/whatsapp';
 
 test('anon en endpoint USER protegido recibe 401', async () => {
@@ -271,3 +273,72 @@ test('schema y migración contienen persistencia e idempotencia requeridas', asy
   assert.match(migration, /idempotencyKey.*UNIQUE/); assert.match(schema, /ADMIN_TEST/);
   assert.match(schema, /BANNED/); assert.match(schema, /ANONYMIZED/); assert.match(schema, /onDelete: Restrict/);
 });
+
+test('SERVER_REQUIRED exige sesión antes de procesar y la vista pública no la exige', async () => {
+  const app = createBackendApp();
+  // Public viewing/health endpoints stay accessible without a session.
+  assert.equal((await request(app).get('/api/health')).status, 200);
+  assert.equal((await request(app).get('/api/tools')).status, 200);
+  // requireProcessingAuth bypasses auth only under NODE_ENV=test, so assert the
+  // real path outside that seam.
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'development';
+  try {
+    assert.equal((await request(app).post('/api/conversions').send({})).status, 401);
+    assert.equal((await request(app).post('/api/uploads?toolId=video-to-mp3')).status, 401);
+    assert.equal((await request(app).post('/api/media/analyze').send({ url: 'https://www.youtube.com/watch?v=abc' })).status, 401);
+    assert.equal((await request(app).post('/api/media/process').send({})).status, 401);
+  } finally {
+    process.env.NODE_ENV = previousEnv;
+  }
+});
+
+test('la ejecución de servidor es sin créditos y sin plan activo', async () => {
+  const suffix = randomUUID();
+  const email = `creditless-${suffix}@example.invalid`;
+  const user = await prisma.user.create({ data: { email, passwordHash: 'test-only', displayName: 'Creditless' } });
+  const jobId = `job-creditless-${suffix}`;
+  try {
+    // No UserPlan is created on purpose.
+    const ledgerBefore = await prisma.creditLedger.count({ where: { userId: user.id } });
+    const usage = await creditLedgerService.reserve(user.id, jobId, 'video-to-mp3', 2048, false);
+    assert.equal(usage.status, 'RESERVED');
+    assert.equal(usage.estimatedCredits, 0);
+    assert.equal(usage.reservedCredits, 0);
+    assert.equal(await prisma.processingUsage.count({ where: { jobId } }), 1);
+    assert.equal(await prisma.creditLedger.count({ where: { userId: user.id } }), ledgerBefore, 'no debe crear movimientos de crédito');
+
+    await creditLedgerService.settle(jobId, 'COMPLETED');
+    const settled = await prisma.processingUsage.findUniqueOrThrow({ where: { jobId } });
+    assert.equal(settled.status, 'COMPLETED');
+    assert.equal(settled.consumedCredits, 0);
+    assert.equal(await prisma.creditLedger.count({ where: { userId: user.id } }), ledgerBefore, 'el asentamiento no debe crear movimientos de crédito');
+  } finally {
+    await prisma.processingUsage.deleteMany({ where: { jobId } });
+    await prisma.user.delete({ where: { id: user.id } });
+  }
+});
+
+test('los límites de servicio gratuito protegen concurrencia y tamaño sin plan', async () => {
+  const suffix = randomUUID();
+  const email = `free-limits-${suffix}@example.invalid`;
+  const user = await prisma.user.create({ data: { email, passwordHash: 'test-only', displayName: 'Free Limits' } });
+  const base = `job-limits-${suffix}`;
+  try {
+    for (let index = 0; index < FREE_SERVICE_LIMITS.maxConcurrentServerJobs; index += 1) {
+      await creditLedgerService.reserve(user.id, `${base}-${index}`, 'video-to-mp3', 1024, false);
+    }
+    await assert.rejects(
+      () => creditLedgerService.reserve(user.id, `${base}-overflow`, 'video-to-mp3', 1024, false),
+      /procesos en curso/,
+    );
+    await assert.rejects(
+      () => creditLedgerService.reserve(user.id, `${base}-big`, 'video-to-mp3', FREE_SERVICE_LIMITS.maxUploadSizeBytes + 1, false),
+      /límite de tamaño/,
+    );
+  } finally {
+    await prisma.processingUsage.deleteMany({ where: { jobId: { startsWith: base } } });
+    await prisma.user.delete({ where: { id: user.id } });
+  }
+});
+

@@ -31,6 +31,8 @@ import { JobProgressView } from "../common/JobProgressView";
 import { CapabilityBadge } from "../common/Badge";
 import { toast } from "../common/ToastContainer";
 import { apiClient } from "../../services/apiClient";
+import { pathForView } from "../../services/appRouting";
+import { requiresServerAuthentication } from "../../config/execution";
 import { uploadAndStartConversion } from "../../services/backendConversionService";
 import {
   formatFileSize,
@@ -51,20 +53,22 @@ interface ToolRunnerProps {
   tool: ToolDefinition;
   initialFile?: File;
   onBack: () => void;
+  onRequireAuth: (returnTo?: string) => void;
 }
 
 export const ToolRunner: React.FC<ToolRunnerProps> = ({
   tool,
   initialFile,
   onBack,
+  onRequireAuth,
 }) => {
   const { user } = useAuth();
   const runnerKind = getToolRunnerKind(tool);
+  const serverExecution = requiresServerAuthentication(tool);
   const [selectedFile, setSelectedFile] = useState<File | null>(
     initialFile || null,
   );
   const [activeJob, setActiveJob] = useState<ProcessingJob | null>(null);
-  const [creditEstimate, setCreditEstimate] = useState<{ estimatedCredits: number; currentBalance: number; balanceAfter: number } | null>(null);
   const [uploadCapability, setUploadCapability] = useState<{ effectiveMaxUploadSize: number; commercialBypass: boolean; localAdminMode?: boolean } | null>(null);
   const backendJobIdRef = useRef<string | null>(null);
   const pollingCancelledRef = useRef(false);
@@ -137,13 +141,6 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   }, [activeJob]);
 
   useEffect(() => {
-    if (!selectedFile || !(tool.requiresServer || tool.id === 'video-to-mp3')) { setCreditEstimate(null); return; }
-    let active = true;
-    apiClient.estimateCredits(tool.id, selectedFile.size).then((value) => { if (active) setCreditEstimate(value); }).catch(() => { if (active) setCreditEstimate(null); });
-    return () => { active = false; };
-  }, [selectedFile, tool.id, tool.requiresServer]);
-
-  useEffect(() => {
     if (!user || !tool.requiresServer) { setUploadCapability(null); return; }
     let active = true;
     apiClient.auth.account().then((account) => { if (active) setUploadCapability(account.capabilities || null); }).catch(() => { if (active) setUploadCapability(null); });
@@ -152,7 +149,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
 
   const selectFile = (file: File) => {
     if (uploadCapability && file.size > uploadCapability.effectiveMaxUploadSize) {
-      toast.error('El archivo supera el tamaño permitido para tu plan.', `Tu archivo pesa ${formatFileSize(file.size)} y el límite actual es ${formatFileSize(uploadCapability.effectiveMaxUploadSize)}.`);
+      toast.error('El archivo supera el tamaño máximo permitido.', `Tu archivo pesa ${formatFileSize(file.size)} y el límite actual es ${formatFileSize(uploadCapability.effectiveMaxUploadSize)}.`);
       return;
     }
     setSelectedFile(file);
@@ -259,8 +256,14 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   // ==================== REAL PROCESSING EXECUTION ====================
   const handleExecute = async () => {
     if (submittingRef.current) return;
-    if (selectedFile && uploadCapability && selectedFile.size > uploadCapability.effectiveMaxUploadSize) { toast.error('El archivo supera el tamaño permitido para tu plan.'); return; }
-    if (user?.role !== 'ADMIN' && creditEstimate && creditEstimate.balanceAfter < 0) { toast.error("Créditos insuficientes", "Necesitas obtener créditos antes de procesar."); return; }
+    // Authentication is required only when execution enters a server path, not
+    // merely to view the tool. Client-side tools never reach this gate.
+    if (serverExecution && !user) {
+      toast.info("Inicia sesión para procesar en el servidor");
+      onRequireAuth(pathForView("tool", tool.slug));
+      return;
+    }
+    if (selectedFile && uploadCapability && selectedFile.size > uploadCapability.effectiveMaxUploadSize) { toast.error('El archivo supera el tamaño máximo permitido.'); return; }
     if (["video-trimmer", "video-to-gif"].includes(tool.id) && (serverTrimStart < 0 || serverTrimEnd <= serverTrimStart || (videoDuration > 0 && serverTrimEnd > videoDuration))) {
       toast.error("Intervalo inválido", "El final debe ser posterior al inicio y no superar la duración del video.");
       return;
@@ -287,7 +290,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
     setActiveJob(job);
 
     try {
-      if ((tool.requiresServer || tool.id === "video-to-mp3") && selectedFile) {
+      if (serverExecution && selectedFile) {
         const health = await apiClient.checkHealth(true);
         if (!health) throw new Error("Backend no disponible");
         if (tool.engine === "server-ffmpeg" && !health.services.ffmpeg) {
@@ -1096,11 +1099,10 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
               )}
 
               {/* Action Button */}
-              {creditEstimate && <div className={`rounded-xl border p-3 text-xs ${user?.role !== 'ADMIN' && creditEstimate.balanceAfter < 0 ? 'border-rose-500/30 text-rose-300' : 'border-indigo-500/20 text-slate-300'}`}>{user?.role==='ADMIN'?<p><strong>ADMIN_TEST</strong> · costo de referencia {creditEstimate.estimatedCredits}; no se descontará saldo.</p>:<><div className="grid gap-1 sm:grid-cols-3"><span>Costo estimado: <strong>{creditEstimate.estimatedCredits}</strong></span><span>Saldo actual: <strong>{creditEstimate.currentBalance}</strong></span><span>Saldo después: <strong>{creditEstimate.balanceAfter}</strong></span></div>{creditEstimate.balanceAfter < 0 && <p className="mt-2">Saldo insuficiente. Usa “Obtener créditos” en el indicador superior.</p>}</>}</div>}
               <div className="flex justify-end pt-2">
                 <button
                   onClick={handleExecute}
-                  disabled={!selectedFile || Boolean(user?.role !== 'ADMIN' && creditEstimate && creditEstimate.balanceAfter < 0)}
+                  disabled={!selectedFile}
                   className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
                 >
                   <Sparkles className="w-4 h-4" />

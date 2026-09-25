@@ -26,7 +26,7 @@ import { AdminRoute, ProtectedRoute } from './auth/RouteGuards';
 import { AppLoader } from './components/common/AppLoader';
 import { FeedbackView } from './components/views/FeedbackViews';
 import { ShortLinkView } from './components/views/ShortLinkView';
-import { pathForView, routeFromPath } from './services/appRouting';
+import { pathForView, routeFromPath, sanitizeReturnTo } from './services/appRouting';
 
 export default function App() {
   const initialRoute = routeFromPath(window.location.pathname);
@@ -37,6 +37,7 @@ export default function App() {
   const [activeTool, setActiveTool] = useState<ToolDefinition | null>(initialTool);
   const [shortSlug, setShortSlug] = useState(initialRoute.view === 'short-link' ? initialRoute.param || '' : '');
   const [authMode, setAuthMode] = useState<'login'|'register'>(initialRoute.authMode || 'login');
+  const [returnTo, setReturnTo] = useState<string | null>(null);
   const [activeFile, setActiveFile] = useState<File | undefined>(undefined);
   const [mediaUrl, setMediaUrl] = useState<string>('');
   const [detectedFile, setDetectedFile] = useState<DetectedFileInfo | null>(null);
@@ -60,18 +61,20 @@ export default function App() {
     return () => window.clearInterval(interval);
   }, [authLoading]);
   useEffect(() => { historyService.setAuthenticated(Boolean(currentUser)); }, [currentUser]);
+  const applyRoute = React.useCallback((path: string) => {
+    const route = routeFromPath(path);
+    const routeTool = route.view === 'tool' && route.param ? getToolById(route.param) || null : null;
+    setActiveView(route.view === 'tool' && !routeTool ? 'not-found' : route.view);
+    setAuthMode(route.authMode || 'login');
+    if (route.view === 'short-link') setShortSlug(route.param || '');
+    if (route.view === 'category') setActiveCategory(route.param || 'all');
+    if (route.view === 'tool') setActiveTool(routeTool);
+  }, []);
   useEffect(() => {
-    const sync = () => {
-      const route = routeFromPath(window.location.pathname);
-      const routeTool = route.view === 'tool' && route.param ? getToolById(route.param) || null : null;
-      setActiveView(route.view === 'tool' && !routeTool ? 'not-found' : route.view); setAuthMode(route.authMode || 'login');
-      if (route.view === 'short-link') setShortSlug(route.param || '');
-      if (route.view === 'category') setActiveCategory(route.param || 'all');
-      if (route.view === 'tool') setActiveTool(routeTool);
-    };
+    const sync = () => applyRoute(window.location.pathname);
     window.addEventListener('popstate', sync);
     return () => window.removeEventListener('popstate', sync);
-  }, []);
+  }, [applyRoute]);
 
   const handleToggleFavorite = (toolId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -134,9 +137,32 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const navigateInternal = (path: string) => {
+    applyRoute(path);
+    if (window.location.pathname !== path) window.history.pushState({}, '', path);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Opens the existing auth view and remembers a validated internal return
+  // destination. Invalid/external targets are dropped by sanitizeReturnTo.
+  const requestAuth = (target?: string) => {
+    setReturnTo(sanitizeReturnTo(target));
+    handleNavigate('auth');
+  };
+
+  const completeAuth = (user: { role: string }) => {
+    if (returnTo) {
+      const destination = returnTo;
+      setReturnTo(null);
+      navigateInternal(destination);
+      return;
+    }
+    handleNavigate(user.role === 'ADMIN' ? 'admin' : 'account');
+  };
+
   if (!bootstrapReady) return <AppLoader progress={progress} />;
 
-  const authFallback = <AuthView initialMode="login" onAuthenticated={(user) => handleNavigate(user.role === 'ADMIN' ? 'admin' : 'account')} onBack={() => handleNavigate('home')} />;
+  const authFallback = <AuthView initialMode="login" onAuthenticated={completeAuth} onBack={() => handleNavigate('home')} />;
 
   return (
     <div className="min-h-screen bg-[#08090D] text-[#F5F7FA] flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
@@ -197,6 +223,7 @@ export default function App() {
             <React.Suspense fallback={<div className="p-8 text-sm text-slate-400">Cargando herramienta…</div>}><ToolRunner
               tool={activeTool}
               initialFile={activeFile}
+              onRequireAuth={requestAuth}
               onBack={() => {
                 setActiveTool(null);
                 setActiveFile(undefined);
@@ -209,6 +236,7 @@ export default function App() {
             <React.Suspense fallback={<div className="p-8 text-sm text-slate-400">Cargando herramienta…</div>}><MediaDownloaderView
               initialUrl={mediaUrl}
               onBack={() => handleNavigate('home')}
+              onRequireAuth={requestAuth}
             /></React.Suspense>
           )}
 
@@ -226,7 +254,7 @@ export default function App() {
 
           {activeView === 'settings' && <SettingsView onBack={() => handleNavigate('home')} />}
 
-          {activeView === 'auth' && <AuthView initialMode={authMode} onAuthenticated={(user) => handleNavigate(user.role === 'ADMIN' ? 'admin' : 'account')} onBack={() => handleNavigate('home')} />}
+          {activeView === 'auth' && <AuthView initialMode={authMode} onAuthenticated={completeAuth} onBack={() => handleNavigate('home')} />}
           {activeView === 'account' && <ProtectedRoute fallback={authFallback}><AccountView onBack={() => handleNavigate('home')} /></ProtectedRoute>}
           {activeView === 'admin' && <AdminRoute fallback={<section className="mx-auto max-w-xl rounded-2xl border border-red-500/20 bg-[#101218] p-8"><h1 className="text-xl font-bold">Acceso denegado</h1><p className="mt-2 text-slate-400">Esta sección requiere una sesión administrativa.</p><button onClick={() => handleNavigate('home')} className="mt-5 min-h-11 text-indigo-400">Regresar</button></section>}><AdminView onBack={() => handleNavigate('account')} /></AdminRoute>}
           {activeView === 'complaints' && <FeedbackView kind="complaint" onBack={() => handleNavigate('home')} />}

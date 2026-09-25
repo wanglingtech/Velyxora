@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth';
 import { prisma } from '../db/prisma';
 import { creditLedgerService } from '../services/creditLedgerService';
 import { ENV } from '../config/env';
+import { FREE_SERVICE_LIMITS } from '../config/freeServiceLimits';
 import { effectiveUploadLimit } from '../middleware/uploadHandler';
 const router = Router(); router.use(requireAuth);
 router.get('/', async (req, res) => {
@@ -20,7 +21,7 @@ router.get('/', async (req, res) => {
   const plan = user.plans[0]?.plan ?? null;
   const commercialBypass = req.auth!.role === 'ADMIN';
   const localAdminMode = commercialBypass && ENV.NODE_ENV !== 'production';
-  const effectiveMaxUploadSize = plan ? effectiveUploadLimit(plan.maxUploadSize, commercialBypass, ENV.MAX_UPLOAD_SIZE_BYTES, ENV.NODE_ENV, ENV.LOCAL_ADMIN_MAX_UPLOAD_SIZE_BYTES) : 0;
+  const effectiveMaxUploadSize = effectiveUploadLimit(FREE_SERVICE_LIMITS.maxUploadSizeBytes, commercialBypass, ENV.MAX_UPLOAD_SIZE_BYTES, ENV.NODE_ENV, ENV.LOCAL_ADMIN_MAX_UPLOAD_SIZE_BYTES);
   res.json({ success: true, data: { email: user.email, displayName: user.displayName, status: 'ACTIVE', plan, capabilities: { effectiveMaxUploadSize, infrastructureMaxUploadSize: localAdminMode ? ENV.LOCAL_ADMIN_MAX_UPLOAD_SIZE_BYTES : ENV.MAX_UPLOAD_SIZE_BYTES, commercialBypass, localAdminMode, environment: ENV.NODE_ENV }, nextResetAt: user.plans[0]?.nextResetAt ?? null, credits: balance, ledger, jobs: usages.map((u) => ({ ...u, inputBytes: u.inputBytes.toString() })), history: history.map((h) => ({ ...h, inputSize: h.inputSize?.toString() ?? null, outputSize: h.outputSize?.toString() ?? null })), payments, complaints, suggestions } });
 });
 export default router;
