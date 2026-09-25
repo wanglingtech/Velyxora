@@ -3,6 +3,7 @@ import { Star } from 'lucide-react';
 import { ToolDefinition } from '../../types';
 import { IconRenderer } from './IconRenderer';
 import { CapabilityBadge } from './Badge';
+import { PlannedTool } from '../../registry/tools';
 
 interface ToolCardProps {
   tool: ToolDefinition;
@@ -71,3 +72,32 @@ export const ToolCard: React.FC<ToolCardProps> = ({
     </div>
   );
 };
+
+// Non-interactive card for planned/coming-soon tools. It never calls an
+// endpoint and never implies that processing exists yet.
+export const ComingSoonCard: React.FC<{ tool: PlannedTool }> = ({ tool }) => (
+  <div
+    aria-disabled="true"
+    title="Próximamente: esta herramienta aún no está disponible."
+    className="group relative flex flex-col justify-between p-4 rounded-xl bg-[#101218]/60 border border-dashed border-white/[0.08] cursor-not-allowed text-left h-full"
+  >
+    <div>
+      <div className="flex items-start justify-between gap-2 mb-2.5">
+        <div className="w-9 h-9 rounded-lg bg-slate-500/10 border border-slate-500/20 flex items-center justify-center text-slate-500">
+          <IconRenderer name={tool.icon} size={18} />
+        </div>
+      </div>
+      <h3 className="text-sm font-semibold text-slate-300 tracking-tight leading-snug line-clamp-1">
+        {tool.name}
+      </h3>
+      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+        {tool.description}
+      </p>
+    </div>
+    <div className="flex items-center justify-between gap-1.5 pt-3 mt-3 border-t border-white/[0.04]">
+      <span className="inline-flex items-center rounded-md border border-slate-600/40 bg-slate-800/60 px-1.5 py-0.5 text-[10px] font-mono font-medium uppercase tracking-wider text-slate-400">
+        Próximamente
+      </span>
+    </div>
+  </div>
+);

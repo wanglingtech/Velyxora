@@ -5,19 +5,19 @@ import {
   Image,
   Video,
   Music,
-  FileSpreadsheet,
   Files,
   Code,
-  FileText,
-  QrCode,
+  MessageCircle,
+  RefreshCw,
   Wrench,
   History,
   Star,
   Settings,
   ShieldCheck,
+  Heart,
   X
 } from 'lucide-react';
-import { CATEGORIES_CONFIG, PUBLIC_TOOL_REGISTRY } from '../../registry/tools';
+import { TOOLKIT_GROUPS, getToolsForGroup } from '../../registry/tools';
 import { VelyxoraLogo } from '../logo/VelyxoraLogo';
 
 interface SidebarProps {
@@ -72,20 +72,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [isOpenMobile, onCloseMobile]);
 
   const categoryIcons: Record<string, React.ReactNode> = {
-    image: <Image className="w-4 h-4" />,
-    video: <Video className="w-4 h-4" />,
-    audio: <Music className="w-4 h-4" />,
-    pdf: <FileSpreadsheet className="w-4 h-4" />,
+    multimedia: <Video className="w-4 h-4" />,
     documents: <Files className="w-4 h-4" />,
-    developer: <Code className="w-4 h-4" />,
-    text: <FileText className="w-4 h-4" />,
-    'qr-barcode': <QrCode className="w-4 h-4" />,
-    utilities: <Wrench className="w-4 h-4" />
+    'audio-speech': <Music className="w-4 h-4" />,
+    images: <Image className="w-4 h-4" />,
+    whatsapp: <MessageCircle className="w-4 h-4" />,
+    converters: <RefreshCw className="w-4 h-4" />,
+    utilities: <Wrench className="w-4 h-4" />,
+    'dev-tools': <Code className="w-4 h-4" />
   };
 
-  const getCategoryCount = (catId: string) => {
-    return PUBLIC_TOOL_REGISTRY.filter((t) => t.category === catId).length;
-  };
+  const getCategoryCount = (catId: string) => getToolsForGroup(catId).length;
 
   const handleNav = (view: string, param?: any) => {
     onNavigate(view, param);
@@ -177,7 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               Categorías de Herramientas
             </div>
 
-            {CATEGORIES_CONFIG.filter((c) => c.id !== 'all' && c.id !== 'media-downloader').map((cat) => {
+            {TOOLKIT_GROUPS.map((cat) => {
               const count = getCategoryCount(cat.id);
               const isActive = activeView === 'category' && activeCategory === cat.id;
 
@@ -253,6 +250,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center gap-2.5">
                 <Settings className="w-4 h-4 text-slate-400" />
                 <span>Configuración</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleNav('support')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                activeView === 'support'
+                  ? 'bg-[#161922] text-rose-300 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#101218]'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Heart className="w-4 h-4 text-rose-400" />
+                <span>Apoyar a VELYXORA</span>
               </div>
             </button>
           </div>

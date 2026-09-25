@@ -1,7 +1,13 @@
+import JSZip from "jszip";
 import { PDFDocument, PDFFont, StandardFonts } from "pdf-lib";
 
 export type PdfPageSize = "A4" | "Letter" | "Fit";
 export type PdfOrientation = "portrait" | "landscape";
+
+// Client-side safeguards for the PDF manipulation tools.
+export const PDF_MERGE_MAX_FILES = 30;
+export const PDF_MAX_TOTAL_BYTES = 200 * 1024 * 1024;
+export const PDF_MAX_PAGES = 2000;
 
 export interface ImagePdfOptions {
   pageSize?: PdfPageSize;
@@ -175,6 +181,121 @@ const wrapText = (
   }
   return lines;
 };
+
+async function loadPdfDocument(blob: Blob, label: string): Promise<PDFDocument> {
+  if (blob.type && blob.type !== "application/pdf") {
+    throw new Error(`${label} no es un PDF válido.`);
+  }
+  try {
+    return await PDFDocument.load(new Uint8Array(await blob.arrayBuffer()), {
+      ignoreEncryption: false,
+    });
+  } catch (error: any) {
+    if (/encrypt/i.test(String(error?.message || ""))) {
+      throw new Error(`${label} está protegido con contraseña y no puede procesarse.`);
+    }
+    throw new Error(`${label} no pudo leerse como PDF válido.`);
+  }
+}
+
+export async function getPdfPageCount(file: Blob, label = "El archivo"): Promise<number> {
+  const document = await loadPdfDocument(file, label);
+  return document.getPageCount();
+}
+
+/**
+ * Parses a 1-based page range expression (e.g. "1-3,5,8-") into sorted,
+ * unique 0-based indices. Throws on malformed or out-of-bounds input.
+ */
+export function parsePdfPageRange(input: string, pageCount: number): number[] {
+  const clean = input.trim();
+  if (!clean) throw new Error("Indica un rango de páginas, por ejemplo 1-3,5.");
+  if (!Number.isInteger(pageCount) || pageCount < 1) throw new Error("El PDF no tiene páginas.");
+  const indices = new Set<number>();
+  for (const rawToken of clean.split(",")) {
+    const token = rawToken.trim();
+    if (!token) continue;
+    const single = /^(\d+)$/.exec(token);
+    const range = /^(\d+)\s*-\s*(\d+)?$/.exec(token);
+    const tail = /^-\s*(\d+)$/.exec(token);
+    let start: number;
+    let end: number;
+    if (single) {
+      start = end = Number(single[1]);
+    } else if (range) {
+      start = Number(range[1]);
+      end = range[2] ? Number(range[2]) : pageCount;
+    } else if (tail) {
+      start = 1;
+      end = Number(tail[1]);
+    } else {
+      throw new Error(`Rango de páginas inválido: "${token}".`);
+    }
+    if (start < 1 || end > pageCount || start > end) {
+      throw new Error(`Rango fuera de límites: "${token}" (el PDF tiene ${pageCount} páginas).`);
+    }
+    for (let page = start; page <= end; page++) indices.add(page - 1);
+  }
+  if (!indices.size) throw new Error("Indica al menos una página válida.");
+  return [...indices].sort((a, b) => a - b);
+}
+
+export async function mergePdfs(files: Blob[]): Promise<Blob> {
+  if (!files.length) throw new Error("Agrega al menos un PDF para unir.");
+  if (files.length > PDF_MERGE_MAX_FILES) {
+    throw new Error(`Puedes unir hasta ${PDF_MERGE_MAX_FILES} PDFs a la vez.`);
+  }
+  const totalBytes = files.reduce((acc, file) => acc + file.size, 0);
+  if (totalBytes > PDF_MAX_TOTAL_BYTES) {
+    throw new Error("El tamaño total supera el límite permitido de 200 MB.");
+  }
+  const output = await PDFDocument.create();
+  let pages = 0;
+  for (const [index, file] of files.entries()) {
+    const source = await loadPdfDocument(file, `El archivo ${index + 1}`);
+    pages += source.getPageCount();
+    if (pages > PDF_MAX_PAGES) {
+      throw new Error(`El documento resultante supera el máximo de ${PDF_MAX_PAGES} páginas.`);
+    }
+    const copied = await output.copyPages(source, source.getPageIndices());
+    copied.forEach((page) => output.addPage(page));
+  }
+  return blobFromPdf(await output.save({ useObjectStreams: true }));
+}
+
+export async function extractPdfPages(file: Blob, pageIndices: number[]): Promise<Blob> {
+  if (!pageIndices.length) throw new Error("Selecciona al menos una página.");
+  const source = await loadPdfDocument(file, "El archivo");
+  const pageCount = source.getPageCount();
+  if (pageIndices.some((index) => index < 0 || index >= pageCount)) {
+    throw new Error("El rango de páginas excede el documento.");
+  }
+  const output = await PDFDocument.create();
+  const copied = await output.copyPages(source, pageIndices);
+  copied.forEach((page) => output.addPage(page));
+  return blobFromPdf(await output.save({ useObjectStreams: true }));
+}
+
+export async function splitPdfIntoZip(file: Blob, baseName = "documento"): Promise<Blob> {
+  const source = await loadPdfDocument(file, "El archivo");
+  const pageCount = source.getPageCount();
+  if (pageCount > PDF_MAX_PAGES) {
+    throw new Error(`El documento supera el máximo de ${PDF_MAX_PAGES} páginas.`);
+  }
+  const safeBase =
+    baseName.replace(/[^a-z0-9_-]+/gi, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "documento";
+  const zip = new JSZip();
+  for (const index of source.getPageIndices()) {
+    const output = await PDFDocument.create();
+    const [page] = await output.copyPages(source, [index]);
+    output.addPage(page);
+    zip.file(
+      `${safeBase}_pagina_${String(index + 1).padStart(3, "0")}.pdf`,
+      await output.save({ useObjectStreams: true }),
+    );
+  }
+  return zip.generateAsync({ type: "blob" });
+}
 
 export async function createPdfFromText(
   title: string,

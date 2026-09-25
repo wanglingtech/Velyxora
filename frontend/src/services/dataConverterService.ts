@@ -158,9 +158,9 @@ export function markdownToHtml(md: string): string {
       '<h1 class="text-2xl font-black text-white mt-6 mb-3">$1</h1>',
     )
 
-    // Blockquotes
+    // Blockquotes (escaping already turned ">" into "&gt;")
     .replace(
-      /^> (.*$)/gim,
+      /^&gt; (.*$)/gim,
       '<blockquote class="border-l-4 border-indigo-500 pl-4 py-1 italic text-slate-300 my-2">$1</blockquote>',
     )
 

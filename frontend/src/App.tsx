@@ -11,6 +11,7 @@ import { HistoryView } from './components/views/HistoryView';
 import { FavoritesView } from './components/views/FavoritesView';
 import { SettingsView } from './components/views/SettingsView';
 import { LegalView } from './components/views/LegalView';
+import { SupportView } from './components/views/SupportView';
 import { CommandPalette } from './components/common/CommandPalette';
 import { ToastContainer, toast } from './components/common/ToastContainer';
 import { GlobalDropOverlay } from './components/common/GlobalDropOverlay';
@@ -232,6 +233,8 @@ export default function App() {
           {activeView === 'suggestions' && <FeedbackView kind="suggestion" onBack={() => handleNavigate('home')} />}
           {activeView === 'short-link' && <ShortLinkView slug={shortSlug} onHome={() => handleNavigate('home')} />}
           {activeView === 'not-found' && <section className="mx-auto max-w-xl rounded-2xl border border-white/10 bg-[#101218] p-8 text-center"><h1 className="text-2xl font-bold">Página no encontrada</h1><p className="mt-2 text-sm text-slate-400">La ruta solicitada no existe en VELYXORA.</p><button onClick={() => handleNavigate('home')} className="mt-6 min-h-11 rounded-xl bg-indigo-600 px-5 text-sm">Ir al inicio</button></section>}
+
+          {activeView === 'support' && <SupportView onBack={() => handleNavigate('home')} />}
 
           {(activeView === 'about' || activeView === 'privacy' || activeView === 'terms') && (
             <LegalView page={activeView as any} onBack={() => handleNavigate('home')} />

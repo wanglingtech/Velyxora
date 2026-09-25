@@ -421,6 +421,24 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
   { id: 'mp3-to-wav', slug: 'mp3-to-wav', name: 'MP3 a WAV', description: 'Convierte audio MP3 a WAV PCM sin compresión.', category: 'audio', subcategory: 'Conversión', icon: 'Music', inputTypes: ['audio/mpeg'], outputTypes: ['audio/wav'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, keywords: ['mp3','wav'], isClientReady: false },
   { id: 'audio-bitrate', slug: 'audio-bitrate', name: 'Cambiar bitrate de audio', description: 'Equilibra calidad y tamaño. Subir el bitrate no recupera calidad perdida.', category: 'audio', subcategory: 'Optimización', icon: 'SlidersHorizontal', inputTypes: ['audio/mpeg','audio/wav','audio/flac','audio/ogg'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, keywords: ['bitrate','audio','calidad'], isClientReady: false },
   { id: 'audio-normalize', slug: 'audio-normalize', name: 'Normalizar volumen', description: 'Ajusta automáticamente el audio para obtener un nivel más uniforme.', category: 'audio', subcategory: 'Procesamiento', icon: 'AudioLines', inputTypes: ['audio/mpeg','audio/wav','audio/flac','audio/ogg'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, keywords: ['normalizar','volumen','loudness'], isClientReady: false },
+  {
+    id: 'text-to-speech',
+    slug: 'text-to-speech',
+    name: 'Texto a Voz (leer en voz alta)',
+    description: 'Lee un texto en voz alta con tu navegador: elige voz, velocidad y tono. No genera archivo descargable.',
+    category: 'audio',
+    subcategory: 'Voz',
+    icon: 'Volume2',
+    inputTypes: ['text/plain'],
+    outputTypes: ['audio/speech'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-speech',
+    supportsBatch: false,
+    supportsPreview: false,
+    keywords: ['texto a voz', 'tts', 'leer', 'voz', 'speech', 'audio'],
+    popular: false,
+    isClientReady: true,
+  },
 
   // ==================== DEVELOPER TOOLS ====================
   {
@@ -445,7 +463,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     id: 'jwt-decoder',
     slug: 'jwt-decoder',
     name: 'Decodificador JWT',
-    description: 'Inspecciona cabeceras, payload, tiempo de expiración y firma de JSON Web Tokens de forma local y privada.',
+    description: 'Decodifica e inspecciona cabeceras, payload y expiración de un JWT de forma local. No verifica la firma ni la validez criptográfica.',
     category: 'developer',
     subcategory: 'Seguridad',
     icon: 'KeyRound',
@@ -757,6 +775,62 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     isClientReady: true
   },
 
+  // ==================== WHATSAPP TOOLS (CLIENT_ONLY) ====================
+  {
+    id: 'whatsapp-link-generator',
+    slug: 'whatsapp-link-generator',
+    name: 'Generador de enlace wa.me',
+    description: 'Crea un enlace de WhatsApp con número y mensaje opcional, localmente en tu navegador.',
+    category: 'whatsapp',
+    subcategory: 'Enlaces',
+    icon: 'Link',
+    inputTypes: ['text/plain'],
+    outputTypes: ['text/plain'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-text',
+    supportsBatch: false,
+    supportsPreview: false,
+    keywords: ['whatsapp', 'wa.me', 'enlace', 'link', 'chat', 'numero'],
+    popular: true,
+    isClientReady: true,
+  },
+  {
+    id: 'whatsapp-message-builder',
+    slug: 'whatsapp-message-builder',
+    name: 'Constructor de mensajes de WhatsApp',
+    description: 'Redacta un mensaje, revisa su versión codificada y combínalo con un número.',
+    category: 'whatsapp',
+    subcategory: 'Mensajes',
+    icon: 'MessageSquare',
+    inputTypes: ['text/plain'],
+    outputTypes: ['text/plain'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-text',
+    supportsBatch: false,
+    supportsPreview: true,
+    keywords: ['whatsapp', 'mensaje', 'texto', 'codificado', 'url encode', 'chat'],
+    popular: false,
+    isClientReady: true,
+  },
+  {
+    id: 'whatsapp-qr-generator',
+    slug: 'whatsapp-qr-generator',
+    name: 'Código QR de WhatsApp',
+    description: 'Genera un código QR descargable para un enlace de WhatsApp, localmente.',
+    category: 'whatsapp',
+    subcategory: 'QR',
+    icon: 'QrCode',
+    inputTypes: ['text/plain'],
+    outputTypes: ['image/png'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-qrcode',
+    supportsBatch: false,
+    supportsPreview: true,
+    keywords: ['whatsapp', 'qr', 'codigo qr', 'escanear', 'enlace'],
+    popular: false,
+    isClientReady: true,
+  },
+
   // ==================== MEDIA DOWNLOADER ====================
   {
     id: 'media-url-analyzer',
@@ -819,20 +893,41 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     id: 'merge-pdf',
     slug: 'merge-pdf',
     name: 'Unir PDFs (Merge)',
-    description: 'Combina múltiples archivos PDF en un único documento manteniendo orientación y calidad.',
+    description: 'Combina múltiples PDF en un único documento, directamente en tu navegador.',
     category: 'pdf',
     subcategory: 'Manipulación',
     icon: 'Layers',
     inputTypes: ['application/pdf'],
     outputTypes: ['application/pdf'],
-    processingMode: 'SERVER_SIDE',
-    engine: 'server-libreoffice',
-    requiresServer: true,
-    serverEngineNotice: 'Motor PDF de ensamblaje server-side requerido.',
+    acceptedExtensions: ['pdf'],
+    acceptedMimeTypes: ['application/pdf'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-pdf',
+    supportsBatch: true,
+    supportsPreview: false,
     keywords: ['unir pdf', 'merge', 'combinar pdf'],
     popular: true,
-    isClientReady: false,
-    public: false
+    isClientReady: true
+  },
+  {
+    id: 'split-pdf',
+    slug: 'split-pdf',
+    name: 'Dividir PDF (Split)',
+    description: 'Extrae un rango de páginas o separa cada página en un PDF, en tu navegador.',
+    category: 'pdf',
+    subcategory: 'Manipulación',
+    icon: 'Scissors',
+    inputTypes: ['application/pdf'],
+    outputTypes: ['application/pdf', 'application/zip'],
+    acceptedExtensions: ['pdf'],
+    acceptedMimeTypes: ['application/pdf'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-pdf',
+    supportsBatch: false,
+    supportsPreview: false,
+    keywords: ['dividir pdf', 'split', 'separar paginas', 'extraer paginas'],
+    popular: false,
+    isClientReady: true
   },
   {
     id: 'word-to-pdf',
@@ -967,6 +1062,7 @@ export const CATEGORIES_CONFIG = [
   { id: 'developer', name: 'Developer Tools', icon: 'Code' },
   { id: 'text', name: 'Texto', icon: 'FileText' },
   { id: 'qr-barcode', name: 'QR & Códigos', icon: 'QrCode' },
+  { id: 'whatsapp', name: 'WhatsApp', icon: 'MessageCircle' },
   { id: 'media-downloader', name: 'Descargar Medios', icon: 'DownloadCloud' },
   { id: 'pdf', name: 'PDF', icon: 'FileSpreadsheet' },
   { id: 'documents', name: 'Documentos', icon: 'Files' },
@@ -975,12 +1071,88 @@ export const CATEGORIES_CONFIG = [
 
 export const PUBLIC_TOOL_REGISTRY = TOOL_REGISTRY.filter((tool) => tool.public !== false);
 
-export type ToolRunnerKind = 'standard-file' | 'sticker-maker' | 'pdf' | 'image-advanced' | 'data-code' | 'utilities' | 'barcode' | 'qr' | 'text' | 'creative';
+// Product-facing navigation groups for the Free & Open Digital Toolkit shell.
+// These intentionally map onto the existing internal `tool.category` values so
+// that runners, deep links and stored favorites remain untouched.
+export interface ToolkitGroup {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  categories: string[];
+  toolIds?: string[];
+  excludeToolIds?: string[];
+}
+
+const CONVERTER_TOOL_IDS = [
+  'csv-to-json',
+  'json-to-csv',
+  'markdown-to-html',
+  'color-converter',
+  'unit-converter',
+  'timestamp-converter',
+  'aspect-ratio-calculator',
+];
+
+export const TOOLKIT_GROUPS: ToolkitGroup[] = [
+  { id: 'multimedia', name: 'Multimedia', description: 'Video, audio y descarga de medios.', icon: 'Video', categories: ['video', 'media-downloader'] },
+  { id: 'documents', name: 'Documents', description: 'PDF y documentos de oficina.', icon: 'Files', categories: ['pdf', 'documents'] },
+  { id: 'audio-speech', name: 'Audio & Speech', description: 'Edición de audio y futuras funciones de voz.', icon: 'Mic', categories: ['audio'] },
+  { id: 'images', name: 'Images', description: 'Conversión, edición y optimización de imágenes.', icon: 'Image', categories: ['image'] },
+  { id: 'whatsapp', name: 'WhatsApp Tools', description: 'Utilidades locales para WhatsApp.', icon: 'MessageCircle', categories: ['whatsapp'] },
+  { id: 'converters', name: 'Converters', description: 'Conversión de formatos de datos y unidades.', icon: 'RefreshCw', categories: [], toolIds: CONVERTER_TOOL_IDS },
+  { id: 'utilities', name: 'Utilities', description: 'Utilidades diarias de texto, QR y códigos.', icon: 'Wrench', categories: ['utilities', 'text', 'qr-barcode'], excludeToolIds: CONVERTER_TOOL_IDS },
+  { id: 'dev-tools', name: 'Dev Tools', description: 'Herramientas para desarrolladores.', icon: 'Code', categories: ['developer'], excludeToolIds: CONVERTER_TOOL_IDS },
+];
+
+export interface PlannedTool {
+  id: string;
+  name: string;
+  description: string;
+  group: string;
+  icon: string;
+}
+
+// Planned tools are surfaced for product discovery only. They are deliberately
+// kept OUT of PUBLIC_TOOL_REGISTRY: they have no runner and must never be
+// routed to ToolRunner or call any endpoint.
+export const PLANNED_TOOL_REGISTRY: PlannedTool[] = [
+  { id: 'compress-pdf', name: 'Comprimir PDF', description: 'Reduce el tamaño de un PDF localmente.', group: 'documents', icon: 'Minimize2' },
+  { id: 'pdf-to-word', name: 'PDF a Word (DOCX)', description: 'Conversión de PDF a documento editable.', group: 'documents', icon: 'FileText' },
+  { id: 'pdf-to-images', name: 'PDF a Imágenes', description: 'Exporta las páginas de un PDF como imágenes.', group: 'documents', icon: 'Images' },
+  { id: 'speech-to-text', name: 'Voz a Texto', description: 'Transcripción de audio a texto (requiere un motor de reconocimiento).', group: 'audio-speech', icon: 'AudioLines' },
+];
+
+export function getToolkitGroup(groupId: string): ToolkitGroup | undefined {
+  return TOOLKIT_GROUPS.find((group) => group.id === groupId);
+}
+
+export function getToolsForGroup(groupId: string): ToolDefinition[] {
+  if (groupId === 'all') return PUBLIC_TOOL_REGISTRY;
+  const group = getToolkitGroup(groupId);
+  // Backward compatibility: legacy deep links such as /category/image still
+  // resolve against the original internal category ids.
+  if (!group) return PUBLIC_TOOL_REGISTRY.filter((tool) => tool.category === groupId);
+  const explicitIds = new Set(group.toolIds ?? []);
+  return PUBLIC_TOOL_REGISTRY.filter((tool) => {
+    if (group.excludeToolIds?.includes(tool.id)) return false;
+    return group.categories.includes(tool.category) || explicitIds.has(tool.id);
+  });
+}
+
+export function getPlannedToolsForGroup(groupId: string): PlannedTool[] {
+  if (groupId === 'all') return [];
+  return PLANNED_TOOL_REGISTRY.filter((tool) => tool.group === groupId);
+}
+
+export type ToolRunnerKind = 'standard-file' | 'sticker-maker' | 'pdf' | 'image-advanced' | 'data-code' | 'utilities' | 'barcode' | 'qr' | 'text' | 'creative' | 'whatsapp' | 'speech';
 export function getToolRunnerKind(tool: ToolDefinition): ToolRunnerKind | null {
+  if (tool.category === 'whatsapp') return 'whatsapp';
+  if (tool.id === 'text-to-speech') return 'speech';
   if (tool.id === 'sticker-maker') return 'sticker-maker';
   if (['url-shortener','icon-maker','social-text-studio','emoji-tool'].includes(tool.id)) return 'creative';
   if (tool.id === 'password-generator') return 'text';
-  if (['images-to-pdf', 'text-to-pdf'].includes(tool.id)) return 'pdf';
+  if (['images-to-pdf', 'text-to-pdf', 'merge-pdf', 'split-pdf'].includes(tool.id)) return 'pdf';
   if (tool.id === 'barcode-generator') return 'barcode';
   if (tool.id === 'qr-generator') return 'qr';
   if (['svg-to-png','svg-to-jpg','image-filters','image-watermark','color-picker-image','image-to-base64'].includes(tool.id)) return 'image-advanced';

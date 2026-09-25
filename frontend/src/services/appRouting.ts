@@ -12,6 +12,7 @@ const PATH_TO_VIEW: Record<string, AppRoute> = {
   '/media-downloader': { view: 'media-downloader' },
   '/complaints': { view: 'complaints' },
   '/suggestions': { view: 'suggestions' },
+  '/support': { view: 'support' },
   '/about': { view: 'about' },
   '/privacy': { view: 'privacy' },
   '/terms': { view: 'terms' },

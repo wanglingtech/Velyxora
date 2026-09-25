@@ -25,6 +25,7 @@ import {
   generateFaviconPackage,
   generateBatchZip,
   generateQrCode,
+  resolveCanvasOutputFormat,
 } from "../../services/conversionEngine";
 import { JobProgressView } from "../common/JobProgressView";
 import { CapabilityBadge } from "../common/Badge";
@@ -37,6 +38,8 @@ import {
 } from "../../services/detectionService";
 import { PdfToolRunner } from "./subtools/PdfToolRunner";
 import { BarcodeToolRunner } from "./subtools/BarcodeToolRunner";
+import { WhatsappTools } from "./subtools/WhatsappTools";
+import { TextToSpeechTool } from "./subtools/TextToSpeechTool";
 import { ImageAdvancedTools } from "./subtools/ImageAdvancedTools";
 import { DataAndCodeTools } from "./subtools/DataAndCodeTools";
 import { UtilitiesToolRunner } from "./subtools/UtilitiesToolRunner";
@@ -417,16 +420,17 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
       }
 
       if (tool.id === "image-resizer" && selectedFile) {
+        const output = resolveCanvasOutputFormat(selectedFile.type);
         const res = await convertImage(selectedFile, {
-          format: (selectedFile.type as any) || "image/png",
+          format: output.mime,
           width: targetWidth,
           height: targetHeight,
           quality: 0.95,
         });
         jobService.completeJob(job.id, {
           blob: res.blob,
-          filename: `resized_${selectedFile.name}`,
-          mimeType: selectedFile.type,
+          filename: `resized_${res.filename}`,
+          mimeType: output.mime,
           size: res.blob.size,
         });
         return;
@@ -736,6 +740,12 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
 
           {/* ==================== BARCODE GENERATOR ==================== */}
           {runnerKind === "barcode" && <BarcodeToolRunner tool={tool} />}
+
+          {/* ==================== WHATSAPP TOOLS (CLIENT_ONLY) ==================== */}
+          {runnerKind === "whatsapp" && <WhatsappTools tool={tool} />}
+
+          {/* ==================== TEXT-TO-SPEECH (CLIENT_ONLY) ==================== */}
+          {runnerKind === "speech" && <TextToSpeechTool tool={tool} />}
 
           {/* ==================== ADVANCED IMAGE TOOLS ==================== */}
           {runnerKind === "image-advanced" && (

@@ -3,7 +3,7 @@ import { Sparkles, Shield, Zap, Layers, ArrowRight } from "lucide-react";
 import { UniversalInput } from "../common/UniversalInput";
 import { ToolCard } from "../common/ToolCard";
 import { SmartFileInspector } from "../common/SmartFileInspector";
-import { PUBLIC_TOOL_REGISTRY, CATEGORIES_CONFIG } from "../../registry/tools";
+import { PUBLIC_TOOL_REGISTRY, TOOLKIT_GROUPS } from "../../registry/tools";
 import { ToolDefinition, DetectedFileInfo } from "../../types";
 
 interface HomeViewProps {
@@ -46,6 +46,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
           Convierte, procesa, edita y analiza archivos multimedia y enlaces de
           video directamente en tu navegador.
+        </p>
+        <p className="text-[11px] font-mono text-slate-500">
+          Gratis · Privacidad · Uso justo · Compatible con Open Source
         </p>
       </div>
 
@@ -104,7 +107,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           Explorar por categoría
         </h3>
         <div className="flex flex-wrap gap-2">
-          {CATEGORIES_CONFIG.filter((c) => c.id !== "all").map((cat) => (
+          {TOOLKIT_GROUPS.map((cat) => (
             <button
               key={cat.id}
               onClick={() => onSelectCategory(cat.id)}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { VelyxoraLogo } from '../logo/VelyxoraLogo';
-import { Youtube, Instagram, Facebook, Twitter, MessageCircle, MessagesSquare, Music2 } from 'lucide-react';
+import { Youtube, Instagram, Facebook, Twitter, MessageCircle, MessagesSquare, Music2, Heart } from 'lucide-react';
 
 interface FooterProps {
   onNavigate: (view: string, param?: any) => void;
@@ -39,6 +39,13 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             className="min-h-11 rounded-lg px-2 hover:text-slate-300 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
           >
             Acerca de
+          </button>
+          <button
+            onClick={() => onNavigate('support')}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-rose-300/90 hover:text-rose-200 focus-visible:outline-2 focus-visible:outline-indigo-400 transition-colors"
+          >
+            <Heart className="h-3.5 w-3.5" />
+            Apoyar
           </button>
           <button
             onClick={() => onNavigate('complaints')}

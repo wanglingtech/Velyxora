@@ -16,6 +16,42 @@ export interface CropRect {
   height: number;
 }
 
+// Client-side safety limits for canvas-based image processing.
+export const MAX_IMAGE_PIXELS = 40_000_000;
+export const MAX_IMAGE_DIMENSION = 16_384;
+
+export type CanvasOutputMime = 'image/jpeg' | 'image/png' | 'image/webp';
+
+/**
+ * Maps a requested MIME to a format the browser can reliably encode via
+ * canvas.toBlob. Unsupported inputs (GIF, SVG, BMP, unknown) fall back to PNG.
+ */
+export function resolveCanvasOutputFormat(requested?: string): { mime: CanvasOutputMime; extension: 'jpg' | 'png' | 'webp' } {
+  const value = (requested || '').toLowerCase();
+  if (value === 'image/jpeg' || value === 'image/jpg') return { mime: 'image/jpeg', extension: 'jpg' };
+  if (value === 'image/webp') return { mime: 'image/webp', extension: 'webp' };
+  return { mime: 'image/png', extension: 'png' };
+}
+
+/**
+ * Validates output dimensions and rejects zero/negative, non-finite, oversized
+ * or pixel-heavy targets to avoid unsafe canvas allocations.
+ */
+export function validateOutputDimensions(width: number, height: number): { width: number; height: number } {
+  const w = Math.round(Number(width));
+  const h = Math.round(Number(height));
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w < 1 || h < 1) {
+    throw new Error('Las dimensiones deben ser mayores a 0 píxeles.');
+  }
+  if (w > MAX_IMAGE_DIMENSION || h > MAX_IMAGE_DIMENSION) {
+    throw new Error(`Las dimensiones no pueden superar ${MAX_IMAGE_DIMENSION} px por lado.`);
+  }
+  if (w * h > MAX_IMAGE_PIXELS) {
+    throw new Error('La imagen resultante es demasiado grande para procesarse de forma segura.');
+  }
+  return { width: w, height: h };
+}
+
 /**
  * Loads an image file into an HTMLImageElement safely
  */
@@ -44,8 +80,11 @@ export async function convertImage(
 ): Promise<{ blob: Blob; width: number; height: number; filename: string }> {
   const img = await loadImageElement(file);
 
-  const targetWidth = options.width || img.naturalWidth;
-  const targetHeight = options.height || img.naturalHeight;
+  const { mime, extension } = resolveCanvasOutputFormat(options.format);
+  const { width: targetWidth, height: targetHeight } = validateOutputDimensions(
+    options.width || img.naturalWidth,
+    options.height || img.naturalHeight,
+  );
 
   const canvas = document.createElement('canvas');
   canvas.width = targetWidth;
@@ -60,8 +99,8 @@ export async function convertImage(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  // If output is JPEG, paint white background to prevent black transparent areas
-  if (options.format === 'image/jpeg') {
+  // JPEG has no alpha channel: paint a predictable opaque background first.
+  if (mime === 'image/jpeg') {
     ctx.fillStyle = options.backgroundColor || '#FFFFFF';
     ctx.fillRect(0, 0, targetWidth, targetHeight);
   }
@@ -76,20 +115,13 @@ export async function convertImage(
         if (result) resolve(result);
         else reject(new Error('Fallo al exportar el buffer de imagen desde Canvas.'));
       },
-      options.format,
+      mime,
       quality
     );
   });
 
-  const extMap: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp'
-  };
-
   const baseName = ('name' in file && file.name) ? file.name.substring(0, file.name.lastIndexOf('.')) || 'image' : 'converted_image';
-  const outExt = extMap[options.format] || 'png';
-  const filename = `${baseName}.${outExt}`;
+  const filename = `${baseName}.${extension}`;
 
   return {
     blob,

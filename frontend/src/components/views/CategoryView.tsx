@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Filter, ArrowLeft } from 'lucide-react';
-import { ToolCard } from '../common/ToolCard';
-import { PUBLIC_TOOL_REGISTRY, CATEGORIES_CONFIG, searchTools } from '../../registry/tools';
+import { ToolCard, ComingSoonCard } from '../common/ToolCard';
+import { CATEGORIES_CONFIG, getToolkitGroup, getToolsForGroup, getPlannedToolsForGroup, searchTools } from '../../registry/tools';
 import { ToolDefinition } from '../../types';
 
 interface CategoryViewProps {
@@ -24,11 +24,15 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('all');
 
-  const categoryConfig = CATEGORIES_CONFIG.find((c) => c.id === currentCategory) || CATEGORIES_CONFIG[0];
+  const categoryName = currentCategory === 'all'
+    ? 'Todas las herramientas'
+    : getToolkitGroup(currentCategory)?.name
+      || CATEGORIES_CONFIG.find((c) => c.id === currentCategory)?.name
+      || 'Todas las herramientas';
 
-  const toolsInCategory = currentCategory === 'all'
-    ? PUBLIC_TOOL_REGISTRY
-    : PUBLIC_TOOL_REGISTRY.filter((t) => t.category === currentCategory);
+  const toolsInCategory = getToolsForGroup(currentCategory);
+  const plannedTools = getPlannedToolsForGroup(currentCategory);
+  const showPlanned = plannedTools.length > 0 && selectedSubcategory === 'all' && !searchFilter.trim();
 
   // Extract unique subcategories
   const subcategories = Array.from(
@@ -50,7 +54,7 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            {categoryConfig.name}
+            {categoryName}
           </h2>
           <p className="text-xs text-slate-400 mt-1">
             {filteredTools.length} herramientas disponibles en esta categoría.
@@ -112,7 +116,7 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
             />
           ))}
         </div>
-      ) : (
+      ) : showPlanned ? null : (
         <div className="py-16 text-center text-slate-500 rounded-2xl bg-[#101218] border border-white/[0.06]">
           <p className="text-sm">No se encontraron herramientas con el filtro actual.</p>
           <button
@@ -124,6 +128,19 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
           >
             Restablecer filtros
           </button>
+        </div>
+      )}
+
+      {showPlanned && (
+        <div className="space-y-3 pt-2">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Próximamente
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+            {plannedTools.map((tool) => (
+              <ComingSoonCard key={tool.id} tool={tool} />
+            ))}
+          </div>
         </div>
       )}
     </div>

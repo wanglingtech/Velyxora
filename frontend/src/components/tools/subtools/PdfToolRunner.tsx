@@ -10,11 +10,18 @@ import {
   FileText,
   CheckCircle2,
   AlertCircle,
+  Scissors,
+  Layers,
 } from "lucide-react";
 import { ToolDefinition } from "../../../types";
 import {
   createPdfFromImages,
   createPdfFromText,
+  extractPdfPages,
+  getPdfPageCount,
+  mergePdfs,
+  parsePdfPageRange,
+  splitPdfIntoZip,
 } from "../../../services/pdfEngine";
 import { historyService } from "../../../services/historyService";
 import { toast } from "../../common/ToastContainer";
@@ -58,6 +65,136 @@ export const PdfToolRunner: React.FC<PdfToolRunnerProps> = ({
   const [docContent, setDocContent] = useState<string>(
     "Escribe o pega aquí el contenido de tu documento para compilarlo directamente a un PDF formal con saltos de línea y formateo de página estándar...",
   );
+
+  // Merge PDF state
+  const [mergeFiles, setMergeFiles] = useState<File[]>([]);
+
+  // Split PDF state
+  const [splitFile, setSplitFile] = useState<File | null>(null);
+  const [splitMode, setSplitMode] = useState<"range" | "each">("range");
+  const [splitRange, setSplitRange] = useState<string>("1-");
+  const [splitPageCount, setSplitPageCount] = useState<number | null>(null);
+
+  const isPdfFile = (file: File) =>
+    file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+  const handleAddMergeFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const selected = Array.from(e.target.files);
+    const pdfs = selected.filter(isPdfFile);
+    if (pdfs.length !== selected.length) {
+      toast.error("Solo se admiten archivos PDF.");
+    }
+    if (pdfs.length > 0) {
+      setMergeFiles((prev) => [...prev, ...pdfs]);
+      setDownloadUrl(null);
+    }
+    e.target.value = "";
+  };
+
+  const handleRemoveMergeFile = (index: number) => {
+    setMergeFiles((prev) => prev.filter((_, i) => i !== index));
+    setDownloadUrl(null);
+  };
+
+  const handleMoveMerge = (index: number, direction: "up" | "down") => {
+    if ((direction === "up" && index === 0) || (direction === "down" && index === mergeFiles.length - 1)) return;
+    const target = direction === "up" ? index - 1 : index + 1;
+    const next = [...mergeFiles];
+    [next[index], next[target]] = [next[target], next[index]];
+    setMergeFiles(next);
+    setDownloadUrl(null);
+  };
+
+  const handleCompileMerge = async () => {
+    if (mergeFiles.length < 2) {
+      toast.error("Agrega al menos dos PDF para unir");
+      return;
+    }
+    try {
+      setIsProcessing(true);
+      const blob = await mergePdfs(mergeFiles);
+      const url = URL.createObjectURL(blob);
+      const filename = `velyxora_unido_${Date.now()}.pdf`;
+      setDownloadUrl(url);
+      setDownloadFilename(filename);
+      historyService.addItem({
+        toolId: tool.id,
+        toolName: tool.name,
+        category: "pdf",
+        inputName: `${mergeFiles.length} PDF`,
+        inputSize: mergeFiles.reduce((acc, f) => acc + f.size, 0),
+        outputName: filename,
+        outputSize: blob.size,
+        processingMode: "CLIENT_SIDE",
+        status: "COMPLETED",
+      });
+      toast.success("PDFs unidos exitosamente");
+    } catch (err: any) {
+      toast.error(err?.message || "No se pudieron unir los PDF");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSplitFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!isPdfFile(file)) {
+      toast.error("Selecciona un archivo PDF válido");
+      return;
+    }
+    setDownloadUrl(null);
+    setSplitPageCount(null);
+    try {
+      const count = await getPdfPageCount(file);
+      setSplitFile(file);
+      setSplitPageCount(count);
+      setSplitRange(count > 0 ? `1-${count}` : "1-");
+    } catch (err: any) {
+      setSplitFile(null);
+      toast.error(err?.message || "No se pudo leer el PDF");
+    }
+  };
+
+  const handleSplit = async () => {
+    if (!splitFile || !splitPageCount) {
+      toast.error("Selecciona un PDF válido");
+      return;
+    }
+    try {
+      setIsProcessing(true);
+      let blob: Blob;
+      let filename: string;
+      if (splitMode === "each") {
+        blob = await splitPdfIntoZip(splitFile, "velyxora");
+        filename = `velyxora_paginas_${Date.now()}.zip`;
+      } else {
+        const indices = parsePdfPageRange(splitRange, splitPageCount);
+        blob = await extractPdfPages(splitFile, indices);
+        filename = `velyxora_recorte_${Date.now()}.pdf`;
+      }
+      setDownloadUrl(URL.createObjectURL(blob));
+      setDownloadFilename(filename);
+      historyService.addItem({
+        toolId: tool.id,
+        toolName: tool.name,
+        category: "pdf",
+        inputName: splitFile.name,
+        inputSize: splitFile.size,
+        outputName: filename,
+        outputSize: blob.size,
+        processingMode: "CLIENT_SIDE",
+        status: "COMPLETED",
+      });
+      toast.success("PDF procesado exitosamente");
+    } catch (err: any) {
+      toast.error(err?.message || "No se pudo dividir el PDF");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   // File addition handler
   const handleAddFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -174,7 +311,7 @@ export const PdfToolRunner: React.FC<PdfToolRunnerProps> = ({
 
   return (
     <div className="space-y-6">
-      {tool.id === "images-to-pdf" ? (
+      {tool.id === "images-to-pdf" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Workspace (Left 2 Columns) */}
           <div className="lg:col-span-2 space-y-4">
@@ -365,7 +502,9 @@ export const PdfToolRunner: React.FC<PdfToolRunnerProps> = ({
             </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {tool.id === "text-to-pdf" && (
         /* Text to PDF Interface */
         <div className="p-6 rounded-2xl bg-[#101218] border border-white/[0.08] space-y-4">
           <div>
@@ -424,6 +563,139 @@ export const PdfToolRunner: React.FC<PdfToolRunnerProps> = ({
               </a>
             </div>
           )}
+        </div>
+      )}
+
+      {tool.id === "merge-pdf" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <div className="p-6 rounded-2xl bg-[#101218] border border-white/[0.08] space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Archivos PDF para unir</h3>
+                  <p className="text-xs text-slate-400">El orden de la lista determina el orden final.</p>
+                </div>
+                <label className="cursor-pointer px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 transition-colors shadow-md shadow-indigo-600/20">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Añadir PDF</span>
+                  <input type="file" accept="application/pdf,.pdf" multiple onChange={handleAddMergeFiles} className="hidden" />
+                </label>
+              </div>
+
+              {mergeFiles.length === 0 ? (
+                <div className="p-8 border-2 border-dashed border-white/10 rounded-xl text-center space-y-3">
+                  <Layers className="w-10 h-10 text-slate-500 mx-auto" />
+                  <p className="text-xs text-slate-400">Aún no has agregado PDF. Necesitas al menos dos.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                  {mergeFiles.map((file, idx) => (
+                    <div key={`${file.name}-${idx}`} className="p-3 rounded-xl bg-[#08090D] border border-white/[0.06] flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-6 h-6 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-mono font-bold flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <div className="truncate">
+                          <p className="text-xs font-medium text-white truncate">{file.name}</p>
+                          <p className="text-[11px] text-slate-500">{formatFileSize(file.size)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => handleMoveMerge(idx, "up")} disabled={idx === 0} className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] disabled:opacity-20 text-slate-300" title="Mover arriba">
+                          <MoveUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleMoveMerge(idx, "down")} disabled={idx === mergeFiles.length - 1} className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] disabled:opacity-20 text-slate-300" title="Mover abajo">
+                          <MoveDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleRemoveMergeFile(idx)} className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400" title="Eliminar">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="p-5 rounded-2xl bg-[#101218] border border-white/[0.08] space-y-4">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Resultado</h4>
+              <p className="text-xs text-slate-400">
+                {mergeFiles.length} archivo(s) · {formatFileSize(mergeFiles.reduce((acc, f) => acc + f.size, 0))}
+              </p>
+              <button onClick={handleCompileMerge} disabled={mergeFiles.length < 2 || isProcessing} className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                <span>{isProcessing ? "Uniendo PDF..." : "Unir PDF"}</span>
+              </button>
+              {downloadUrl && (
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center space-y-2">
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-400 font-semibold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>PDF unido con éxito</span>
+                  </div>
+                  <a href={downloadUrl} download={downloadFilename} className="block w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors">
+                    Descargar {downloadFilename}
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tool.id === "split-pdf" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="p-6 rounded-2xl bg-[#101218] border border-white/[0.08] space-y-4">
+            <div>
+              <label className="text-xs text-slate-300 block mb-1.5">Archivo PDF</label>
+              <input type="file" accept="application/pdf,.pdf" onChange={handleSplitFile} className="w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-3 file:py-2 file:text-white" />
+              {splitFile && splitPageCount !== null && (
+                <p className="mt-2 text-[11px] text-slate-400">{splitFile.name} · {splitPageCount} páginas</p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-300 block mb-1.5">Modo</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([["range", "Rango de páginas"], ["each", "Cada página (ZIP)"]] as const).map(([mode, label]) => (
+                  <button key={mode} onClick={() => { setSplitMode(mode); setDownloadUrl(null); }} className={`py-2 px-2 rounded-xl text-xs font-medium border transition-colors ${splitMode === mode ? "bg-indigo-600 text-white border-indigo-500" : "bg-[#08090D] text-slate-300 border-white/[0.06] hover:border-white/20"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {splitMode === "range" && (
+              <div>
+                <label className="text-xs text-slate-300 block mb-1.5">Páginas (ej: 1-3,5,8-)</label>
+                <input type="text" value={splitRange} onChange={(e) => { setSplitRange(e.target.value); setDownloadUrl(null); }} placeholder="1-3,5" className="w-full px-3.5 py-2.5 rounded-xl bg-[#08090D] border border-white/[0.08] text-xs text-white focus:outline-none focus:border-indigo-500" />
+              </div>
+            )}
+
+            <button onClick={handleSplit} disabled={!splitFile || !splitPageCount || isProcessing} className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2">
+              <Scissors className="w-4 h-4" />
+              <span>{isProcessing ? "Procesando..." : splitMode === "each" ? "Separar en ZIP" : "Extraer páginas"}</span>
+            </button>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-[#101218] border border-white/[0.08] flex flex-col items-center justify-center text-center space-y-3">
+            {downloadUrl ? (
+              <>
+                <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                <p className="text-xs text-emerald-400 font-semibold">Resultado listo</p>
+                <a href={downloadUrl} download={downloadFilename} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2">
+                  <Download className="w-4 h-4" />
+                  <span>Descargar {downloadFilename}</span>
+                </a>
+              </>
+            ) : (
+              <>
+                <Scissors className="w-8 h-8 text-slate-500" />
+                <p className="text-xs text-slate-400">Selecciona un PDF y el modo para obtener el resultado.</p>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
