@@ -48,3 +48,28 @@ Thumbs.db
 # Editor / IDE
 .vscode/
 .idea/
+
+# Local AI / coding-assistant tooling (owner-local, not part of the project)
+.agents/
+AGENTS.md
+opencode.json
+docs/modelsopencode.md
+
+# Caches and incremental build metadata
+.cache/
+.vite/
+.turbo/
+*.tsbuildinfo
+
+# Keys and certificates (never commit)
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Dumps and backups
+*.dump
+*.sql.gz
+*.bak
+*.backup
+*.orig

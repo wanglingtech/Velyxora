@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/wanglingtech/Velyxora/blob/main/SECURITY.md
+    about: Do not open a public issue for security problems. Follow the security policy.
+  - name: Support and usage questions
+    url: https://github.com/wanglingtech/Velyxora/blob/main/SUPPORT.md
+    about: Read the support guide before opening an issue.
+  - name: Contributing guide
+    url: https://github.com/wanglingtech/Velyxora/blob/main/CONTRIBUTING.md
+    about: How to set up the project and propose changes.

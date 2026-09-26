@@ -1,12 +1,22 @@
 # Hardening de producción — septiembre de 2026
 
+> **Documento histórico.** Registra una revisión de seguridad realizada en
+> septiembre de 2026. Algunas secciones describen el modelo comercial de
+> planes y créditos que posteriormente fue retirado
+> (`prisma/migrations/20260926000100_retire_commercial_models`). No describe el
+> comportamiento actual en esos puntos; se conserva como historial.
+
 ## Alcance de la corrección
 
 Se cerraron SEC-001 a SEC-014 de forma incremental: rechazo temprano y validación por herramienta en uploads; limitadores para registro y rutas costosas; CSRF estable entre pestañas; shortener sin resolución DNS; límites diferenciados; firmas mínimas y nombres físicos UUID; enlaces Markdown seguros; login/registro JSON con origen estricto en producción; cabeceras y caché privada; logs y errores sanitizados; comprobación de frontera en paths; y límites menores para cuerpos JSON/urlencoded. No se modificaron hashing, pagos, idempotencia, Prisma como ORM, allowlist/SSRF de media, FFmpeg, LibreOffice ni la estrategia pinneada de yt-dlp.
 
-## Planes y límites
+## Planes y límites (HISTÓRICO / RETIRADO)
 
-`backend/src/config/plans.ts` define los valores comerciales que el seed sincroniza con PostgreSQL. En runtime, el plan activo almacenado en la base de datos es autoritativo. Los valores no fueron modificados:
+> Planes y créditos fueron retirados. VELYXORA usa límites técnicos de
+> fair-use (`backend/src/config/freeServiceLimits.ts`). La tabla siguiente se
+> conserva solo como registro histórico.
+
+`backend/src/config/plans.ts` definía los valores comerciales que el seed sincronizaba con PostgreSQL. En runtime, el plan activo almacenado en la base de datos era autoritativo. Los valores no fueron modificados:
 
 | Plan | Créditos | Upload comercial | Jobs | Historial |
 | --- | ---: | ---: | ---: | ---: |

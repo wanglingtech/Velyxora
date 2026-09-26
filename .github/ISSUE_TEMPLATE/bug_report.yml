@@ -1,0 +1,83 @@
+name: Bug report
+description: Report a reproducible problem with VELYXORA.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        **Do not include secrets.** Never paste tokens, cookies, passwords,
+        API keys, connection strings, private keys or personal data. Redact
+        logs and screenshots before posting.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the problem.
+      placeholder: What went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps that trigger the problem.
+      placeholder: |
+        1. Go to '...'
+        2. Select tool '...'
+        3. Upload '...'
+        4. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Relevant versions and configuration (without secrets).
+      placeholder: |
+        - OS:
+        - Node version:
+        - Browser:
+        - Deployment (local / self-hosted):
+        - Tool or API endpoint:
+    validations:
+      required: true
+  - type: input
+    id: browser-os
+    attributes:
+      label: Browser / OS (when UI-related)
+      description: Browser and OS, including version, if the issue affects the UI.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Relevant logs or console output with all secrets and personal data removed.
+      render: text
+    validations:
+      required: false
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I have removed all secrets, tokens, cookies, passwords and personal data from this report.
+          required: true

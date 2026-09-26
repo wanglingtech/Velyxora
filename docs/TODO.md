@@ -10,9 +10,12 @@
 - [ ] Integrar gradualmente runners con resultados propios después de revisión manual.
 - [ ] Fases futuras: TTS/STT y WhatsApp Business/Cloud API; no forman parte de 1A–1C.
 
-## Fase 1B — WhatsApp Click-to-Chat de pagos
+## Fase 1B — WhatsApp Click-to-Chat de pagos (HISTÓRICO / RETIRADO)
 
-- [x] Configuración backend independiente `WHATSAPP_ADMIN_PHONE_E164`, validada como E.164.
+> El modelo de pagos fue retirado (`prisma/migrations/20260926000100_retire_commercial_models`).
+> Esta fase se conserva como registro histórico; no describe comportamiento actual.
+
+- [x] Configuración backend independiente `WHATSAPP_ADMIN_PHONE_E164`, validada como E.164. (variable retirada)
 - [x] Mensajes mínimos construidos desde la cuenta y `PaymentOrder` propios devueltos por backend.
 - [x] Consulta en `PENDING_PAYMENT` y contacto para revisión en `PENDING_REVIEW`; estados terminales sin acción.
 - [x] Enlace `wa.me` codificado, iniciado y enviado únicamente por decisión del usuario.
@@ -28,17 +31,21 @@
 - [x] Descarga, Share Layer con fallback e historial de metadata a 0 créditos.
 - [ ] Futuro evaluable: borde de silueta, background removal y stickers animados; no implementados en este MVP.
 
-## Fase SaaS beta
+## Fase SaaS beta (HISTÓRICO / MODELO RETIRADO)
+
+> Planes, créditos, ledger, reservas y Yape manual fueron retirados. VELYXORA
+> es gratuito y la protección runtime es técnica. Los elementos comerciales se
+> conservan solo como registro histórico.
 
 - [x] Schema Prisma y migración PostgreSQL.
 - [x] Auth por sesión, roles, CSRF, rate limit y seed administrativo.
-- [x] Planes, ledger, reserva/consumo/reembolso y ADMIN_TEST.
-- [x] Yape manual, revisión idempotente y allowlist de providers.
+- [x] Planes, ledger, reserva/consumo/reembolso y ADMIN_TEST. (RETIRADO)
+- [x] Yape manual, revisión idempotente y allowlist de providers. (RETIRADO)
 - [ ] Aplicar migración y ejecutar E2E DB: falta `DATABASE_URL` en este entorno.
 - [ ] Recuperación de contraseña: `REQUIRES_EXTERNAL_PROVIDER`.
 - [ ] `ApiHistoryRepository` y migración consentida de metadata.
 - [ ] Revisión legal profesional: `LEGAL_REVIEW_REQUIRED`.
-- [ ] Gateway/webhooks: `REQUIRES_EXTERNAL_PROVIDER`.
+- [ ] Gateway/webhooks: no aplicable; el modelo de pagos fue retirado.
 
 ## Pendientes de la fase LibreOffice + UX
 

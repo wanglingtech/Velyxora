@@ -1,0 +1,66 @@
+name: New tool proposal
+description: Propose a new tool or conversion for the VELYXORA toolkit.
+title: "[Tool]: "
+labels:
+  - new-tool
+body:
+  - type: markdown
+    attributes:
+      value: |
+        New tools must fit VELYXORA's processing and privacy model. Describe the
+        real implementation path, not just the desired outcome.
+  - type: input
+    id: tool
+    attributes:
+      label: Proposed tool
+      description: A short name for the tool.
+      placeholder: e.g. "PDF to images"
+    validations:
+      required: true
+  - type: textarea
+    id: formats
+    attributes:
+      label: Input / output formats
+      description: Which input formats are accepted and which output formats are produced?
+    validations:
+      required: true
+  - type: dropdown
+    id: processing-mode
+    attributes:
+      label: Processing mode
+      description: How should this tool be executed? See the project README for definitions.
+      options:
+        - CLIENT_SIDE
+        - SERVER_SIDE
+        - HYBRID
+        - EXTERNAL_PROVIDER
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: Reason
+      description: Why is this tool valuable? Who needs it and for what?
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Required libraries, browser APIs or host binaries (FFmpeg, LibreOffice, yt-dlp, etc.).
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks
+      description: Security, resource, legal or compatibility risks you are aware of.
+    validations:
+      required: true
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy impact
+      description: Do files leave the device? Are external providers contacted? What data is stored or logged?
+    validations:
+      required: true

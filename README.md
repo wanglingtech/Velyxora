@@ -1,187 +1,363 @@
-# VELYXORA | Universal Conversion & Media Toolkit
+# VELYXORA
 
-## SaaS beta: PostgreSQL y admin inicial
+A free, open-source, privacy-first toolkit for everyday file, media and document
+transformation tasks. VELYXORA runs most operations entirely in the browser and
+only sends files to a server when native tooling such as FFmpeg, FFprobe,
+LibreOffice or yt-dlp is genuinely required.
 
-Configura `DATABASE_URL` y un `AUTH_PASSWORD_PEPPER` aleatorio desde `.env.example`; ejecuta `npm run db:generate`, `npm run db:migrate` y `npm run db:seed`. Para crear el primer administrador, define temporalmente `INITIAL_ADMIN_EMAIL` e `INITIAL_ADMIN_PASSWORD` solo en el entorno del seed. El registro público nunca acepta ADMIN.
+VELYXORA is licensed under the **GNU Affero General Public License v3.0**
+(`AGPL-3.0-only`). See [License](#license).
 
-Auth usa sesiones opacas en cookie HttpOnly y Secure en producción, con `SameSite` configurable mediante `SESSION_COOKIE_SAME_SITE` (`none` por defecto en producción y `lax` en desarrollo) y protección CSRF por token de sesión. Para la beta Vercel/Railway cross-site se usa `none`; al migrar a `velyxora.com` + `api.velyxora.com`, configure `lax`. Los pagos son revisión manual Yape (`BETA_MANUAL`), no una pasarela automática.
+---
 
-Las órdenes Yape propias en `PENDING_PAYMENT` o `PENDING_REVIEW` pueden abrir WhatsApp Click-to-Chat desde Mi cuenta. Configure en el backend `WHATSAPP_ADMIN_PHONE_E164` con un número público independiente de `YAPE_PHONE` (por ejemplo, `+51968555200`). El mensaje usa plan, monto, moneda, email e ID obtenidos del backend y añade la referencia solo cuando existe y es válida. VELYXORA no envía el mensaje, no usa WhatsApp Cloud API y no activa planes: el usuario lo revisa y decide enviarlo, mientras la revisión administrativa existente sigue siendo autoritativa.
+## What is VELYXORA?
 
-## Herramientas FFmpeg
+VELYXORA is a web application that bundles dozens of file and media utilities
+into a single interface: image conversion, PDF creation, audio/video
+transcoding, media analysis, QR/barcode generation, WhatsApp link helpers,
+developer utilities and more.
 
-El catálogo expone conversiones reales de video y audio mediante el backend: MP4/WebM, MP3/WAV, GIF, recorte, silencio, velocidad, compresión, resolución, bitrate y normalización. El frontend sólo envía opciones tipadas; el servidor usa `spawn` con argumentos separados, valida cada resultado con FFprobe y publica la descarga únicamente después de `COMPLETED`.
+It is designed around three ideas:
 
-Puede configurar `FFMPEG_PATH`, `FFPROBE_PATH` y `FFMPEG_TIMEOUT_MS`; por defecto se resuelven `ffmpeg` y `ffprobe` desde PATH.
+- **Free to use.** There are no plans, credits, balances, paywalls or paid
+  gating. Server processing is protected only by technical fair-use limits.
+- **Privacy first.** Whenever a task can be completed with browser APIs, the
+  file never leaves the device.
+- **Honest engineering.** If a capability depends on an external binary that is
+  not present, VELYXORA reports that fact instead of fabricating results.
 
-## Descargador multimedia con yt-dlp
+## Current status
 
-`POST /api/media/analyze` obtiene metadata JSON y formatos reales mediante una capa de providers para YouTube, TikTok, Instagram, Facebook, X/Twitter, Vimeo, Reddit, Twitch y SoundCloud, con un provider genérico para otros sitios compatibles. `POST /api/media/process` crea un job cancelable; yt-dlp descarga, FFmpeg combina streams o convierte a MP3 cuando corresponde y FFprobe valida el resultado antes de habilitar la descarga.
+VELYXORA is under active development and is **not yet a formal public release**.
+The application is usable, but interfaces, tool coverage and infrastructure may
+still change.
 
-Configure `YT_DLP_PATH` con la ruta al ejecutable (o déjelo como `yt-dlp` si está en PATH) y `YT_DLP_TIMEOUT_MS`. La compatibilidad depende de yt-dlp y de cambios externos; solo se admite contenido público o autorizado. VELYXORA no usa cookies, sesiones, credenciales, bypass de DRM, autenticación ni paywalls.
+- The previous commercial model (credits, plans, manual payments) was **retired**.
+- The code is free to use and open source under AGPLv3.
+- Some tools depend on host binaries (FFmpeg, FFprobe, LibreOffice, yt-dlp) and
+  remain limited by the environment where the server runs.
+- See [CHANGELOG.md](CHANGELOG.md) for verifiable recent changes.
 
-VELYXORA is an enterprise-grade, privacy-first universal file transformation and media processing toolkit designed for modern desktop and mobile web environments.
+## Features
+
+Tools are grouped by area in `frontend/src/registry/tools.ts`:
+
+- **Images** — PNG/JPG/WebP conversion, compression, resizing, cropping,
+  filters, watermarking, SVG rasterization, base64 export, favicons, color
+  extraction and a 512×512 sticker maker.
+- **Video** — container conversion, compression, trimming, mute, speed,
+  resolution changes and frame extraction.
+- **Audio** — trimming, channel conversion, format/bitrate conversion,
+  normalization and browser text-to-speech.
+- **Documents & PDF** — images/text to PDF, PDF merge and split, and
+  Word/Excel/PowerPoint/OpenDocument → PDF through LibreOffice.
+- **Media downloader** — URL analysis and download through yt-dlp for
+  supported public sources.
+- **Developer & text utilities** — JSON/CSV/Markdown converters, JWT decoding,
+  hashing, UUID/password generation, diffs, regex testing and more.
+- **QR, barcode and WhatsApp** — QR/barcode generation and local WhatsApp link
+  helpers.
+- **Everyday utilities** — color, unit, timestamp, aspect-ratio and storage
+  converters.
+
+The exact, authoritative catalog is the tool registry in code, not this list.
+
+## Processing model
+
+Every tool declares a `processingMode` in its registry entry:
+
+| `processingMode`    | Meaning                                                         |
+| ------------------- | --------------------------------------------------------------- |
+| `CLIENT_SIDE`       | Runs entirely in the browser; the file never leaves the device. |
+| `SERVER_SIDE`       | Requires backend execution and native binaries.                 |
+| `HYBRID`            | Client-first, with server processing where needed.              |
+| `EXTERNAL_PROVIDER` | Resolves public data through external providers (SSRF-guarded). |
+
+Conceptually these map onto **CLIENT_SIDE / SERVER_REQUIRED / EXTERNAL**
+execution. Server-dependent tools require an authenticated session and are
+subject to technical limits, not payment.
+
+The current source of truth is:
+`frontend/src/types.ts` (`ProcessingMode`), `frontend/src/config/processingPolicy.ts`
+and `frontend/src/registry/tools.ts`.
+
+## Privacy model
+
+- **Client-side tools** process bytes in browser memory. No upload occurs.
+- **Server tools** upload to bounded, ephemeral temporary storage that is
+  cleaned up automatically (default TTL: 30 minutes). Files are not used for
+  anything other than the requested job.
+- **External analysis** validates URLs against SSRF protections and only queries
+  supported public endpoints. No social credentials, cookies, DRM bypass,
+  authentication or paywall circumvention are used.
+- Download results are served as attachments from temporary storage and expire.
+
+## Architecture
+
+```mermaid
+flowchart TD
+  subgraph Client["Client (React 19 / Vite / Tailwind v4)"]
+    UI[Universal Input & UI]
+    REG[Tool Registry]
+    RUN[Tool Runner]
+    ENG[Browser Engines<br/>Canvas · Web Audio · Web Crypto · pdf-lib · JSZip · QR]
+    API[API Client]
+    UI --> REG --> RUN
+    RUN --> ENG
+    RUN --> API
+  end
+
+  subgraph Server["Server (Node / Express / TypeScript)"]
+    MW[Middleware<br/>Auth · CSRF · Rate limit · Upload · SSRF]
+    CTRL[Controllers<br/>health · uploads · conversions · media · jobs]
+    JOB[JobManager & In-Memory Queue]
+    WORKER[Conversion Worker]
+    MEDIA[Media Provider Router]
+    EXEC[Execution Engines<br/>FFmpeg · FFprobe · LibreOffice · yt-dlp]
+    STORE[Ephemeral Storage TTL<br/>backend/temp · backend/storage]
+    API -->|HTTP / REST| MW --> CTRL --> JOB --> WORKER --> EXEC --> STORE
+    CTRL --> MEDIA
+  end
+
+  subgraph Data["Persistence"]
+    PG[(PostgreSQL via Prisma)]
+  end
+  Server --> PG
+```
+
+The single frontend Vite configuration is the root `vite.config.ts` (root
+`frontend/`, output `dist/`). The unified development server is `server.ts`.
+
+## Tech stack
+
+- **Frontend:** React 19, TypeScript, Vite 6, Tailwind CSS v4, `pdf-lib`,
+  `jszip`, `qrcode`, `lucide-react`, `motion`.
+- **Backend:** Node.js 22, Express 4, TypeScript, `multer`, `express-rate-limit`.
+- **Database:** Prisma ORM with PostgreSQL.
+- **Native engines:** FFmpeg / FFprobe, LibreOffice (headless), yt-dlp.
+- **Testing:** Node's built-in test runner with `tsx`, plus `supertest`.
+
+## Screenshots / demo
+
+No screenshots or hosted demo URLs are committed to this repository yet.
+This section will be updated when stable public assets exist. No placeholder
+images or unverified links are included.
+
+## Quick start
+
+Requirements:
+
+- **Node.js 22.x**
+- **npm** (used throughout this documentation)
+- **PostgreSQL** for auth, persistence and server jobs
+- Optional native binaries for server tools: FFmpeg/FFprobe, LibreOffice, yt-dlp
+
+```bash
+# Install dependencies from the repository root
+npm install
+
+# Create your local environment files (see next section)
+# Copy .env.example -> .env and adjust the values.
+
+# Prepare the database client and schema
+npm run db:generate
+npm run db:migrate
+
+# Start the unified development server (frontend + backend on port 3000)
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+## Environment configuration
+
+Copy the examples and fill them in locally. Never commit real secrets.
+
+- Root: `.env.example` → `.env`
+- Backend: `backend/.env.example` → `backend/.env`
+- Frontend: `frontend/.env.example` → `frontend/.env` (only `VITE_API_URL`)
+
+Key variables (see the `.env.example` files for the authoritative list):
+
+| Variable                        | Purpose                                              |
+| ------------------------------- | ---------------------------------------------------- |
+| `NODE_ENV`                      | `development` / `production` / `test`.               |
+| `PORT`                          | Backend port (default `3000`).                       |
+| `VITE_API_URL`                  | Frontend API origin.                                 |
+| `CORS_ORIGIN`                   | Allowed frontend origin(s), comma-separated.         |
+| `SESSION_COOKIE_SAME_SITE`      | `lax` or `none` (cross-site deployments).            |
+| `DATABASE_URL`                  | PostgreSQL connection string.                        |
+| `AUTH_PASSWORD_PEPPER`          | Required stable secret; changing it invalidates hashes. |
+| `MAX_UPLOAD_SIZE_MB`            | Hard upload ceiling.                                 |
+| `STORAGE_DIR` / `TEMP_DIR`      | Ephemeral result/upload directories with TTL.        |
+| `FFMPEG_PATH` / `FFPROBE_PATH`  | FFmpeg/FFprobe executables.                          |
+| `LIBREOFFICE_PATH`              | LibreOffice `soffice` executable.                    |
+| `YT_DLP_PATH`                   | yt-dlp executable.                                   |
+| `TRUST_PROXY`                   | Enable behind a reverse proxy (e.g. `true` on Railway). |
+
+Values shown are documentation only. Do not commit production secrets.
+
+## Database setup
+
+VELYXORA uses Prisma against PostgreSQL.
+
+```bash
+npm run db:generate   # generate Prisma Client
+npm run db:migrate    # apply migrations (prisma migrate deploy)
+npm run db:seed       # optional: seed initial/admin data
+```
+
+`INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` are only for the first seed.
+Remove `INITIAL_ADMIN_PASSWORD` from the environment afterwards. Public
+registration never creates `ADMIN` accounts.
+
+## Development
+
+```bash
+npm run dev            # unified frontend + backend (port 3000)
+npm run build:frontend # Vite production build -> dist/
+npm run build:backend  # prisma generate + esbuild backend bundle
+npm run build          # full production build
+npm start              # run the production server
+```
+
+Binary requirements for server tools:
+
+- **FFmpeg/FFprobe:** install via your package manager and ensure it is on
+  `PATH`, or set `FFMPEG_PATH`/`FFPROBE_PATH`.
+- **LibreOffice:** install `soffice` and set `LIBREOFFICE_PATH`.
+- **yt-dlp:** install the official binary and set `YT_DLP_PATH`.
+
+Without these binaries, the corresponding server tools report that the engine
+is unavailable rather than producing fabricated output.
+
+## Testing
+
+```bash
+npm test          # root test suite (backend + frontend)
+npm run typecheck # tsc --noEmit
+npm run lint      # eslint frontend/src backend/src server.ts
+npm run build     # verify the production build
+```
+
+Integration tests that require FFmpeg or LibreOffice skip themselves when the
+corresponding binary is not available locally. Some backend tests require a
+reachable PostgreSQL database configured by `DATABASE_URL`.
+
+## Project structure
 
 ```text
 velyxora/
-├── frontend/             # High-speed React 19 / Vite / Tailwind v4 Client
+├── frontend/                 # React 19 / Vite / Tailwind client
 │   ├── src/
-│   │   ├── components/   # UI components and tool runners
-│   │   ├── registry/     # Tool registry
-│   │   ├── services/     # Client engines and API client
-│   │   ├── types.ts      # Shared frontend types
-│   │   └── types/        # Domain-specific type modules
-│   ├── public/           # Static public files & web manifest
-│   ├── package.json      # Frontend standalone package manifest
-│   ├── tsconfig.json     # Frontend TypeScript extension
-│   └── README.md         # Frontend developer documentation
-│
-├── backend/              # Node.js / Express / TypeScript Conversion Backend
-│   ├── src/
-│   │   ├── app.ts        # Express app factory with CORS & rate limiting
-│   │   ├── server.ts     # Standalone HTTP server entry point
-│   │   ├── config/       # Environment variables & constants
-│   │   ├── controllers/  # Health, tools, formats, uploads, conversions, media
-│   │   ├── routes/       # RESTful API route definitions
-│   │   ├── services/     # Job service, storage service, media service
-│   │   ├── engines/      # ServerFFmpegEngine, LibreOfficeEngine, ServerImageEngine
-│   │   ├── providers/    # MediaProvider adapters (YouTube, Vimeo, TikTok, etc.)
-│   │   ├── jobs/         # JobManager & InMemoryQueue (BullMQ compatible)
-│   │   ├── workers/      # Asynchronous conversion worker
-│   │   ├── middleware/   # Request logger, error handler, upload handler
-│   │   ├── schemas/      # Input validation schemas & DTOs
-│   │   ├── types/        # Typed API responses & job contracts
-│   │   ├── utils/        # Sanitizer, logger, path assertion
-│   │   └── security/     # SSRF defense, IP filtering, rate limiting
-│   ├── storage/          # Ephemeral converted output storage with TTL
-│   ├── temp/             # Temporary upload staging directory with TTL
-│   ├── package.json      # Backend standalone package manifest
-│   ├── tsconfig.json     # Backend TypeScript configuration
-│   └── README.md         # Backend developer documentation
-│
-├── docs/                 # Engineering Documentation & Contracts
-│   ├── ARCHITECTURE.md   # Detailed system & layer architecture diagrams
-│   ├── IMPLEMENTATION_STATUS.md # Full 60-tool status & matrix
-│   ├── TODO.md           # Concrete, actionable engineering roadmap
-│   ├── API.md            # Complete RESTful API specification
-│   └── FORMATS.md        # File formats & conversion engine matrix
-│
-├── server.ts             # Unified full-stack development & production server
-├── package.json          # Root workspace & orchestrator manifest
-├── .env.example          # Environment variable template
-└── README.md             # This document
+│   │   ├── components/       # UI and tool runners
+│   │   ├── config/           # processing policy, support, service status
+│   │   ├── registry/         # tools.ts — tool catalog
+│   │   ├── services/         # client engines and apiClient
+│   │   └── types.ts          # shared frontend types
+│   └── test/                 # frontend tests
+├── backend/                  # Node / Express / TypeScript API
+│   └── src/
+│       ├── config/           # environment and limits
+│       ├── controllers/      # health, uploads, conversions, media, jobs
+│       ├── engines/          # FFmpeg, LibreOffice, image engines
+│       ├── jobs/ workers/    # job manager and processing worker
+│       ├── providers/        # media provider adapters
+│       ├── routes/           # API routes
+│       ├── security/         # SSRF, upload policy, auth middleware
+│       └── services/         # job, storage, media, usage services
+├── prisma/                   # schema and tracked SQL migrations
+├── docs/                     # engineering documentation
+├── server.ts                 # unified full-stack server
+└── package.json              # root orchestrator manifest
 ```
 
----
+## Adding a new tool
 
-## 🏛️ Architecture & Processing Modes
+1. **Add a definition** to `frontend/src/registry/tools.ts` with a unique `id`
+   and `slug`, `category`, `inputTypes`/`outputTypes`, and a `processingMode`
+   of `CLIENT_SIDE`, `SERVER_SIDE`, `HYBRID` or `EXTERNAL_PROVIDER`.
+2. **Choose the runner kind.** `getToolRunnerKind` maps a definition to an
+   existing runner. Reuse an existing runner before adding a new one.
+3. **Client-side:** implement the engine in `frontend/src/services/` using
+   browser APIs or existing dependencies.
+4. **Server-side:** implement through the existing API contracts — upload via
+   `/api/uploads`, start a job via `/api/conversions`, poll `/api/jobs/:id` and
+   download through the returned `fileId`. Use `frontend/src/services/apiClient.ts`
+   rather than ad-hoc `fetch` calls.
+5. **Do not invent APIs.** Reuse controllers, engines and DTOs that already
+   exist. If a genuinely new endpoint is required, document and test it.
+6. **Add tests** and run `npm run typecheck`, `npm run lint` and `npm test`.
 
-Every tool in VELYXORA is strictly governed by its declared `processingMode`:
+Tools that have no real runner yet are marked `public: false` in the registry
+and are not routable. Do not expose a tool until it has a real implementation.
 
-1. **`CLIENT_SIDE`**:
-   - Zero-latency execution in browser memory.
-   - Files never leave the client device (using Canvas 2D, Web Audio API, Web Crypto API, JSZip, and QRCode).
-2. **`SERVER_SIDE`**:
-   - High-throughput conversion requiring native system binaries (e.g. `/usr/bin/ffmpeg` for MP4/WebM to MP3/WAV, bitrate modification).
-3. **`HYBRID`**:
-   - Client-first inspection with automatic server fallback.
-4. **`EXTERNAL_PROVIDER`**:
-   - SSRF-sanitized queries to official oEmbed endpoints (e.g., YouTube, Vimeo, TikTok, Reddit, Twitter/X) avoiding fake stream claims.
+## Security
 
-> **Absolute Rule**: Never simulate functionality. If an external engine is not present on the host (e.g. LibreOffice), VELYXORA exposes the exact API contract, validation, and transparent diagnostic messages without producing dummy files.
+See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
 
----
+Summary of existing protections:
 
-## 🚀 Getting Started in VS Code
+- **SSRF defense** for external media URLs (loopback, private ranges, link-local
+  metadata endpoints and forbidden schemes are blocked).
+- **Path-traversal protection** on uploaded and generated paths.
+- **Ephemeral storage with TTL** for temporary files.
+- **Rate limiting** across sensitive endpoints.
+- **Session auth + CSRF** for authenticated server processing.
 
-### 1. Unified Full-Stack Run (Recommended)
+Never commit secrets. Credentials belong only in local environment files.
 
-You can run both frontend and backend concurrently from the workspace root:
+## Fair use
 
-```bash
-# Install dependencies from the workspace root
-npm install
+VELYXORA is free, but server processing is a shared resource. Technical
+safeguards (configured in `backend/src/config/freeServiceLimits.ts`) bound
+uploads, concurrency and pending files per account to keep the service
+available for everyone. These limits are technical, not commercial, and are not
+tied to payment or support.
 
-# Start development server (serves frontend + backend API on port 3000)
-npm run dev
-```
+## Voluntary support
 
-Visit `http://localhost:3000` in your browser.
+Supporting VELYXORA is entirely optional and never unlocks features, credits or
+priorities. The application exposes voluntary support options from
+`frontend/src/config/supportMethods.ts`, which is the single source of truth for
+the configured methods. Methods are shown and activated only when explicitly
+configured, and the app never processes payments or stores financial data.
 
-### 2. Standalone Frontend Run
+## Contributing
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+Contributions are welcome through pull requests against the official repository:
+<https://github.com/wanglingtech/Velyxora>
 
-### 3. Standalone Backend Run
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+before opening a pull request. All contributions are subject to review and
+acceptance by the maintainer.
 
-```bash
-cd backend
-npm install
-npm run dev
-```
+## Roadmap
 
----
+The roadmap lives in [docs/TODO.md](docs/TODO.md). Highlights include wiring
+cancellation through running native processes, expanding real tool coverage,
+and accessibility/responsive polish. A roadmap item is not implemented merely
+because it is listed.
 
-## 🛠️ Binary Dependencies (Windows & Linux Setup)
+## License
 
-### FFmpeg
+VELYXORA is licensed under the **GNU Affero General Public License v3.0**
+(SPDX: `AGPL-3.0-only`). See [LICENSE](LICENSE) for the full text.
 
-- **Linux (Ubuntu/Debian)**: `sudo apt update && sudo apt install -y ffmpeg` (Path: `/usr/bin/ffmpeg`)
-- **Windows**: Install via `winget install Gyan.FFmpeg` or download from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) and add `bin` to PATH. Configure `FFMPEG_PATH` in `backend/.env`.
+The VELYXORA name and branding are separate from the software license. The
+AGPLv3 grant covers the source code; it does not grant rights to use the
+VELYXORA name or branding as an official representation of the project. See the
+[LICENSE](LICENSE) notice for details.
 
-### LibreOffice (for Word/PowerPoint/Excel to PDF)
+Because VELYXORA is server software, the AGPL's network-use condition applies:
+if you run a modified version as a network service, you must offer its
+Corresponding Source to users interacting with it.
 
-- **Linux (Ubuntu/Debian)**: `sudo apt update && sudo apt install -y libreoffice-writer libreoffice-calc libreoffice-impress` (Path: `soffice`)
-- **Windows**: Install standard MSI from [libreoffice.org](https://www.libreoffice.org/download/download-libreoffice/). Path: `C:\Program Files\LibreOffice\program\soffice.exe`. Configure `LIBREOFFICE_PATH` in `backend/.env`.
+## Acknowledgements
 
-### yt-dlp
-
-- Compruebe `yt-dlp --version` desde la misma terminal que ejecutará VELYXORA.
-- En Windows puede definir `YT_DLP_PATH=C:\ruta\a\yt-dlp.exe`.
-- No configure cookies ni credenciales: esta integración está limitada a contenido público/autorizado.
-
----
-
-## 🔒 Security Measures
-
-- **SSRF Defense**: Strict validation in `backend/src/security/ssrfValidator.ts` blocks requests to loopback addresses (`127.0.0.1`, `::1`), private LAN ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local metadata endpoints (`169.254.169.254`), and forbidden protocols (`file://`, `ftp://`).
-- **Path Traversal Protection**: All uploaded and generated file paths are strictly vetted with `assertSafePath` to prevent directory traversal outside `temp/` and `storage/`.
-- **Ephemeral Storage TTL**: Automatic cleanup process evicts files older than 30 minutes.
-- **Rate Limiting**: Configurable sliding window limit prevents API abuse.
-
----
-
-## 📦 Production Deployment & Build
-
-```bash
-# Compile frontend and backend
-npm run build
-
-# Start production server
-npm start
-```
-
-Vite is configured only in the root `vite.config.ts`; its root is `frontend/` and its output is `dist/`. There is no second frontend Vite configuration.
-
-The current baseline includes real client PDF generation through `frontend/src/services/pdfEngine.ts`, API/media validation, and backend security/API tests. FFmpeg, LibreOffice and direct media extraction remain dependent on host binaries and are not treated as verified merely because their adapters exist.
-# Documentos Office, historial y preferencias
-
-Las conversiones `DOCX`, `XLSX`, `PPTX`, `ODT`, `ODS` y `ODP` a PDF usan un proceso real de LibreOffice headless. Configure `LIBREOFFICE_PATH` (en Windows, por ejemplo `C:\Program Files\LibreOffice\program\soffice.exe`) y opcionalmente `LIBREOFFICE_TIMEOUT_MS` (por defecto 600000). Cada job usa un perfil temporal aislado; la salida debe existir, no estar vacía y tener estructura PDF válida antes de publicarse.
-
-El historial previo a cuentas/DB es local, versionado y guarda solo metadatos. Puede desactivarse sin eliminar entradas existentes. Las preferencias y la reducción de movimiento también se guardan localmente.
-
-## Compartir resultados
-
-La capa Share del frontend admite resultados `file`, `text` y `url`. Los resultados que pasan por `JobProgressView` pueden abrir el menú nativo del sistema con `navigator.share()`: los archivos se ofrecen únicamente después de que `navigator.canShare({ files })` confirme soporte; si no existe soporte se conserva la descarga, y los textos usan copiar al portapapeles como fallback. Una cancelación voluntaria del menú no se presenta como fallo.
-
-Las URL solo son compartibles/copiables mediante este contrato cuando son HTTP(S) públicas; se rechazan `blob:`, `file:`, localhost, redes privadas, credenciales embebidas, rutas relativas e IDs de almacenamiento. VELYXORA no publica directamente en redes sociales, no solicita credenciales sociales y no sube resultados a un intermediario para compartir. Esta acción es local y no consume créditos.
-
-## Crear Sticker
-
-Sticker Maker es una herramienta pública de Imagen para PNG, JPG/JPEG y WebP. Valida MIME, firma, decodificación, bytes y dimensiones; permite encuadre 1:1 mediante arrastre, zoom y restablecimiento, y genera localmente un WebP estático de 512 × 512. Prueba calidades 92%, 82%, 72%, 62%, 52% y 42% hasta intentar alcanzar 100 KB, con un máximo acotado de seis exportaciones. Si no alcanza el objetivo, permite descargar el resultado pero lo identifica como fuera del objetivo.
-
-La herramienta preserva transparencia cuando la entrada y el navegador la proporcionan, cuesta 0 créditos y está disponible para FREE, PLUS y PRO. No elimina fondos, no crea stickers animados o packs, no instala archivos en WhatsApp y no implementa un borde de silueta. Descargar siempre permanece disponible; Compartir reutiliza Share Layer y su fallback de descarga.
+VELYXORA builds on third-party open-source software and tools, including but not
+limited to React, Vite, Tailwind CSS, Express, Prisma, `pdf-lib`, `jszip`,
+`qrcode`, FFmpeg/FFprobe, LibreOffice and yt-dlp. Each dependency and external
+binary remains under its own license and terms; see the respective project for
+details. Please use external integrations only with content you own or are
+authorized to process.

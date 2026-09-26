@@ -1,15 +1,18 @@
 # VELYXORA — Tool Implementation Status Matrix
 
-## Fase Auth + PostgreSQL + Credits + Admin Beta
+## Fase Auth + PostgreSQL + Admin Beta (modelo comercial RETIRADO)
+
+> Planes, créditos, ledger y pagos fueron retirados. VELYXORA es gratuito y
+> open source bajo AGPLv3. Las filas comerciales se conservan como historial.
 
 | Área | Estado | Nota |
 |---|---|---|
 | Schema/migración PostgreSQL | `PARTIAL` | Prisma valida; no aplicada por falta de DATABASE_URL |
 | Auth/sesión/roles/CSRF | `PARTIAL` | implementado; E2E DB pendiente |
-| Créditos/ledger/jobs | `PARTIAL` | lifecycle transaccional; E2E DB pendiente |
+| Créditos/ledger/jobs | `RETIRADO` | eliminado por la migración `retire_commercial_models` |
 | Admin/UI de cuenta | `PARTIAL` | rutas/vistas; prueba visual pendiente |
-| Yape manual | `BETA_MANUAL` | sin verificación automática |
-| PaymentProvider | `REQUIRES_EXTERNAL_PROVIDER` | contrato futuro, sin simulación |
+| Yape manual | `RETIRADO` | sin verificación automática; modelo eliminado |
+| PaymentProvider | `RETIRADO` | contrato eliminado |
 | Privacy/Terms | `LEGAL_REVIEW_REQUIRED` | borradores actualizados |
 | About | `COMPLETE` | arquitectura LOCAL/SERVER/EXTERNAL alineada |
 | Privacy technical | `COMPLETE` | datos y flujos reales documentados |
@@ -20,7 +23,7 @@
 | Complaint book legal | `LEGAL_REVIEW_REQUIRED` | formato peruano sujeto a revisión |
 | Yape | `BETA_MANUAL` | revisión manual |
 | Payment gateway | `POST_BETA` | no implementado |
-| License | `PROPRIETARY` | All Rights Reserved |
+| License | `AGPL-3.0-only` | GNU Affero General Public License v3.0 |
 
 ## Fase 1A — Share Layer
 
@@ -98,7 +101,10 @@ This document tracks the implementation status of the tools represented by the c
 
 Phase 2B fixed the shared result-delivery defect: client jobs now download their real Blob through `downloadService`, while backend jobs return `output.fileId` and download through `GET /api/download/:fileId`. Tools still requiring unavailable host binaries remain `BACKEND_READY`/`REQUIRES_EXTERNAL_ENGINE`, not complete.
 
-## Fase 1B — WhatsApp Click-to-Chat de pagos
+## Fase 1B — WhatsApp Click-to-Chat de pagos (HISTÓRICO / RETIRADO)
+
+> El modelo de pagos fue retirado. Esta sección se conserva como registro
+> histórico y no describe el comportamiento actual.
 
 Implementado en Mi cuenta para órdenes Yape propias con estado `PENDING_PAYMENT` (consulta) y `PENDING_REVIEW` (contacto para revisión). El enlace prellena plan, monto/moneda, email e ID de orden; la referencia de nueve dígitos solo se incluye cuando existe. El usuario revisa, modifica y decide enviar en WhatsApp. No hay Cloud API, bot, envío automático, consumo de créditos ni activación de planes; `PaymentService.review()` conserva toda la autoridad.
 

@@ -1,11 +1,24 @@
 {
-  "name": "react-example",
+  "name": "velyxora",
   "private": true,
+  "version": "0.0.0",
+  "description": "VELYXORA — free, open-source, privacy-first file and media toolkit.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wanglingtech/Velyxora.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wanglingtech/Velyxora/issues"
+  },
+  "homepage": "https://github.com/wanglingtech/Velyxora#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "overrides": {
     "qs": "^6.16.0"
   },
-  "version": "0.0.0",
-  "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.mjs",

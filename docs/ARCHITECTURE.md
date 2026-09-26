@@ -1,14 +1,31 @@
 # VELYXORA — System Architecture & Design
 
-## SaaS beta
+## Free & open source model
 
-PostgreSQL es la persistencia de producción mediante Prisma. La migración crea `User`, `Session`, `Plan`, `UserPlan`, `CreditLedger`, `ProcessingUsage`, `PaymentOrder`, `Payment` y `AdminAuditLog`, unidos por UUID. El saldo es la suma del ledger, no un campo mutable.
+El código está bajo AGPLv3. VELYXORA es gratuito: no hay planes, créditos,
+ledger ni órdenes de pago.
 
-Una operación SERVER autenticada calcula costo en backend, comprueba plan/concurrencia, reserva con clave idempotente y confirma consumo al completar. `FAILED` y `CANCELLED` reembolsan íntegramente. ADMIN registra `ADMIN_TEST` con costo estimado y reserva cero.
+PostgreSQL es la persistencia de producción mediante Prisma. El schema actual
+define `User`, `ShortLink`, `ShortLinkReport`, `DeniedIdentity`, `Complaint`,
+`Suggestion`, `ProcessingHistory`, `Session`, `ProcessingUsage`,
+`ProviderCircuitBreaker`, `ServiceStatus` y `AdminAuditLog`, unidos por UUID.
 
-Yape beta exige revisión ADMIN. Aprobar converge en Payment, PURCHASE, UserPlan y audit log dentro de una transacción. `PaymentProvider` queda como contrato sin checkout/webhook simulado. El downloader aplica `ProviderPolicyService` antes de SSRF/yt-dlp; GenericProvider no elude la allowlist.
+Una operación SERVER autenticada se ejecuta sin costo y sin reserva de
+créditos. La protección en runtime es puramente técnica
+(`backend/src/config/freeServiceLimits.ts`): límite de subida, jobs de servidor
+concurrentes y archivos pendientes por cuenta. `FAILED` y `CANCELLED` liberan
+el cupo técnico; no existe reembolso porque no existe consumo.
 
-WhatsApp Click-to-Chat es una ayuda de contacto separada de Share Layer y de la aprobación. `GET /api/payments/config`, protegido por sesión, expone únicamente el número público normalizado; las órdenes y la cuenta continúan llegando desde consultas limitadas por `userId`. El navegador construye `https://wa.me/<número>?text=<mensaje codificado>` solo para `PENDING_PAYMENT` y `PENDING_REVIEW`, usando el DTO real de la orden. No hay envío servidor, webhook, bot, Cloud API ni cambio de estado provocado por WhatsApp.
+> Historical note: el modelo comercial anterior (planes, ledger, Yape manual,
+> `PaymentOrder`/`Payment` y la ayuda de contacto por WhatsApp para pagos) fue
+> retirado del código y del schema por la migración
+> `prisma/migrations/20260926000100_retire_commercial_models`. Se conserva
+> únicamente como referencia histórica.
+
+El downloader aplica `ProviderPolicyService` antes de SSRF/yt-dlp; GenericProvider no elude la allowlist.
+
+El soporte es voluntario y opcional (`frontend/src/config/supportMethods.ts`);
+nunca desbloquea herramientas, créditos, prioridad ni cuentas privilegiadas.
 
 Sticker Maker usa un runner dedicado y `stickerMakerService` en el cliente. El servicio valida firma y MIME, decodifica la imagen, limita memoria por bytes/dimensiones/píxeles, calcula un crop cuadrado de tipo cover y exporta WebP mediante Canvas. No crea jobs ni endpoints. El resultado es un `File` que pasa al Share Layer existente; el historial conserva únicamente metadata mínima, nunca el archivo.
 

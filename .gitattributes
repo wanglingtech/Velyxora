@@ -1,0 +1,68 @@
+# Normalize line endings conservatively.
+#
+# Text files are stored with LF in the repository and checked out with LF to
+# avoid the "LF will be replaced by CRLF" warnings on Windows. This file does
+# not trigger a repository-wide renormalization on its own.
+
+* text=auto eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+
+# Windows batch scripts (if added later)
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# SQL migrations must remain readable, tracked text
+*.sql text eol=lf
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.bmp binary
+*.tiff binary
+*.tif binary
+*.avif binary
+*.svg text eol=lf
+
+# Fonts
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+
+# Documents and archives
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tgz binary
+*.tar binary
+*.7z binary
+*.rar binary
+
+# Executables and libraries
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+
+# Media
+*.mp3 binary
+*.mp4 binary
+*.m4a binary
+*.webm binary
+*.wav binary
+*.ogg binary
+*.oga binary
+*.flac binary
+*.mov binary
+*.avi binary
+*.mkv binary

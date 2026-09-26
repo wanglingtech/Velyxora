@@ -4,7 +4,7 @@ This repository is prepared for a Vercel frontend and a Docker-based Railway API
 
 ## Data boundary
 
-PostgreSQL is the system of record for users, sessions, plans, credits, payment orders, payments, processing usage/history, complaints, suggestions, audit logs, denied identities, and short links. Upload bytes, conversion outputs, in-memory jobs, and queue state are deliberately ephemeral during beta. A restart can invalidate an active job or download, but must not remove business records.
+PostgreSQL is the system of record for users, sessions, processing usage/history, complaints, suggestions, audit logs, denied identities, short links, provider circuit-breaker state and service status. Upload bytes, conversion outputs, in-memory jobs, and queue state are deliberately ephemeral. A restart can invalidate an active job or download, but must not remove business records. VELYXORA is free: there are no plans, credits or payment records.
 
 The beta file flow is `upload -> processing -> result -> download -> TTL cleanup`. `TEMP_DIR` and `STORAGE_DIR` must point to disposable container paths. Object storage, Redis, BullMQ, separate workers, Kubernetes, and complex autoscaling are postponed until post-beta.
 
@@ -12,9 +12,8 @@ The beta file flow is `upload -> processing -> result -> download -> TTL cleanup
 
 1. Create the API service from this repository using `Dockerfile`; add Railway PostgreSQL and expose its `DATABASE_URL` to the API.
 2. Configure the production variables from `.env.example`. Railway supplies `PORT`; during the cross-site beta set `NODE_ENV=production`, `CORS_ORIGIN=https://velyxora.vercel.app`, `SESSION_COOKIE_SAME_SITE=none`, `TRUST_PROXY=true`, and a stable random `AUTH_PASSWORD_PEPPER`. After moving the frontend and API to `velyxora.com` subdomains, change the origin to `https://velyxora.com` and `SESSION_COOKIE_SAME_SITE=lax`.
-   For payment contact, set optional `WHATSAPP_ADMIN_PHONE_E164` to the public destination in strict E.164 form (leading `+`, country code and 8–15 total digits, for example `+51968555200`). It is separate from `YAPE_PHONE`; invalid non-empty configuration stops startup instead of producing a broken link.
 3. Keep the pre-deploy command `npx prisma migrate deploy`, start command `node backend/dist/server.mjs`, and health path `/api/health` from `railway.json`.
-4. Run `npm run db:seed` manually once if plans/admin are required. The seed is idempotent and does not rotate an existing admin password. Remove `INITIAL_ADMIN_PASSWORD` afterward.
+4. Run `npm run db:seed` manually once if an initial admin is required. The seed is idempotent and does not rotate an existing admin password. Remove `INITIAL_ADMIN_PASSWORD` afterward.
 5. Attach `api.velyxora.com` only after verification. Do not configure a persistent volume for temporary files.
 
 ## Vercel
@@ -44,9 +43,11 @@ Run `npm run typecheck`, `npm run lint`, `npm test`, `npm run build:frontend`, `
 
 Share no necesita variables de entorno, permisos backend ni cambios de despliegue. Debe validarse en HTTPS y en los navegadores/SO objetivo porque Web Share y el soporte de tipos de archivo varían. La revisión manual debe cubrir: share sheet disponible, `canShare` negativo, navegador sin Web Share, cancelación, fallback de descarga/copia y portapapeles bloqueado. VELYXORA no controla ni registra el destino elegido por el usuario y no publica directamente en redes sociales.
 
-## WhatsApp payment contact checks
+## Payment checks (historical)
 
-Con una cuenta de prueba, cree una orden y compruebe sin enviar mensajes que `PENDING_PAYMENT` muestra “Consultar por WhatsApp”, que después de registrar los nueve dígitos `PENDING_REVIEW` muestra “Contactar por WhatsApp” y que estados terminales no muestran la acción. Inspeccione la URL `wa.me`: debe contener el número sin `+`, espacios ni separadores y un parámetro `text` codificado. El mensaje solo debe contener plan, monto/moneda, email, ID y, cuando corresponda, reference. El usuario controla el envío; WhatsApp/Meta procesa los datos cuando decide continuar. Esta fase no usa Cloud API ni sustituye la revisión administrativa.
+> The commercial model was retired: there are no plans, credits, payment orders
+> or WhatsApp payment-contact flows. This section is kept only as a historical
+> reference and must not be run as part of current operations.
 
 ## Sticker Maker manual checks
 
