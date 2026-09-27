@@ -125,8 +125,10 @@ flowchart TD
   Server --> PG
 ```
 
-The single frontend Vite configuration is the root `vite.config.ts` (root
-`frontend/`, output `dist/`). The unified development server is `server.ts`.
+The unified build uses the root `vite.config.ts` (project root is `frontend/`,
+output is `dist/`) and the unified development server is `server.ts`. The
+`frontend/` directory keeps its own `vite.config.ts` only for optional
+standalone frontend development.
 
 ## Tech stack
 
@@ -148,9 +150,15 @@ images or unverified links are included.
 Requirements:
 
 - **Node.js 22.x**
-- **npm** (used throughout this documentation)
+- **npm** — the package manager used by this project
 - **PostgreSQL** for auth, persistence and server jobs
 - Optional native binaries for server tools: FFmpeg/FFprobe, LibreOffice, yt-dlp
+
+The official flow is npm from the repository root. The root `package-lock.json`
+is the authoritative lockfile, installed with `npm ci` in CI and the Docker
+image. `frontend/` and `backend/` also ship standalone `package.json` and
+`package-lock.json` files for optional independent development; Bun is not used
+or required.
 
 ```bash
 # Install dependencies from the repository root
@@ -322,6 +330,8 @@ priorities. The application exposes voluntary support options from
 `frontend/src/config/supportMethods.ts`, which is the single source of truth for
 the configured methods. Methods are shown and activated only when explicitly
 configured, and the app never processes payments or stores financial data.
+
+See [SUPPORT.md](SUPPORT.md) for usage and support guidance.
 
 ## Contributing
 
