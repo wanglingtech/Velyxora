@@ -1,0 +1,68 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dev: servidor unificado",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "dev: estado de puertos",
+      "type": "shell",
+      "command": "npm run dev:ports",
+      "problemMatcher": []
+    },
+    {
+      "label": "dev: liberar puertos",
+      "type": "shell",
+      "command": "npm run dev:stop",
+      "problemMatcher": []
+    },
+    {
+      "label": "db: generar cliente Prisma",
+      "type": "shell",
+      "command": "npm run db:generate",
+      "problemMatcher": []
+    },
+    {
+      "label": "db: aplicar migraciones",
+      "type": "shell",
+      "command": "npm run db:migrate",
+      "problemMatcher": []
+    },
+    {
+      "label": "db: seed admin",
+      "type": "shell",
+      "command": "npm run db:seed",
+      "problemMatcher": []
+    },
+    {
+      "label": "verificar: typecheck",
+      "type": "shell",
+      "command": "npm run typecheck",
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "verificar: lint",
+      "type": "shell",
+      "command": "npm run lint",
+      "problemMatcher": ["$eslint-stylish"]
+    },
+    {
+      "label": "verificar: tests",
+      "type": "shell",
+      "command": "npm test",
+      "problemMatcher": []
+    },
+    {
+      "label": "build: producción",
+      "type": "shell",
+      "command": "npm run build",
+      "problemMatcher": []
+    }
+  ]
+}

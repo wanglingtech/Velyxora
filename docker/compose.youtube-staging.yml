@@ -23,7 +23,8 @@ services:
 
   api:
     build:
-      context: .
+      # The compose file lives in docker/, so the build context is the repo root.
+      context: ..
       dockerfile: Dockerfile.media-staging
     environment:
       DATABASE_URL: postgresql://velyxora:local-staging-only@postgres:5432/velyxora?schema=public

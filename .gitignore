@@ -46,7 +46,12 @@ artifacts/
 Thumbs.db
 
 # Editor / IDE
-.vscode/
+# Shared workspace config is committed; personal overrides are ignored.
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
 .idea/
 
 # Local AI / coding-assistant tooling (owner-local, not part of the project)
@@ -60,6 +65,9 @@ docs/modelsopencode.md
 .vite/
 .turbo/
 *.tsbuildinfo
+
+# Playwright MCP browser artifacts
+.playwright-mcp/
 
 # Keys and certificates (never commit)
 *.pem
