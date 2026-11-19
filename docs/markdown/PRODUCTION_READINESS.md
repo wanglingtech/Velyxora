@@ -10,7 +10,7 @@ The beta file flow is `upload -> processing -> result -> download -> TTL cleanup
 
 ## Railway
 
-1. Create the API service from this repository using `Dockerfile`; add Railway PostgreSQL and expose its `DATABASE_URL` to the API.
+1. Create the API service from this repository using `docker/Dockerfile`; add Railway PostgreSQL and expose its `DATABASE_URL` to the API.
 2. Configure the production variables from `.env.example`. Railway supplies `PORT`; during the cross-site beta set `NODE_ENV=production`, `CORS_ORIGIN=https://velyxora.vercel.app`, `SESSION_COOKIE_SAME_SITE=none`, `TRUST_PROXY=true`, and a stable random `AUTH_PASSWORD_PEPPER`. After moving the frontend and API to `velyxora.com` subdomains, change the origin to `https://velyxora.com` and `SESSION_COOKIE_SAME_SITE=lax`.
 3. Keep the pre-deploy command `npx prisma migrate deploy`, start command `node backend/dist/server.mjs`, and health path `/api/health` from `railway.json`.
 4. Run `npm run db:seed` manually once if an initial admin is required. The seed is idempotent and does not rotate an existing admin password. Remove `INITIAL_ADMIN_PASSWORD` afterward.

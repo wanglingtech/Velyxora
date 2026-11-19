@@ -34,6 +34,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Improved responsive shell behavior across viewport sizes.
 - Modal/FAB interaction support in the shell.
+- **Login race condition:** `login()` and `register()` reused the session
+  restore requested at mount (deduplicated in `apiClient`), so submitting the
+  form while that unauthenticated `/api/auth/me` was still in flight returned
+  401 and discarded the new session. Login/register now use the user returned
+  by their own response and invalidate the cached `/auth/me`; a late 401 from
+  the mount-time restore can no longer overwrite a newer session.
+- Rate limiting no longer applies to HTML pages and static assets, which used
+  to exhaust the API budget and return 429 during normal navigation.
 
 ### Notes
 
