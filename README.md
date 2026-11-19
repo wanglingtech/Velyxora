@@ -139,11 +139,18 @@ standalone frontend development.
 - **Native engines:** FFmpeg / FFprobe, LibreOffice (headless), yt-dlp.
 - **Testing:** Node's built-in test runner with `tsx`, plus `supertest`.
 
-## Screenshots / demo
+## Screenshots
 
-No screenshots or hosted demo URLs are committed to this repository yet.
-This section will be updated when stable public assets exist. No placeholder
-images or unverified links are included.
+| Home | Tool runner |
+|---|---|
+| ![VELYXORA home](docs/screenshots/01-home.webp) | ![PNG to WebP tool](docs/screenshots/09-tool-png-to-webp.webp) |
+
+| Media downloader | Admin dashboard |
+|---|---|
+| ![Media downloader](docs/screenshots/14-media-downloader.webp) | ![Admin dashboard](docs/screenshots/05-admin.webp) |
+
+See the full [screenshot gallery](docs/screenshots/README.md) (desktop and
+mobile, WebP).
 
 ## Quick start
 
@@ -223,11 +230,18 @@ registration never creates `ADMIN` accounts.
 
 ```bash
 npm run dev            # unified frontend + backend (port 3000)
+npm run dev:ports      # show which process owns 3000 / 24678 / 5173
+npm run dev:stop       # stop this project's dev server and free those ports
 npm run build:frontend # Vite production build -> dist/
 npm run build:backend  # prisma generate + esbuild backend bundle
 npm run build          # full production build
 npm start              # run the production server
 ```
+
+`npm run dev` refuses to start when a port is already taken and tells you which
+command frees it, instead of failing with a raw `EADDRINUSE` stack trace.
+`dev:stop` only terminates processes whose command line belongs to this
+repository; anything else is reported and left alone.
 
 Binary requirements for server tools:
 
@@ -252,6 +266,22 @@ Integration tests that require FFmpeg or LibreOffice skip themselves when the
 corresponding binary is not available locally. Some backend tests require a
 reachable PostgreSQL database configured by `DATABASE_URL`.
 
+## Docker
+
+Container definitions live in `docker/`. The build context is the repository
+root, so `.dockerignore` must stay at the root.
+
+```bash
+docker build -f docker/Dockerfile -t velyxora .
+docker run --env-file .env -e NODE_ENV=production -p 3000:3000 velyxora
+
+# YouTube staging stack (Postgres + POT provider + media staging image)
+docker compose -f docker/compose.youtube-staging.yml up --build
+```
+
+Local development does not need Docker: `npm run dev` plus a native PostgreSQL
+instance is enough.
+
 ## Project structure
 
 ```text
@@ -275,7 +305,10 @@ velyxora/
 │       ├── security/         # SSRF, upload policy, auth middleware
 │       └── services/         # job, storage, media, usage services
 ├── prisma/                   # schema and tracked SQL migrations
-├── docs/                     # engineering documentation
+├── docker/                   # Dockerfile, media staging image, compose file
+├── docs/
+│   ├── markdown/             # engineering documentation
+│   └── screenshots/          # UI screenshots (WebP) for README and portfolio
 ├── server.ts                 # unified full-stack server
 └── package.json              # root orchestrator manifest
 ```
@@ -344,7 +377,7 @@ acceptance by the maintainer.
 
 ## Roadmap
 
-The roadmap lives in [docs/TODO.md](docs/TODO.md). Highlights include wiring
+The roadmap lives in [docs/markdown/TODO.md](docs/markdown/TODO.md). Highlights include wiring
 cancellation through running native processes, expanding real tool coverage,
 and accessibility/responsive polish. A roadmap item is not implemented merely
 because it is listed.

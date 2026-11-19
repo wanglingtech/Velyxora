@@ -20,7 +20,10 @@
     "qs": "^6.16.0"
   },
   "scripts": {
+    "predev": "node .scripts/dev-ports.mjs --guard",
     "dev": "tsx server.ts",
+    "dev:ports": "node .scripts/dev-ports.mjs",
+    "dev:stop": "node .scripts/dev-ports.mjs --stop",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.mjs",
     "build:frontend": "vite build",
     "build:backend": "prisma generate && esbuild backend/src/server.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=backend/dist/server.mjs",

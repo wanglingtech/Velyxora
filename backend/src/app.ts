@@ -17,7 +17,15 @@ export function createBackendApp(): Express {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+    const isApi = /^\/(api|s)(\/|$)/.test(req.path);
+    if (isApi) {
+      // Respuestas de API/redirect: JSON puro, bloquear todo
+      res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+    } else if (ENV.NODE_ENV === 'production') {
+      // Páginas: CSP de la app (idéntico al de frontend/vercel.json)
+      res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; frame-src https:; connect-src 'self' https:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+    }
+    // En desarrollo: sin CSP para páginas (Vite necesita inline scripts + HMR)
     res.setHeader('X-Frame-Options', 'DENY');
     if (ENV.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     if (/^\/api\/(auth|account|admin|history|jobs|download|conversions|media)(\/|$)/.test(req.path)) res.setHeader('Cache-Control', 'no-store, private');
@@ -35,7 +43,13 @@ export function createBackendApp(): Express {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'Idempotency-Key'],
   }));
 
-  app.use(rateLimiter);
+  // Rate limiting protects API and redirect endpoints. Pages and static assets
+  // must not consume the API budget: a single dev page load requests dozens of
+  // Vite modules and would exhaust the window almost immediately.
+  app.use((req, res, next) => {
+    if (/^\/(api|s)(\/|$)/.test(req.path)) return rateLimiter(req, res, next);
+    next();
+  });
   app.use(requestLogger);
 
   app.use(express.json({ limit: '1mb', type: 'application/json' }));

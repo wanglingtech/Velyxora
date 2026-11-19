@@ -1,0 +1,35 @@
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "editor.tabSize": 2,
+  "editor.formatOnSave": false,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "eslint.validate": ["javascript", "typescript", "typescriptreact"],
+  "eslint.workingDirectories": [{ "mode": "auto" }],
+  "tailwindCSS.experimental.classRegex": [
+    ["className\\s*[:=]\\s*[\"'`]([^\"'`]*)[\"'`]", "([a-zA-Z0-9\\-:\\[\\]\\/\\.%]+)"]
+  ],
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/backend/storage": true,
+    "**/backend/temp": true,
+    "**/package-lock.json": true,
+    "**/docs/screenshots": false
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/backend/storage/**": true,
+    "**/backend/temp/**": true
+  },
+  "files.associations": {
+    "*.css": "tailwindcss"
+  }
+}
