@@ -108,7 +108,11 @@ export class ApiClient {
   constructor() {
     // VITE_API_URL is the complete API base. Accepting a bare origin here keeps
     // older local environments safe while canonical configuration ends in /api.
-    const envUrl = (import.meta as any).env?.VITE_API_URL || "http://localhost:3000/api";
+    // Default is relative ("/api") so the browser always calls the same origin
+    // the page was opened from: cookies are host-scoped, so a page on
+    // 127.0.0.1 calling http://localhost:3000 would be cross-site and its
+    // SameSite=Lax session cookie would never be sent.
+    const envUrl = (import.meta as any).env?.VITE_API_URL || "/api";
     const normalized = envUrl ? envUrl.replace(/\/+$/, "") : "/api";
     this.baseUrl = normalized.endsWith("/api") ? normalized : `${normalized}/api`;
   }
@@ -187,15 +191,41 @@ export class ApiClient {
     return request;
   }
 
+  /**
+   * Drop an in-flight/deduped request so the next caller gets a fresh one.
+   * A session-changing call (login, register, logout) must never reuse a
+   * request that started before the change: the earlier /auth/me is
+   * unauthenticated and would fail with 401 even though the new session is
+   * already valid.
+   */
+  private invalidate(key: string): void {
+    this.inFlight.delete(key);
+  }
+
   private csrfToken(): string {
     return this.csrf;
   }
 
   auth = {
-    register: (email: string, password: string, displayName?: string) => this.request<any>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, displayName }) }),
-    login: (email: string, password: string) => this.request<any>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    // Login/register already return the authenticated user, so the caller does
+    // not need a second /auth/me round trip. That second request is both
+    // redundant and racy: a session restore started at mount can still be in
+    // flight and would be reused through the dedupe map.
+    register: async (email: string, password: string, displayName?: string) => {
+      const data = await this.request<any>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, displayName }) });
+      this.invalidate('auth:me');
+      return data.user;
+    },
+    login: async (email: string, password: string) => {
+      const data = await this.request<any>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+      this.invalidate('auth:me');
+      return data.user;
+    },
     me: () => this.deduped('auth:me', () => this.request<any>('/auth/me').then((result) => result.user)),
-    logout: () => this.request<void>('/auth/logout', { method: 'POST' }),
+    logout: async () => {
+      try { await this.request<void>('/auth/logout', { method: 'POST' }); }
+      finally { this.invalidate('auth:me'); this.csrf = ''; }
+    },
     account: () => this.deduped('account', () => this.request<any>('/account')),
     adminDashboard: () => this.deduped('admin:dashboard', () => this.request<any>('/admin/dashboard')),
     adminUsers: () => this.deduped('admin:users', () => this.request<any[]>('/admin/users')),

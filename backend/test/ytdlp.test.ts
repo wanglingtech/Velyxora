@@ -691,7 +691,7 @@ test("analyze and process errors keep stage-specific format messages", () => {
 });
 
 test("production Docker pins and verifies yt-dlp instead of using Debian's stale package", async () => {
-  const dockerfile = await readFile("Dockerfile", "utf8");
+  const dockerfile = await readFile("docker/Dockerfile", "utf8");
   assert.match(dockerfile, /ARG YT_DLP_VERSION=2026\.08\.19/);
   assert.match(dockerfile, /ARG YT_DLP_SHA256=[a-f0-9]{64}/);
   assert.match(dockerfile, /sha256sum --check --strict/);
@@ -702,8 +702,8 @@ test("production Docker pins and verifies yt-dlp instead of using Debian's stale
 
 test("media staging Docker alone enables diagnostics and production Docker stays unconfigured", async () => {
   const [productionDockerfile, stagingDockerfile] = await Promise.all([
-    readFile("Dockerfile", "utf8"),
-    readFile("Dockerfile.media-staging", "utf8"),
+    readFile("docker/Dockerfile", "utf8"),
+    readFile("docker/Dockerfile.media-staging", "utf8"),
   ]);
   assert.doesNotMatch(productionDockerfile, /MEDIA_STAGING_DIAGNOSTICS/);
   assert.match(stagingDockerfile, /MEDIA_STAGING_DIAGNOSTICS=true/);
