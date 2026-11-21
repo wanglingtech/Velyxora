@@ -1,82 +1,121 @@
-name: CI
+name: CI — VELYXORA
 
 on:
-  pull_request:
   push:
-    branches:
-      - main
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
 
-permissions:
-  contents: read
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '9'
 
 jobs:
-  build-and-test:
-    name: Typecheck, lint, build and test
+  typecheck:
+    name: TypeCheck
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
 
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16-alpine
         env:
-          POSTGRES_USER: velyxora
-          POSTGRES_PASSWORD: velyxora_ci
-          POSTGRES_DB: velyxora
-        ports:
-          - 5432:5432
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: velyxora_test
+        ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U velyxora -d velyxora"
+          --health-cmd "pg_isready -U test"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 10
-
+          --health-retries 5
     env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/velyxora_test
       NODE_ENV: test
-      DATABASE_URL: postgresql://velyxora:velyxora_ci@localhost:5432/velyxora?schema=public
-      # CI-only placeholder. Never a real credential.
-      AUTH_PASSWORD_PEPPER: ci-only-not-a-secret-pepper-value-000000
-      SESSION_COOKIE_SAME_SITE: lax
-      CORS_ORIGIN: http://localhost:5173
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js 22
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
         with:
-          node-version: 22
-          cache: npm
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run db:generate
+      - run: pnpm run db:migrate
+      - run: pnpm run test
 
-      - name: Install FFmpeg and FFprobe
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg
+  build:
+    name: Build (Frontend + Backend)
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
 
-      - name: Install dependencies
-        run: npm ci
+  build-frontend-only:
+    name: Build Frontend Only (Vercel Simulation)
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:frontend
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          retention-days: 1
 
-      - name: Generate Prisma Client
-        run: npx prisma generate
-
-      - name: Validate Prisma schema
-        run: npx prisma validate
-
-      - name: Apply database migrations
-        run: npx prisma migrate deploy
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
-
-      - name: Test
-        run: npm test
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true

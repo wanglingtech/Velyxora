@@ -213,12 +213,13 @@ export class ApiClient {
     // flight and would be reused through the dedupe map.
     register: async (email: string, password: string, displayName?: string) => {
       const data = await this.request<any>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, displayName }) });
-      this.invalidate('auth:me');
+      // NO invalidar 'auth:me' — login/register ya devuelven user autenticado.
+      // Invalidar causaba race condition: /auth/me en vuelo (sin auth) devolvía 401 y pisaba user válido.
       return data.user;
     },
     login: async (email: string, password: string) => {
       const data = await this.request<any>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-      this.invalidate('auth:me');
+      // NO invalidar 'auth:me' — mismo rationale que register.
       return data.user;
     },
     me: () => this.deduped('auth:me', () => this.request<any>('/auth/me').then((result) => result.user)),

@@ -11,6 +11,15 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Redirect 127.0.0.1 → localhost in development (cookies are host-scoped)
+  // This ensures session cookies work correctly when accessing via http://localhost:3000
+  app.use((req, res, next) => {
+    if (req.hostname === '127.0.0.1' && process.env.NODE_ENV !== 'production') {
+      return res.redirect(301, `http://localhost:3000${req.originalUrl}`);
+    }
+    next();
+  });
+
   // Mount backend API routes first (includes /api/*, health, uploads, conversions, media, jobs)
   app.use(backendApp);
 
