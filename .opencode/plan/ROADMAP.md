@@ -2,7 +2,7 @@
 
 > **Versión:** 2.0  
 > **Fecha:** 2026-11-20  
-> **Estado:** FASE 0/1 en ejecución  
+> **Estado:** FASE 0 ✅ completa — FASE 1 pendiente  
 > **Fuente única:** Este archivo + `.opencode/plan/ROADMAP.md` (sync manual)
 
 ---
@@ -18,18 +18,18 @@ VELYXORA evoluciona hacia un **toolkit 100% local-first** donde:
 
 ---
 
-## 📋 FASE 0: FOUNDATION (Crítica — Bloqueante Local)
+## 📋 FASE 0: FOUNDATION (Crítica — Bloqueante Local) — ✅ COMPLETA
 
 **Objetivo:** Login funcional en `localhost:3000` + auth race condition fix
 
 | Subfase | Tarea | Archivos | Estado |
 |---------|-------|----------|--------|
-| 0.1 | Redirect `127.0.0.1:3000` → `localhost:3000` en `server.ts` | `server.ts` | 🔄 Ejecutando |
-| 0.2 | Eliminar `invalidate('auth:me')` en `login/register` (race condition) | `frontend/src/services/apiClient.ts` L216, L221 | ⬜ Pendiente |
-| 0.3 | Verificar cookies `SameSite=Lax` en dev, `None;Secure` en prod | `backend/src/config/env.ts` | ⬜ Pendiente |
-| 0.4 | Test login completo: register → login → reload → sesión persiste | Manual | ⬜ Pendiente |
+| 0.1 | Redirect `127.0.0.1:3000` → `localhost:3000` en `server.ts` | `server.ts` | ✅ Hecho |
+| 0.2 | Eliminar `invalidate('auth:me')` en `login/register` (race condition) | `frontend/src/services/apiClient.ts` | ✅ Hecho |
+| 0.3 | Verificar cookies `SameSite=Lax` en dev, `None;Secure` en prod | `backend/src/config/env.ts` | ✅ Verificado |
+| 0.4 | Test login completo: register → login → reload → sesión persiste | Manual (curl) | ✅ Verificado |
 
-**Tokens estimados:** ~3k | **Tiempo:** 15-20 min
+**Resultado:** Register/login/reload/logout OK. `Set-Cookie: ...; HttpOnly; SameSite=Lax` (dev). Redirect 301 de `127.0.0.1` → `localhost` (API y página).
 
 ---
 
@@ -290,8 +290,10 @@ SESSION_COOKIE_SECURE: nodeEnv === 'production' // true en prod (HTTPS)
 
 ## ✅ CHECKLIST EJECUCIÓN INMEDIATA (FASE 0 + 1.1-1.4)
 
-- [ ] **0.1** Redirect 127.0.0.1 → localhost en `server.ts`
-- [ ] **0.2** Eliminar `invalidate('auth:me')` en login/register
+- [x] **0.1** Redirect 127.0.0.1 → localhost en `server.ts`
+- [x] **0.2** Eliminar `invalidate('auth:me')` en login/register
+- [x] **0.3** Verificar cookies SameSite=Lax en dev
+- [x] **0.4** Test login completo (register → login → reload → logout)
 - [ ] **1.1.1-1.1.4** `requiredServices` + limpieza types
 - [ ] **1.2.1-1.2.3** Maintenance badge UI
 - [ ] **1.3.1-1.3.3** ToolRunner guard + modal
@@ -303,6 +305,6 @@ SESSION_COOKIE_SECURE: nodeEnv === 'production' // true en prod (HTTPS)
 
 ## 🚀 PRÓXIMO PASO
 
-**Ejecutar FASE 0.1 → 0.2 → 1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6** en orden estricto de dependencias.
+**FASE 0 ✅ completa. Ejecutar FASE 1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6** en orden estricto de dependencias.
 
 > **Nota:** La eliminación del historial (1.4) es la tarea más grande en archivos tocados (~15 archivos) pero reduce deuda técnica y tokens DB permanentemente.
