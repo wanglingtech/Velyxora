@@ -1,6 +1,7 @@
 import { isIP } from "node:net";
 import { ENV } from "../config/env";
 import { MediaAnalysisResult } from "../types/media";
+import { logger } from "../utils/logger";
 import { YtDlpError, YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE, ytDlpService } from "../services/ytDlpService";
 import {
   YouTubeCircuitBreakerService,
@@ -11,6 +12,15 @@ import {
 import { YtDlpProvider } from "./YtDlpProvider";
 
 export const YOUTUBE_PO_PROVIDER_VERSION = "2.0.0";
+
+/**
+ * Local development escape hatch. When no PO token provider is configured, the
+ * regular yt-dlp path is allowed **only** outside production. The flag is
+ * ignored everywhere else, and env.ts refuses to boot production with it set.
+ */
+export function isUnverifiedYouTubeDevMode(enabled: boolean, nodeEnv: string): boolean {
+  return enabled && nodeEnv !== "production";
+}
 
 export function parseInternalPoProviderUrl(rawUrl: string): URL | null {
   try {
@@ -53,6 +63,13 @@ export class YouTubeProvider extends YtDlpProvider {
   private async invocationArgs(): Promise<string[]> {
     const providerUrl = parseInternalPoProviderUrl(ENV.YOUTUBE_PO_TOKEN_PROVIDER_URL);
     if (!providerUrl) {
+      if (isUnverifiedYouTubeDevMode(ENV.YOUTUBE_ALLOW_UNVERIFIED_DEV, ENV.NODE_ENV)) {
+        logger.warn("YOUTUBE_UNVERIFIED_DEV_MODE", {
+          reason: "po_provider_not_configured",
+          impact: "plain yt-dlp without PO token",
+        });
+        return [];
+      }
       throw new YtDlpError("MEDIA_PROVIDER_RESTRICTED", "El proveedor interno de verificación de YouTube no está configurado de forma segura.");
     }
     const controller = new AbortController();

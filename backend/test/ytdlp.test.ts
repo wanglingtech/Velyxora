@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { providerRegistry } from "../src/providers/ProviderRegistry";
-import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildDownloadArgs, buildEffectiveYtDlpArgs, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, buildYouTubeRawFormatDiagnostics, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, parseYouTubeJscDiagnostics, parseYouTubePotDiagnostics, parseYouTubeRuntimeDiagnostic, parseYouTubeTraceDiagnostics, selectThumbnail, shouldEnableTikTokStagingDiagnostics, shouldEnableYouTubeDiagnostics, withYouTubeDiagnosticsArgs, YtDlpError, YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE } from "../src/services/ytDlpService";
+import { assertUsableAnalysisFormats, buildAnalyzeArgs, buildAnalyzeExecutionPlan, buildCookieArgs, buildDownloadArgs, buildEffectiveYtDlpArgs, buildTikTokFailureDiagnostic, buildTikTokStagingDiagnostic, buildYouTubeRawFormatDiagnostics, classifyTikTokFailure, classifyWarnings, friendlyError, isRequestedFormatAvailable, normalizeFormats, normalizeFormatsWithDiagnostics, parseAnalysis, parseImpersonationTargetFamily, parseStagingRuntimeDiagnostics, parseTikTokVerboseDiagnostics, parseYouTubeJscDiagnostics, parseYouTubePotDiagnostics, parseYouTubeRuntimeDiagnostic, parseYouTubeTraceDiagnostics, selectThumbnail, shouldEnableTikTokStagingDiagnostics, shouldEnableYouTubeDiagnostics, withYouTubeDiagnosticsArgs, YtDlpError, YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE } from "../src/services/ytDlpService";
 import { backendApp } from "../src/app";
 import { ytDlpService } from "../src/services/ytDlpService";
 import { ENV, parseBooleanFlag } from "../src/config/env";
 import { readFile } from "node:fs/promises";
-import { buildYouTubeYtDlpArgs, parseInternalPoProviderUrl, YouTubeProvider, YOUTUBE_PO_PROVIDER_VERSION } from "../src/providers/YouTubeProvider";
+import { buildYouTubeYtDlpArgs, isUnverifiedYouTubeDevMode, parseInternalPoProviderUrl, YouTubeProvider, YOUTUBE_PO_PROVIDER_VERSION } from "../src/providers/YouTubeProvider";
 import { YtDlpProvider } from "../src/providers/YtDlpProvider";
 import { mediaService } from "../src/services/mediaService";
 import { mediaDownloadService } from "../src/services/mediaDownloadService";
@@ -483,6 +483,33 @@ test("TikTok post access restriction is provider-specific and unknown failures r
   assert.equal(tiktokError.message, "TikTok no permitió acceder a este contenido desde el servidor. Prueba con otra publicación pública o inténtalo más tarde.");
   assert.equal(friendlyError("ERROR: [TikTok] unexpected response", "analyze", "tiktok").code, "PROVIDER_UNAVAILABLE");
   assert.equal(friendlyError(blocked, "analyze", "vimeo").code, "PROVIDER_UNAVAILABLE");
+});
+
+test("required-session platforms map to an actionable provider error", () => {
+  const reddit = "ERROR: [Reddit] 6rrwyj: Account authentication is required. Use --cookies-from-browser or --cookies for the authentication.";
+  const vimeo = "ERROR: [vimeo] 76979871: The web client only works when logged-in. Use --cookies, --cookies-from-browser, --username and --password";
+  assert.equal(friendlyError(reddit, "analyze", "reddit").code, "PROVIDER_REQUIRES_AUTH");
+  assert.equal(friendlyError(vimeo, "analyze", "vimeo").code, "PROVIDER_REQUIRES_AUTH");
+  // Existing TikTok mapping must not regress to the new code.
+  assert.equal(friendlyError("TikTok is requiring login for access to this content", "analyze", "tiktok").code, "NOT_PUBLIC");
+});
+
+test("cookie read failures are reported as a configuration problem", () => {
+  assert.equal(friendlyError("ERROR: Failed to decrypt with DPAPI", "analyze", "reddit").code, "PROVIDER_COOKIES_UNAVAILABLE");
+  assert.equal(friendlyError("ERROR: cookies file does not exist: C:\\tmp\\cookies.txt", "analyze", "reddit").code, "PROVIDER_COOKIES_UNAVAILABLE");
+});
+
+test("cookies are forwarded only when a file is configured", () => {
+  assert.deepEqual(buildCookieArgs(""), []);
+  assert.deepEqual(buildCookieArgs(undefined), []);
+  assert.deepEqual(buildCookieArgs("  C:\\tmp\\cookies.txt "), ["--cookies", "C:\\tmp\\cookies.txt"]);
+});
+
+test("unverified YouTube fallback is development-only", () => {
+  assert.equal(isUnverifiedYouTubeDevMode(true, "development"), true);
+  assert.equal(isUnverifiedYouTubeDevMode(true, "test"), true);
+  assert.equal(isUnverifiedYouTubeDevMode(true, "production"), false);
+  assert.equal(isUnverifiedYouTubeDevMode(false, "development"), false);
 });
 
 test("TikTok failures are classified into closed sanitized reasons", () => {
