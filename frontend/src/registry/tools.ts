@@ -330,6 +330,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     keywords: ['mp4', 'mp3', 'wav', 'extraer audio', 'musica', 'sonido'],
     popular: true,
     requiresServer: true,
+    requiredServices: ['ffmpeg'],
     serverEngineNotice: 'Requiere FFmpeg para codificar bytes MP3 reales.',
     isClientReady: false
   },
@@ -346,18 +347,19 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     processingMode: 'SERVER_SIDE',
     engine: 'server-ffmpeg',
     requiresServer: true,
+    requiredServices: ['ffmpeg'],
     keywords: ['comprimir video', 'h264', 'crf', 'discord', 'reducir mp4'],
     popular: true,
     isClientReady: false
   },
-  { id: 'video-to-wav', slug: 'video-to-wav', name: 'Video a WAV', description: 'Extrae el audio del video como WAV sin compresión.', category: 'video', subcategory: 'Conversión', icon: 'Music', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['audio/wav'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['video','wav','extraer audio'], isClientReady: false },
-  { id: 'video-to-gif', slug: 'video-to-gif', name: 'Video a GIF', description: 'Convierte un fragmento de video en una animación GIF.', category: 'video', subcategory: 'Conversión', icon: 'Film', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['image/gif'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['video','gif','animación'], isClientReady: false },
-  { id: 'video-trimmer', slug: 'video-trimmer', name: 'Recortar video', description: 'Selecciona el inicio y final del fragmento que quieres conservar.', category: 'video', subcategory: 'Edición', icon: 'Scissors', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['recortar','trim','cortar video'], isClientReady: false },
-  { id: 'video-mute', slug: 'video-mute', name: 'Silenciar video', description: 'Elimina completamente la pista de audio y conserva la imagen.', category: 'video', subcategory: 'Edición', icon: 'VolumeX', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['silenciar','quitar audio','mute'], isClientReady: false },
-  { id: 'video-speed', slug: 'video-speed', name: 'Cambiar velocidad de video', description: 'Acelera o ralentiza el video manteniendo audio e imagen sincronizados.', category: 'video', subcategory: 'Edición', icon: 'Gauge', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['velocidad','acelerar','ralentizar'], isClientReady: false },
-  { id: 'video-resize', slug: 'video-resize', name: 'Cambiar resolución de video', description: 'Redimensiona el video a una resolución estándar.', category: 'video', subcategory: 'Edición', icon: 'Maximize2', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['resolución','720p','1080p','redimensionar'], isClientReady: false },
-  { id: 'mp4-to-webm', slug: 'mp4-to-webm', name: 'MP4 a WebM', description: 'Convierte video MP4 al formato WebM.', category: 'video', subcategory: 'Conversión', icon: 'Video', inputTypes: ['video/mp4'], outputTypes: ['video/webm'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['mp4','webm','convertir'], isClientReady: false },
-  { id: 'webm-to-mp4', slug: 'webm-to-mp4', name: 'WebM a MP4', description: 'Convierte video WebM al formato MP4 compatible.', category: 'video', subcategory: 'Conversión', icon: 'Video', inputTypes: ['video/webm'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['webm','mp4','convertir'], isClientReady: false },
+  { id: 'video-to-wav', slug: 'video-to-wav', name: 'Video a WAV', description: 'Extrae el audio del video como WAV sin compresión.', category: 'video', subcategory: 'Conversión', icon: 'Music', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['audio/wav'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['video','wav','extraer audio'], isClientReady: false },
+  { id: 'video-to-gif', slug: 'video-to-gif', name: 'Video a GIF', description: 'Convierte un fragmento de video en una animación GIF.', category: 'video', subcategory: 'Conversión', icon: 'Film', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['image/gif'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['video','gif','animación'], isClientReady: false },
+  { id: 'video-trimmer', slug: 'video-trimmer', name: 'Recortar video', description: 'Selecciona el inicio y final del fragmento que quieres conservar.', category: 'video', subcategory: 'Edición', icon: 'Scissors', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['recortar','trim','cortar video'], isClientReady: false },
+  { id: 'video-mute', slug: 'video-mute', name: 'Silenciar video', description: 'Elimina completamente la pista de audio y conserva la imagen.', category: 'video', subcategory: 'Edición', icon: 'VolumeX', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['silenciar','quitar audio','mute'], isClientReady: false },
+  { id: 'video-speed', slug: 'video-speed', name: 'Cambiar velocidad de video', description: 'Acelera o ralentiza el video manteniendo audio e imagen sincronizados.', category: 'video', subcategory: 'Edición', icon: 'Gauge', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['velocidad','acelerar','ralentizar'], isClientReady: false },
+  { id: 'video-resize', slug: 'video-resize', name: 'Cambiar resolución de video', description: 'Redimensiona el video a una resolución estándar.', category: 'video', subcategory: 'Edición', icon: 'Maximize2', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['resolución','720p','1080p','redimensionar'], isClientReady: false },
+  { id: 'mp4-to-webm', slug: 'mp4-to-webm', name: 'MP4 a WebM', description: 'Convierte video MP4 al formato WebM.', category: 'video', subcategory: 'Conversión', icon: 'Video', inputTypes: ['video/mp4'], outputTypes: ['video/webm'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['mp4','webm','convertir'], isClientReady: false },
+  { id: 'webm-to-mp4', slug: 'webm-to-mp4', name: 'WebM a MP4', description: 'Convierte video WebM al formato MP4 compatible.', category: 'video', subcategory: 'Conversión', icon: 'Video', inputTypes: ['video/webm'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['webm','mp4','convertir'], isClientReady: false },
 
   // ==================== AUDIO TOOLS ====================
   {
@@ -411,15 +413,16 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     processingMode: 'HYBRID',
     engine: 'server-ffmpeg',
     requiresServer: true,
+    requiredServices: ['ffmpeg'],
     serverEngineNotice: 'Transcodificación avanzada multiformato provista por servicio FFmpeg backend.',
     keywords: ['mp3', 'flac', 'wav', 'audio converter', 'bitrate'],
     popular: true,
     isClientReady: false
   },
-  { id: 'wav-to-mp3', slug: 'wav-to-mp3', name: 'WAV a MP3', description: 'Convierte audio WAV a MP3 real con bitrate configurable.', category: 'audio', subcategory: 'Conversión', icon: 'Music', inputTypes: ['audio/wav'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, keywords: ['wav','mp3'], isClientReady: false },
-  { id: 'mp3-to-wav', slug: 'mp3-to-wav', name: 'MP3 a WAV', description: 'Convierte audio MP3 a WAV PCM sin compresión.', category: 'audio', subcategory: 'Conversión', icon: 'Music', inputTypes: ['audio/mpeg'], outputTypes: ['audio/wav'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, keywords: ['mp3','wav'], isClientReady: false },
-  { id: 'audio-bitrate', slug: 'audio-bitrate', name: 'Cambiar bitrate de audio', description: 'Equilibra calidad y tamaño. Subir el bitrate no recupera calidad perdida.', category: 'audio', subcategory: 'Optimización', icon: 'SlidersHorizontal', inputTypes: ['audio/mpeg','audio/wav','audio/flac','audio/ogg'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, keywords: ['bitrate','audio','calidad'], isClientReady: false },
-  { id: 'audio-normalize', slug: 'audio-normalize', name: 'Normalizar volumen', description: 'Ajusta automáticamente el audio para obtener un nivel más uniforme.', category: 'audio', subcategory: 'Procesamiento', icon: 'AudioLines', inputTypes: ['audio/mpeg','audio/wav','audio/flac','audio/ogg'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, keywords: ['normalizar','volumen','loudness'], isClientReady: false },
+  { id: 'wav-to-mp3', slug: 'wav-to-mp3', name: 'WAV a MP3', description: 'Convierte audio WAV a MP3 real con bitrate configurable.', category: 'audio', subcategory: 'Conversión', icon: 'Music', inputTypes: ['audio/wav'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], keywords: ['wav','mp3'], isClientReady: false },
+  { id: 'mp3-to-wav', slug: 'mp3-to-wav', name: 'MP3 a WAV', description: 'Convierte audio MP3 a WAV PCM sin compresión.', category: 'audio', subcategory: 'Conversión', icon: 'Music', inputTypes: ['audio/mpeg'], outputTypes: ['audio/wav'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], keywords: ['mp3','wav'], isClientReady: false },
+  { id: 'audio-bitrate', slug: 'audio-bitrate', name: 'Cambiar bitrate de audio', description: 'Equilibra calidad y tamaño. Subir el bitrate no recupera calidad perdida.', category: 'audio', subcategory: 'Optimización', icon: 'SlidersHorizontal', inputTypes: ['audio/mpeg','audio/wav','audio/flac','audio/ogg'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], keywords: ['bitrate','audio','calidad'], isClientReady: false },
+  { id: 'audio-normalize', slug: 'audio-normalize', name: 'Normalizar volumen', description: 'Ajusta automáticamente el audio para obtener un nivel más uniforme.', category: 'audio', subcategory: 'Procesamiento', icon: 'AudioLines', inputTypes: ['audio/mpeg','audio/wav','audio/flac','audio/ogg'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], keywords: ['normalizar','volumen','loudness'], isClientReady: false },
   {
     id: 'text-to-speech',
     slug: 'text-to-speech',
@@ -844,6 +847,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     processingMode: 'HYBRID',
     engine: 'server-ytdlp',
     requiresServer: true,
+    requiredServices: ['ytDlp'],
     serverEngineNotice: 'Análisis de metadatos y embeds activo; la descarga de flujos combinados requiere microservicio yt-dlp + ffmpeg.',
     keywords: ['youtube', 'tiktok', 'instagram', 'twitter', 'facebook', 'descargar video', 'vimeo', 'reels'],
     popular: true,
@@ -943,6 +947,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     processingMode: 'SERVER_SIDE',
     engine: 'server-libreoffice',
     requiresServer: true,
+    requiredServices: ['libreOffice'],
     serverEngineNotice: 'Requiere LibreOffice headless en el backend.',
     keywords: ['word', 'docx', 'pdf', 'libreoffice', 'convertir documento'],
     popular: true,
@@ -953,7 +958,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     description: 'Convierte hojas de cálculo XLSX a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Sheet',
     inputTypes: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'], outputTypes: ['application/pdf'],
     acceptedExtensions: ['xlsx'], acceptedMimeTypes: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
-    processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true,
+    processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, requiredServices: ['libreOffice'],
     serverEngineNotice: 'Requiere LibreOffice headless en el backend.', keywords: ['excel', 'xlsx', 'pdf', 'libreoffice'], popular: true, isClientReady: true
   },
   {
@@ -961,17 +966,17 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     description: 'Convierte presentaciones PPTX a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Presentation',
     inputTypes: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'], outputTypes: ['application/pdf'],
     acceptedExtensions: ['pptx'], acceptedMimeTypes: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'],
-    processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true,
+    processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, requiredServices: ['libreOffice'],
     serverEngineNotice: 'Requiere LibreOffice headless en el backend.', keywords: ['powerpoint', 'pptx', 'pdf', 'libreoffice'], popular: true, isClientReady: true
   },
   {
-    id: 'odt-to-pdf', slug: 'odt-to-pdf', name: 'OpenDocument (ODT) a PDF', description: 'Convierte documentos ODT a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'FileText', inputTypes: ['application/vnd.oasis.opendocument.text'], outputTypes: ['application/pdf'], acceptedExtensions: ['odt'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.text'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['odt','opendocument','writer','pdf'], isClientReady: true
+    id: 'odt-to-pdf', slug: 'odt-to-pdf', name: 'OpenDocument (ODT) a PDF', description: 'Convierte documentos ODT a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'FileText', inputTypes: ['application/vnd.oasis.opendocument.text'], outputTypes: ['application/pdf'], acceptedExtensions: ['odt'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.text'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, requiredServices: ['libreOffice'], keywords: ['odt','opendocument','writer','pdf'], isClientReady: true
   },
   {
-    id: 'ods-to-pdf', slug: 'ods-to-pdf', name: 'OpenDocument (ODS) a PDF', description: 'Convierte hojas ODS a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Sheet', inputTypes: ['application/vnd.oasis.opendocument.spreadsheet'], outputTypes: ['application/pdf'], acceptedExtensions: ['ods'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.spreadsheet'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['ods','opendocument','calc','pdf'], isClientReady: true
+    id: 'ods-to-pdf', slug: 'ods-to-pdf', name: 'OpenDocument (ODS) a PDF', description: 'Convierte hojas ODS a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Sheet', inputTypes: ['application/vnd.oasis.opendocument.spreadsheet'], outputTypes: ['application/pdf'], acceptedExtensions: ['ods'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.spreadsheet'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, requiredServices: ['libreOffice'], keywords: ['ods','opendocument','calc','pdf'], isClientReady: true
   },
   {
-    id: 'odp-to-pdf', slug: 'odp-to-pdf', name: 'OpenDocument (ODP) a PDF', description: 'Convierte presentaciones ODP a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Presentation', inputTypes: ['application/vnd.oasis.opendocument.presentation'], outputTypes: ['application/pdf'], acceptedExtensions: ['odp'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.presentation'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['odp','opendocument','impress','pdf'], isClientReady: true
+    id: 'odp-to-pdf', slug: 'odp-to-pdf', name: 'OpenDocument (ODP) a PDF', description: 'Convierte presentaciones ODP a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Presentation', inputTypes: ['application/vnd.oasis.opendocument.presentation'], outputTypes: ['application/pdf'], acceptedExtensions: ['odp'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.presentation'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, requiredServices: ['libreOffice'], keywords: ['odp','opendocument','impress','pdf'], isClientReady: true
   },
 
   // ==================== UTILITIES ====================

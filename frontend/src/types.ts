@@ -2,7 +2,6 @@ export type ProcessingMode =
   | "CLIENT_SIDE"
   | "SERVER_SIDE"
   | "HYBRID"
-  | "EXTERNAL_PROVIDER"
   | string;
 export type ProcessingStatus =
   | "IDLE"
@@ -38,6 +37,7 @@ export interface ToolDefinition {
   isClientReady?: boolean;
   public?: boolean;
   requiresServer?: boolean;
+  requiredServices?: ('ffmpeg' | 'libreOffice' | 'ytDlp')[];
   serverEngineNotice?: string;
   [key: string]: unknown;
 }

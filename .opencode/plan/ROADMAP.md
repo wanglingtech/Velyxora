@@ -37,14 +37,17 @@ VELYXORA evoluciona hacia un **toolkit 100% local-first** donde:
 
 **Objetivo:** Prod con UX clara de mantenimiento, Vercel deploy estático, **historial eliminado**
 
-### 1.1 Tool Registry: `requiredServices` + Limpieza
+### 1.1 Tool Registry: `requiredServices` + Limpieza — ✅ COMPLETA (1.1.4 diferida a 1.4)
 
-| Subfase | Tarea | Archivos |
-|---------|-------|----------|
-| 1.1.1 | Agregar `requiredServices?: ('ffmpeg'|'libreOffice'|'ytDlp')[]` a `ToolDefinition` | `frontend/src/types.ts` |
-| 1.1.2 | Poblar `requiredServices` en todas las tools `requiresServer: true` | `frontend/src/registry/tools.ts` |
-| 1.1.3 | Eliminar `EXTERNAL_PROVIDER` de `ProcessingMode` type (no se usa) | `frontend/src/types.ts` |
-| 1.1.4 | Eliminar `HistoryItem.processingLocation` y campos legacy | `frontend/src/types.ts` |
+| Subfase | Tarea | Archivos | Estado |
+|---------|-------|----------|--------|
+| 1.1.1 | Agregar `requiredServices?: ('ffmpeg'|'libreOffice'|'ytDlp')[]` a `ToolDefinition` | `frontend/src/types.ts` | ✅ Hecho |
+| 1.1.2 | Poblar `requiredServices` en todas las tools `requiresServer: true` | `frontend/src/registry/tools.ts` | ✅ Hecho (15 ffmpeg, 6 libreOffice, 1 ytDlp) |
+| 1.1.3 | Eliminar `EXTERNAL_PROVIDER` de `ProcessingMode` type (no se usa) | `frontend/src/types.ts` | ✅ Hecho |
+| 1.1.4 | Eliminar `HistoryItem.processingLocation` y campos legacy | `frontend/src/types.ts` | ⏭️ Diferido a 1.4 |
+
+> **Nota 1.1.4:** los campos `processingLocation`/`outputFileId`/`completedAt` de `HistoryItem` solo se consumen en `historyService.ts`, `jobService.ts`, `HistoryView.tsx` y `StickerMakerTool.tsx` — todos eliminados/editados en FASE 1.4. Se eliminan junto con el módulo de historial para evitar doble trabajo y mantener el build verde.
+> **Nota `url-shortener`:** `requiresServer: true` pero `engine: 'velyxora-links'` (no ffmpeg/libreOffice/ytDlp) → sin `requiredServices`; el gating genérico de backend en 1.3 lo cubre.
 
 ### 1.2 Maintenance Badge en UI (ToolCard, CategoryView, HomeView)
 
@@ -294,7 +297,8 @@ SESSION_COOKIE_SECURE: nodeEnv === 'production' // true en prod (HTTPS)
 - [x] **0.2** Eliminar `invalidate('auth:me')` en login/register
 - [x] **0.3** Verificar cookies SameSite=Lax en dev
 - [x] **0.4** Test login completo (register → login → reload → logout)
-- [ ] **1.1.1-1.1.4** `requiredServices` + limpieza types
+- [x] **1.1.1-1.1.3** `requiredServices` + limpieza types (`EXTERNAL_PROVIDER` fuera)
+- [ ] **1.1.4** `HistoryItem` legacy fields → movido a 1.4
 - [ ] **1.2.1-1.2.3** Maintenance badge UI
 - [ ] **1.3.1-1.3.3** ToolRunner guard + modal
 - [ ] **1.4.1-1.4.10** **ELIMINACIÓN TOTAL HISTORIAL** (10 sub-tareas)
