@@ -72,6 +72,13 @@ export type TikTokStagingExtractionDiagnostics = StagingRuntimeDiagnostics & {
 
 const DIAGNOSTIC_BUFFER_LIMIT = 64 * 1024;
 
+// A cold `yt-dlp --version` can take far longer than a healthy command on
+// Windows (PyInstaller bootstrap + antivirus scanning); observed runs range
+// from ~6s up to ~30s. The probe must not report a working engine as missing,
+// so it gets a generous deadline and a single retry instead of the 5s default.
+const VERSION_PROBE_TIMEOUT_MS = 30_000;
+const VERSION_PROBE_ATTEMPTS = 2;
+
 export type YouTubeRuntimeDiagnostic = {
   stage: YouTubeDiagnosticStage;
   playerClient: "mweb";
@@ -550,6 +557,7 @@ function recordYouTubeHealthFailure(operationId: number | null, error: unknown):
 
 class YtDlpService {
   private version?: string;
+  private versionProbe?: Promise<string | null>;
   private stagingRuntimeDiagnostics?: Promise<StagingRuntimeDiagnostics>;
 
   async isAvailable(): Promise<boolean> {
@@ -558,10 +566,33 @@ class YtDlpService {
 
   async getVersion(): Promise<string | null> {
     if (this.version) return this.version;
-    try {
-      this.version = (await this.run(["--ignore-config", "--version"], "diagnostic", undefined, 5000)).stdout.trim();
-      return this.version || null;
-    } catch { return null; }
+    // Deduplicate concurrent callers (startup warm-up + health request) so a
+    // slow probe is not spawned twice. Failures are not cached, so a later
+    // call retries.
+    const probe = this.versionProbe ?? this.probeVersion();
+    this.versionProbe = probe;
+    const detected = await probe.finally(() => {
+      if (this.versionProbe === probe) this.versionProbe = undefined;
+    });
+    if (detected) this.version = detected;
+    return detected;
+  }
+
+  private async probeVersion(): Promise<string | null> {
+    for (let attempt = 1; attempt <= VERSION_PROBE_ATTEMPTS; attempt += 1) {
+      try {
+        const { stdout } = await this.run(["--ignore-config", "--version"], "diagnostic", undefined, VERSION_PROBE_TIMEOUT_MS);
+        const version = stdout.trim();
+        if (version) return version;
+      } catch (error) {
+        logger.warn("YT_DLP_VERSION_PROBE_FAILED", {
+          attempt,
+          maxAttempts: VERSION_PROBE_ATTEMPTS,
+          reason: error instanceof YtDlpError ? error.code : "unknown",
+        });
+      }
+    }
+    return null;
   }
 
   async analyze(url: string, platform: MediaPlatform, providerArgs: readonly string[] = []): Promise<MediaAnalysisResult> {
