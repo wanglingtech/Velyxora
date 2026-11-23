@@ -19,7 +19,7 @@ export class YtDlpProvider extends BaseMediaProvider {
     url: string,
     formatId: string,
     container: string,
-    type: "video" | "audio",
+    type: "video" | "audio" | "image",
     outputStem: string,
     signal?: AbortSignal,
     onProgress?: (value: number) => void,

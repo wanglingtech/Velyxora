@@ -32,6 +32,8 @@ import { pathForView } from "../../services/appRouting";
 import { downloadService } from "../../services/downloadService";
 import { useAuth } from "../../auth/AuthContext";
 
+const MEDIA_GROUP_LABELS = { video: "VIDEO", audio: "AUDIO", image: "IMAGEN" } as const;
+
 interface MediaDownloaderViewProps {
   initialUrl?: string;
   onBack?: () => void;
@@ -111,7 +113,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
         url: metadata.originalUrl,
         formatId: selectedFormat.id,
         container: selectedFormat.extension,
-        type: selectedFormat.type || (selectedFormat.hasVideo ? "video" : "audio"),
+        type: selectedFormat.type || (selectedFormat.hasVideo ? "video" : selectedFormat.hasAudio ? "audio" : "image"),
         title: metadata.title,
       });
       setDownloadJob(job);
@@ -305,9 +307,9 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
                     {EMPTY_MEDIA_FORMATS_MESSAGE}
                   </p>
                 )}
-                {(["video", "audio"] as const).map((group) => (
+                {(["video", "audio", "image"] as const).map((group) => (
                   <div key={group} className="space-y-2">
-                    <h5 className="text-[11px] font-bold tracking-widest text-indigo-300">{group.toUpperCase()}</h5>
+                    <h5 className="text-[11px] font-bold tracking-widest text-indigo-300">{MEDIA_GROUP_LABELS[group]}</h5>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {metadata.availableFormats.filter((fmt) => fmt.type === group).map((fmt) => {
                   const isSelected = selectedFormat?.id === fmt.id;

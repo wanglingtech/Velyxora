@@ -31,6 +31,8 @@ const createAdapter = (
   },
 });
 
+const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "avif", "bmp"]);
+
 const extractEmbedUrl = (embedHtml?: string): string | undefined => {
   if (!embedHtml) return undefined;
   const match = embedHtml.match(/\bsrc=["']([^"']+)["']/i);
@@ -48,8 +50,9 @@ export const normalizeMediaAnalysis = (
     const declaredType = format.type || format.kind;
     const hasVideo = format.hasVideo === true || (Boolean(format.vcodec) && format.vcodec !== 'none') || declaredType === 'video';
     const hasAudio = format.hasAudio === true || (Boolean(format.acodec) && format.acodec !== 'none') || declaredType === 'audio';
-    if (!formatId || !extension || (!hasVideo && !hasAudio)) return [];
-    const type: 'video' | 'audio' = hasVideo ? 'video' : 'audio';
+    const isImage = declaredType === 'image' || (!hasVideo && !hasAudio && IMAGE_EXTENSIONS.has(extension));
+    if (!formatId || !extension || (!hasVideo && !hasAudio && !isImage)) return [];
+    const type: 'video' | 'audio' | 'image' = hasVideo ? 'video' : hasAudio ? 'audio' : 'image';
     const qualityLabel = format.qualityLabel || format.formatNote || format.format_note || format.label || format.resolution;
     return [{ ...format, formatId, extension, type, hasVideo, hasAudio, qualityLabel }];
   }) : [];
@@ -79,7 +82,9 @@ export const normalizeMediaAnalysis = (
         ? "Video + audio"
         : format.hasVideo
           ? "Video"
-          : "Audio",
+          : format.hasAudio
+            ? "Audio"
+            : "Imagen",
     resolution: format.resolution,
     qualityLabel: format.qualityLabel,
     qualityBadge: format.qualityLabel,

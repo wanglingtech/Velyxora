@@ -347,6 +347,32 @@ test("normalization preserves video-only, audio-only and combined adaptive forma
   assert.ok(diagnostics.audioCount >= 1);
 });
 
+test("photo posts keep image formats while non-media entries stay filtered", () => {
+  const { formats, diagnostics } = normalizeFormatsWithDiagnostics([
+    { format_id: "img0", ext: "jpg", vcodec: "none", acodec: "none", width: 1080, height: 1080 },
+    { format_id: "img1", ext: "webp", width: 640, height: 640 },
+    { format_id: "storyboard", ext: "mhtml", vcodec: "none", acodec: "none" },
+  ]);
+  assert.equal(diagnostics.afterCodecFilter, 2);
+  assert.equal(diagnostics.imageCount, 2);
+  assert.equal(diagnostics.imageCount + diagnostics.videoCount + diagnostics.audioCount, 2);
+  const image = formats.find((format) => format.formatId === "img0");
+  assert.equal(image?.type, "image");
+  assert.equal(image?.hasVideo, false);
+  assert.equal(image?.hasAudio, false);
+  assert.equal(image?.resolution, "1080x1080");
+});
+
+test("analyze reports image content type for photo-only posts", () => {
+  const result = parseAnalysis({
+    title: "Photo post",
+    formats: [{ format_id: "photo", ext: "jpg", vcodec: "none", acodec: "none" }],
+  }, "https://instagram.com/p/public", "instagram");
+  assert.equal(result.contentType, "image");
+  assert.equal(result.formats[0]?.type, "image");
+  assert.equal(result.isDirectDownloadPossible, true);
+});
+
 test("format diagnostics distinguish empty extractor output from filtered non-media entries", () => {
   const empty = normalizeFormatsWithDiagnostics([]).diagnostics;
   assert.equal(empty.rawFormatsCount, 0);

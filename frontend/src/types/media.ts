@@ -10,7 +10,7 @@ export interface MediaFormatOption {
   hasVideo?: boolean;
   hasAudio?: boolean;
   directDownloadUrl?: string;
-  type?: "video" | "audio";
+  type?: "video" | "audio" | "image";
   fps?: number;
   bitrate?: number;
   filesize?: number;

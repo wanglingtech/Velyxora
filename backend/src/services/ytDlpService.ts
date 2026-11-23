@@ -22,7 +22,7 @@ export type RawInfo = {
 export type FormatDiagnostics = {
   rawFormatsCount: number; afterIdFilter: number; afterExtensionFilter: number;
   afterCodecFilter: number; afterDeduplication: number; normalizedFormatsCount: number;
-  videoCount: number; audioCount: number; combinedCount: number;
+  videoCount: number; audioCount: number; combinedCount: number; imageCount: number;
 };
 
 export class YtDlpError extends Error {
@@ -443,19 +443,32 @@ export function friendlyError(stderr: string, stage: YtDlpStage, provider?: Medi
 const hasUsableCodec = (codec: unknown): boolean =>
   typeof codec === "string" && !["", "none", "unknown"].includes(codec.trim().toLowerCase());
 
+// yt-dlp exposes photo posts (Instagram carousels, tweets, pins) as formats
+// without any audio/video codec. Without this allowlist they were discarded and
+// the UI reported "no downloadable formats" for perfectly valid images.
+export const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "avif", "bmp"]);
+
+export const isImageFormat = (format: RawFormat): boolean =>
+  !hasUsableCodec(format.vcodec) && !hasUsableCodec(format.acodec)
+  && typeof format.ext === "string" && IMAGE_EXTENSIONS.has(format.ext.trim().toLowerCase());
+
 export function normalizeFormatsWithDiagnostics(formats: RawFormat[] = []): { formats: MediaStreamFormat[]; diagnostics: FormatDiagnostics } {
   const normalized: MediaStreamFormat[] = [];
   const seen = new Set<string>();
   const withId = formats.filter((item) => typeof item.format_id === "string" && item.format_id.trim());
   const withExtension = withId.filter((item) => typeof item.ext === "string" && item.ext.trim());
-  const withCodec = withExtension.filter((item) => hasUsableCodec(item.vcodec) || hasUsableCodec(item.acodec));
+  const withCodec = withExtension.filter((item) => hasUsableCodec(item.vcodec) || hasUsableCodec(item.acodec) || isImageFormat(item));
   for (const item of withCodec) {
     const formatId = item.format_id!;
     const extension = item.ext!;
     const hasVideo = hasUsableCodec(item.vcodec);
     const hasAudio = hasUsableCodec(item.acodec);
-    const type = hasVideo ? "video" : "audio";
-    const resolution = hasVideo && item.height ? `${item.height}p` : undefined;
+    const image = !hasVideo && !hasAudio && isImageFormat(item);
+    if (!hasVideo && !hasAudio && !image) continue;
+    const type: MediaStreamFormat["type"] = hasVideo ? "video" : hasAudio ? "audio" : "image";
+    const resolution = hasVideo && item.height
+      ? `${item.height}p`
+      : image && item.width && item.height ? `${item.width}x${item.height}` : undefined;
     const bitrate = Math.round(item.abr || item.tbr || 0) || undefined;
     const key = `${formatId}:${type}:${extension}`;
     if (seen.has(key)) continue;
@@ -464,7 +477,7 @@ export function normalizeFormatsWithDiagnostics(formats: RawFormat[] = []): { fo
       formatId, type, container: extension, extension,
       resolution, qualityLabel: item.format_note || resolution || (bitrate ? `${bitrate} kbps` : extension.toUpperCase()),
       hasVideo, hasAudio, estimatedSize: item.filesize || item.filesize_approx,
-      codec: hasVideo ? item.vcodec : item.acodec, fps: item.fps, bitrate,
+      codec: hasVideo ? item.vcodec : hasAudio ? item.acodec : undefined, fps: item.fps, bitrate,
     });
   }
   const afterDeduplication = normalized.length;
@@ -482,6 +495,7 @@ export function normalizeFormatsWithDiagnostics(formats: RawFormat[] = []): { fo
     videoCount: sorted.filter((format) => format.hasVideo).length,
     audioCount: sorted.filter((format) => format.hasAudio && !format.hasVideo).length,
     combinedCount: sorted.filter((format) => format.hasVideo && format.hasAudio).length,
+    imageCount: sorted.filter((format) => format.type === "image").length,
   } };
 }
 
@@ -531,11 +545,14 @@ export const buildAnalyzeArgs = (url: string, providerArgs: readonly string[] = 
 
 export function parseAnalysis(data: RawInfo, requestedUrl: string, platform: MediaPlatform): MediaAnalysisResult {
   const formats = normalizeFormats(data.formats);
+  const rawFormats = data.formats || [];
+  const hasVideo = rawFormats.some((format) => hasUsableCodec(format.vcodec));
+  const hasImage = !hasVideo && rawFormats.some(isImageFormat);
   return {
     url: data.webpage_url || requestedUrl, platform, title: data.title || "Contenido multimedia",
     author: data.uploader || data.channel || "Autor no disponible", authorUrl: data.uploader_url,
     thumbnailUrl: selectThumbnail(data), durationSeconds: data.duration,
-    contentType: (data.formats || []).some((format) => format.vcodec && format.vcodec !== "none") ? "video" : "audio",
+    contentType: hasVideo ? "video" : hasImage ? "image" : "audio",
     formats, isDirectDownloadPossible: formats.length > 0,
     requiresExternalExtractor: true,
     notice: formats.length
@@ -559,7 +576,7 @@ export function buildDownloadArgs(
   url: string,
   formatId: string,
   container: string,
-  type: "video" | "audio",
+  type: "video" | "audio" | "image",
   outputStem: string,
   providerArgs: readonly string[] = [],
 ): string[] {
@@ -686,7 +703,7 @@ class YtDlpService {
     return { data, warningCategories: result.warningCategories, stagingTrace: result.stagingTrace };
   }
 
-  async download(url: string, formatId: string, container: string, type: "video" | "audio", outputStem: string, signal?: AbortSignal, onProgress?: (value: number) => void, platform?: MediaPlatform, providerArgs: readonly string[] = []): Promise<string> {
+  async download(url: string, formatId: string, container: string, type: "video" | "audio" | "image", outputStem: string, signal?: AbortSignal, onProgress?: (value: number) => void, platform?: MediaPlatform, providerArgs: readonly string[] = []): Promise<string> {
     const healthOperation = platform === "youtube" ? youtubeProviderHealthService.beginOperation() : null;
     const args = buildDownloadArgs(url, formatId, container, type, outputStem, providerArgs);
     logger.info("YT_DLP_STAGE", { stage: "process" });

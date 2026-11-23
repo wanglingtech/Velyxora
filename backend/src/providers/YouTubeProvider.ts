@@ -80,6 +80,15 @@ export class YouTubeProvider extends YtDlpProvider {
       // The provider's /ping response is intentionally treated as a liveness
       // check only; the plugin/image versions are pinned at build time.
     } catch {
+      // Only the local dev server may degrade to plain yt-dlp; tests must keep
+      // proving the fail-closed contract and production never reaches here.
+      if (ENV.NODE_ENV === "development" && isUnverifiedYouTubeDevMode(ENV.YOUTUBE_ALLOW_UNVERIFIED_DEV, ENV.NODE_ENV)) {
+        logger.warn("YOUTUBE_UNVERIFIED_DEV_MODE", {
+          reason: "po_provider_unreachable",
+          impact: "plain yt-dlp without PO token",
+        });
+        return [];
+      }
       throw new YtDlpError("MEDIA_PROVIDER_RESTRICTED", "El proveedor interno de verificación de YouTube no está disponible.");
     } finally {
       clearTimeout(timeout);
@@ -136,7 +145,7 @@ export class YouTubeProvider extends YtDlpProvider {
     url: string,
     formatId: string,
     container: string,
-    type: "video" | "audio",
+    type: "video" | "audio" | "image",
     outputStem: string,
     signal?: AbortSignal,
     onProgress?: (value: number) => void,

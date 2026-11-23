@@ -1,3 +1,7 @@
+// Media analysis/processing runs a real yt-dlp extraction (25-90s for YouTube),
+// so it must outlive the generic 8s API deadline.
+const MEDIA_LONG_REQUEST_TIMEOUT_MS = 130_000;
+
 export interface BackendHealth {
   status: "ok" | "degraded" | "error";
   version: string;
@@ -68,8 +72,8 @@ export interface MediaAnalysisResponse {
     formatId?: string;
     format_id?: string;
     id?: string;
-    type?: "video" | "audio";
-    kind?: "video" | "audio";
+    type?: "video" | "audio" | "image";
+    kind?: "video" | "audio" | "image";
     container?: string;
     extension?: string;
     ext?: string;
@@ -408,22 +412,27 @@ export class ApiClient {
   }
 
   /**
-   * Safe media URL analysis
+   * Safe media URL analysis.
+   *
+   * yt-dlp metadata extraction is slow on purpose-built environments (YouTube
+   * with the Node JS runtime takes 25-90s), so this request needs its own
+   * deadline. The generic 8s API timeout used to abort the browser request
+   * while the server was still working, which looked like "nothing happens".
    */
   async analyzeMediaUrl(url: string): Promise<MediaAnalysisResponse> {
     return this.request<MediaAnalysisResponse>("/media/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
-    });
+    }, MEDIA_LONG_REQUEST_TIMEOUT_MS);
   }
 
-  async startMediaDownload(params: { url: string; formatId: string; container: string; type: "video" | "audio"; title: string }): Promise<ConversionJobResponse> {
+  async startMediaDownload(params: { url: string; formatId: string; container: string; type: "video" | "audio" | "image"; title: string }): Promise<ConversionJobResponse> {
     return this.request<ConversionJobResponse>("/media/process", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
-    });
+    }, MEDIA_LONG_REQUEST_TIMEOUT_MS);
   }
 
   async downloadFile(fileId: string): Promise<{ blob: Blob; filename: string; contentType: string }> {
