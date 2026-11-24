@@ -25,6 +25,7 @@ import {
   generateFaviconPackage,
   generateBatchZip,
   generateQrCode,
+  resolveCanvasConversionTarget,
   resolveCanvasOutputFormat,
 } from "../../services/conversionEngine";
 import { JobProgressView } from "../common/JobProgressView";
@@ -65,6 +66,15 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   const { user } = useAuth();
   const runnerKind = getToolRunnerKind(tool);
   const serverExecution = requiresServerAuthentication(tool);
+  const canvasConversionTarget = resolveCanvasConversionTarget(tool.outputTypes);
+  // Quality only matters for lossy targets. PNG conversions stay lossless and
+  // resizer/frame-extractor already expose their own dedicated controls.
+  const showImageQualityControls =
+    runnerKind === "standard-file" &&
+    canvasConversionTarget !== null &&
+    canvasConversionTarget.mime !== "image/png" &&
+    tool.id !== "image-resizer" &&
+    tool.id !== "video-frame-extractor";
   const [selectedFile, setSelectedFile] = useState<File | null>(
     initialFile || null,
   );
@@ -529,12 +539,15 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
           10,
         );
         const processedResults: Array<{ blob: Blob; filename: string }> = [];
+        // Batch conversions must honor the tool's declared target (e.g. WebP→PNG
+        // stays PNG). Only fall back to WebP when the tool has no canvas target.
+        const batchTarget = resolveCanvasConversionTarget(tool.outputTypes) ?? resolveCanvasOutputFormat("image/webp");
 
         for (let i = 0; i < batchFiles.length; i++) {
           const file = batchFiles[i];
           const conv = await convertImage(file, {
-            format: "image/webp",
-            quality: quality / 100,
+            format: batchTarget.mime,
+            quality: batchTarget.mime === "image/png" ? undefined : quality / 100,
           });
           processedResults.push({ blob: conv.blob, filename: conv.filename });
           jobService.updateStatus(
@@ -551,6 +564,43 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
           filename: `velyxora_batch_${Date.now()}.zip`,
           mimeType: "application/zip",
           size: zipBlob.size,
+        });
+        return;
+      }
+
+      // --- Generic client-side image format conversion ---
+      // Covers every registered pair whose target is encodable by the browser
+      // (PNG, JPG, WebP): WebP→PNG/JPG, AVIF→*, BMP→*, GIF→*, etc.
+      if (tool.engine === "browser-canvas" && selectedFile) {
+        const target = resolveCanvasConversionTarget(tool.outputTypes);
+        if (target) {
+          const res = await convertImage(selectedFile, {
+            format: target.mime,
+            quality: target.mime === "image/png" ? undefined : quality / 100,
+          });
+          jobService.completeJob(job.id, {
+            blob: res.blob,
+            filename: res.filename,
+            mimeType: target.mime,
+            size: res.blob.size,
+          });
+          historyService.addItem({
+            toolId: tool.id,
+            toolName: tool.name,
+            category: tool.category,
+            inputName: selectedFile.name,
+            inputSize: selectedFile.size,
+            outputName: res.filename,
+            outputSize: res.blob.size,
+            processingMode: "CLIENT_SIDE",
+            status: "COMPLETED",
+          });
+          return;
+        }
+        jobService.failJob(job.id, {
+          code: "UNSUPPORTED_OUTPUT_FORMAT",
+          message:
+            "Tu navegador no puede generar ese formato de imagen. Prueba con PNG, JPG o WebP.",
         });
         return;
       }
@@ -824,11 +874,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
 
               {/* SPECIFIC CONTROLS */}
               {/* Image Compression & Quality Controls */}
-              {(tool.id === "png-to-jpg" ||
-                tool.id === "png-to-webp" ||
-                tool.id === "jpg-to-webp" ||
-                tool.id === "image-compressor") &&
-                selectedFile && (
+              {showImageQualityControls && selectedFile && (
                   <div className="p-5 rounded-xl bg-[#101218] border border-white/[0.08] space-y-4">
                     <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                       <Settings className="w-3.5 h-3.5" /> Ajustes de compresión

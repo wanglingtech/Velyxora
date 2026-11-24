@@ -1,8 +1,8 @@
 # VELYXORA — ROADMAP TÉCNICO (Copiar a .opencode/plan/ROADMAP.md)
 
-> **Versión:** 2.0  
-> **Fecha:** 2026-11-20  
-> **Estado:** FASE 0 ✅ completa — FASE 1 pendiente  
+> **Versión:** 2.0
+> **Fecha:** 2026-11-20
+> **Estado:** FASE 0 ✅ completa — FASE 1 pendiente
 > **Fuente única:** Este archivo + `.opencode/plan/ROADMAP.md` (sync manual)
 
 ---
@@ -49,13 +49,28 @@ VELYXORA evoluciona hacia un **toolkit 100% local-first** donde:
 > **Nota 1.1.4:** los campos `processingLocation`/`outputFileId`/`completedAt` de `HistoryItem` solo se consumen en `historyService.ts`, `jobService.ts`, `HistoryView.tsx` y `StickerMakerTool.tsx` — todos eliminados/editados en FASE 1.4. Se eliminan junto con el módulo de historial para evitar doble trabajo y mantener el build verde.
 > **Nota `url-shortener`:** `requiresServer: true` pero `engine: 'velyxora-links'` (no ffmpeg/libreOffice/ytDlp) → sin `requiredServices`; el gating genérico de backend en 1.3 lo cubre.
 
-### 1.2 Maintenance Badge en UI (ToolCard, CategoryView, HomeView)
+### 1.2 Maintenance Badge en UI (ToolCard, CategoryView, HomeView) — ✅ COMPLETA
 
 | Subfase | Tarea | Archivos |
 |---------|-------|----------|
 | 1.2.1 | `ToolCard`: badge "Mantenimiento" + botón disabled si servicio caído | `frontend/src/components/common/ToolCard.tsx` |
 | 1.2.2 | `CategoryView`: filtrado visual + tooltip explicativo | `frontend/src/components/views/CategoryView.tsx` |
 | 1.2.3 | `HomeView`: popular tools con estado mantenimiento | `frontend/src/components/views/HomeView.tsx` |
+| 1.2.4 | Implementar conversión de imagenes de webp a png/jpg y todos los formatos que se conviertan entre si |
+| 1.2.5 | Implementar descargar por url de imagenes con previsualización y en cualquier formato al igual que se descargar un video|
+| 1.2.6 | En el buscador de herramientas y formatos no salen todas las herramientas disponibles corregir y ajustar|
+| 1.2.7 | Implementar un modulo aparte para descargar masiva por url de imageens al seleccionar una opcion con multiples formatos que se deseee y la previsualización de cada imagem que se va agregando para la descarga masiva de imagenes y también que se pueda seleccionar un formato individual de ser pertinente o uno predeterminado para la descargar de imagenes masiva o eliminar, tener presenta la previsualización de cada una de ellas para mejorar el modulo.|
+| 1.2.8 | Quiero agregar la opcion de poder crear en base el formato de html osea ponemos una url y en el navegador se muestra un html, entoncs todo referente a ello se puede obtener ya sea todo el html en imagenes en varias y su formato puede ser diferentes como webp, png, jpg y etc y a la ves también que se pueda de html a pdf y manejar bien la orientación, eliminación de imagen o pantalla si no se desea o son innecesaria porque estan en blanco o ajustar lo demás para tener algo de buena calidad.|
+| 1.2.9 | Corregir el scroll cuando esta abierto el modal de "Buscar herramientas o formatos o enlaces" ya que permite hacer scroll completo a la pagina mientras tenemos la vista del modal aperturada|
+
+> **Estado 1.2 (2026-11-24):** 1.2.1–1.2.9 implementadas y verificadas.
+> - **1.2.4:** `resolveCanvasConversionTarget` en `conversionEngine.ts`; fallo explícito `UNSUPPORTED_OUTPUT_FORMAT`; `webp-to-gif` retirado; `gif-to-webp` documentado como primer fotograma; lote usa el destino de la tool.
+> - **1.2.5:** formatos sintéticos PNG/JPG/WebP con `convertTo`; se descarga el original y se convierte en el navegador; vista previa real de imagen.
+> - **1.2.6:** `normalizeSearchText` + sinónimos ES + stopwords + ranking; búsqueda global en `CategoryView`; sin tope en `CommandPalette`.
+> - **1.2.7:** `/image-downloader` (`bulkImageService.ts`, `BulkImageDownloaderView.tsx`): vista previa, formato por ítem/predeterminado, eliminar, ZIP.
+> - **1.2.8:** `/webpage-capture`: snapshot HTML SSRF-safe + proxy de imágenes, captura por pantallas PNG/JPG/WebP, detección de blancos, ZIP y PDF con orientación. Límites: canvas/video/iframes/tipografías externas simplificados.
+> - **1.2.9:** `CommandPalette` bloquea el scroll del documento mientras está abierto.
+> - Tests: `imageTools`, `coreTools`, `toolRegistry`, `shellResponsive`, `bulkImage`, `webpageCapture`, `backend/test/webpageSnapshot`.
 
 ### 1.3 ToolRunner: Guard Execution + Modal Mantenimiento
 

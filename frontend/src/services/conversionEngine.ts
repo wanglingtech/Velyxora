@@ -22,6 +22,19 @@ export const MAX_IMAGE_DIMENSION = 16_384;
 
 export type CanvasOutputMime = 'image/jpeg' | 'image/png' | 'image/webp';
 
+const CANVAS_ENCODABLE_OUTPUTS: readonly string[] = ['image/jpeg', 'image/png', 'image/webp'];
+
+/**
+ * Picks the first output MIME a browser canvas can actually encode.
+ * Tools that declare an output such as `image/gif` are not silently rewritten
+ * to PNG: returning null lets the runner report "engine unavailable" instead of
+ * handing the user a file with the wrong extension.
+ */
+export function resolveCanvasConversionTarget(outputTypes: readonly string[]): { mime: CanvasOutputMime; extension: 'jpg' | 'png' | 'webp' } | null {
+  const supported = outputTypes.find((type) => CANVAS_ENCODABLE_OUTPUTS.includes(type.toLowerCase()));
+  return supported ? resolveCanvasOutputFormat(supported) : null;
+}
+
 /**
  * Maps a requested MIME to a format the browser can reliably encode via
  * canvas.toBlob. Unsupported inputs (GIF, SVG, BMP, unknown) fall back to PNG.

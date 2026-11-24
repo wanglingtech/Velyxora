@@ -58,6 +58,12 @@ export interface ConversionJobResponse {
   error?: string;
 }
 
+export interface WebpageSnapshot {
+  html: string;
+  finalUrl: string;
+  title?: string;
+}
+
 export interface MediaAnalysisResponse {
   url: string;
   platform: string;
@@ -433,6 +439,29 @@ export class ApiClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     }, MEDIA_LONG_REQUEST_TIMEOUT_MS);
+  }
+
+  async fetchWebpageSnapshot(url: string): Promise<WebpageSnapshot> {
+    return this.request<WebpageSnapshot>("/webpage/snapshot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    }, MEDIA_LONG_REQUEST_TIMEOUT_MS);
+  }
+
+  /** Loads an image referenced by a snapshot through the backend to avoid CORS. */
+  async fetchWebpageAsset(url: string): Promise<Blob> {
+    let response: Response;
+    try {
+      response = await fetch(
+        `${this.baseUrl}/webpage/asset?url=${encodeURIComponent(url)}`,
+        { credentials: "include" },
+      );
+    } catch {
+      throw new Error("No se pudo cargar una imagen de la página.");
+    }
+    if (!response.ok) throw new Error(`No se pudo cargar una imagen de la página (HTTP ${response.status}).`);
+    return response.blob();
   }
 
   async downloadFile(fileId: string): Promise<{ blob: Blob; filename: string; contentType: string }> {

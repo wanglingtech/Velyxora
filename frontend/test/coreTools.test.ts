@@ -9,7 +9,7 @@ import {
   parseColorToAll,
 } from '../src/services/dataConverterService';
 import { generateQrCode } from '../src/services/conversionEngine';
-import { EMPTY_MEDIA_FORMATS_MESSAGE, canStartMediaAnalyze, completedMediaOutput, mediaAnalyzeErrorMessage, mediaDownloadStartErrorMessage, mediaFormatActionLabel, normalizeMediaAnalysis, selectInitialMediaFormat, shouldShowMediaThumbnail } from '../src/services/mediaService';
+import { EMPTY_MEDIA_FORMATS_MESSAGE, canStartMediaAnalyze, completedMediaOutput, findImageConversionSource, isImageMedia, mediaAnalyzeErrorMessage, mediaDownloadStartErrorMessage, mediaFormatActionLabel, normalizeMediaAnalysis, selectInitialMediaFormat, shouldShowMediaThumbnail, withImageConversionFormats } from '../src/services/mediaService';
 import { ApiError } from '../src/services/apiClient';
 
 test('conversores de datos producen salidas reales y rechazan JSON inválido', () => {
@@ -98,6 +98,39 @@ test('media downloader termina inmediatamente si COMPLETED no contiene output', 
     /sin un archivo de salida válido/,
   );
   assert.equal(completedMediaOutput({ id: 'job', toolId: 'media-downloader', status: 'PROCESSING', progress: 50 }), null);
+});
+
+test('media downloader añade conversiones locales para imágenes sin inventar formatos del proveedor', () => {
+  const imageMetadata = normalizeMediaAnalysis({
+    url: 'https://cdn.example.com/foto.webp', platform: 'direct', title: 'foto.webp', author: 'cdn.example.com',
+    contentType: 'image', thumbnailUrl: 'https://cdn.example.com/foto.webp',
+    formats: [{ formatId: 'direct', type: 'image', container: 'webp', extension: 'webp' }],
+    isDirectDownloadPossible: true, requiresExternalExtractor: false,
+  }, 'Enlace directo');
+
+  assert.equal(isImageMedia(imageMetadata), true);
+  assert.equal(findImageConversionSource(imageMetadata)?.id, 'direct');
+
+  const enriched = withImageConversionFormats(imageMetadata);
+  assert.equal(enriched.availableFormats.length, 3);
+  assert.deepEqual(
+    enriched.availableFormats.filter((format) => format.convertTo).map((format) => [format.extension, format.convertTo]),
+    [['png', 'image/png'], ['jpg', 'image/jpeg']],
+  );
+  // Source format is untouched and remains the download source.
+  assert.equal(findImageConversionSource(enriched)?.extension, 'webp');
+  assert.equal(mediaFormatActionLabel(enriched.availableFormats[1]), 'Descargar PNG convertido');
+});
+
+test('media downloader no ofrece conversiones para audio o video', () => {
+  const metadata = normalizeMediaAnalysis({
+    url: 'https://youtube.com/watch?v=test', platform: 'youtube', title: 'Test', author: 'Creator',
+    formats: [{ formatId: 'audio', ext: 'm4a', acodec: 'mp4a', hasAudio: true }],
+    isDirectDownloadPossible: true, requiresExternalExtractor: true,
+  }, 'YouTube');
+  assert.equal(isImageMedia(metadata), false);
+  assert.equal(withImageConversionFormats(metadata), metadata);
+  assert.equal(findImageConversionSource(metadata), null);
 });
 
 test('Code 128B codifica ASCII y rechaza caracteres fuera del alfabeto', () => {

@@ -13,4 +13,6 @@ export const shortLinkResolveLimit = build(300);
 export const shortLinkReportLimit = build(10);
 export const mediaAnalyzeLimit = build(30);
 export const mediaProcessLimit = build(10);
+export const webpageSnapshotLimit = build(20);
+export const webpageAssetLimit = build(400);
 export const adminMutationLimit = build(60);

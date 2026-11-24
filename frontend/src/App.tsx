@@ -7,8 +7,10 @@ import { HomeView } from './components/views/HomeView';
 import { CategoryView } from './components/views/CategoryView';
 const ToolRunner = React.lazy(() => import('./components/tools/ToolRunner').then((module) => ({ default: module.ToolRunner })));
 const MediaDownloaderView = React.lazy(() => import('./components/tools/MediaDownloaderView').then((module) => ({ default: module.MediaDownloaderView })));
+const BulkImageDownloaderView = React.lazy(() => import('./components/tools/BulkImageDownloaderView').then((module) => ({ default: module.BulkImageDownloaderView })));
 import { HistoryView } from './components/views/HistoryView';
 import { FavoritesView } from './components/views/FavoritesView';
+import { WebpageCaptureView } from './components/views/WebpageCaptureView';
 import { SettingsView } from './components/views/SettingsView';
 import { LegalView } from './components/views/LegalView';
 import { SupportView } from './components/views/SupportView';
@@ -30,6 +32,7 @@ import { AppLoader } from './components/common/AppLoader';
 import { FeedbackView } from './components/views/FeedbackViews';
 import { ShortLinkView } from './components/views/ShortLinkView';
 import { pathForView, routeFromPath, sanitizeReturnTo } from './services/appRouting';
+import { ServiceStatusProvider } from './context/ServiceStatusContext';
 
 export default function App() {
   const initialRoute = routeFromPath(window.location.pathname);
@@ -180,12 +183,13 @@ export default function App() {
   const authFallback = <AuthView initialMode="login" onAuthenticated={completeAuth} onBack={() => handleNavigate('home')} />;
 
   return (
-    <div className="min-h-screen bg-[#08090D] text-[#F5F7FA] flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
-      {/* Global Drag and Drop Overlay */}
-      <GlobalDropOverlay onDropFile={handleGlobalDropFile} />
+    <ServiceStatusProvider>
+      <div className="min-h-screen bg-[#08090D] text-[#F5F7FA] flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
+        {/* Global Drag and Drop Overlay */}
+        <GlobalDropOverlay onDropFile={handleGlobalDropFile} />
 
-      {/* Top Header */}
-      <Header
+        {/* Top Header */}
+        <Header
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onNavigate={handleNavigate}
         activeView={activeView}
@@ -252,7 +256,22 @@ export default function App() {
               initialUrl={mediaUrl}
               onBack={() => handleNavigate('home')}
               onRequireAuth={requestAuth}
+              onOpenBulkImages={() => handleNavigate('image-downloader')}
             /></React.Suspense>
+          )}
+
+          {activeView === 'image-downloader' && (
+            <React.Suspense fallback={<div className="p-8 text-sm text-slate-400">Cargando herramienta…</div>}><BulkImageDownloaderView
+              onBack={() => handleNavigate('home')}
+              onRequireAuth={requestAuth}
+            /></React.Suspense>
+          )}
+
+          {activeView === 'webpage-capture' && (
+            <WebpageCaptureView
+              onBack={() => handleNavigate('home')}
+              onRequireAuth={requestAuth}
+            />
           )}
 
           {activeView === 'favorites' && (
@@ -315,5 +334,6 @@ export default function App() {
       {/* Toast Notification Container */}
       <ToastContainer />
     </div>
+    </ServiceStatusProvider>
   );
 }

@@ -44,7 +44,7 @@ test('login real reutiliza la cookie en auth/me, account, payments y media analy
       .set('X-CSRF-Token', login.body.data.csrf)
       .send({ url: 'https://example.com/not-allowlisted' });
     assert.equal(analyze.status, 422);
-    assert.equal(analyze.body.error.code, 'ANALYSIS_FAILED');
+    assert.equal(analyze.body.error.code, 'UNSUPPORTED_URL');
   } finally {
     await prisma.session.deleteMany({ where: { userId: user.id } });
     await prisma.user.delete({ where: { id: user.id } });

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { Search, Filter, ArrowLeft } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Search, ArrowLeft, AlertTriangle, Wrench } from 'lucide-react';
 import { ToolCard, ComingSoonCard } from '../common/ToolCard';
 import { CATEGORIES_CONFIG, getToolkitGroup, getToolsForGroup, getPlannedToolsForGroup, searchTools } from '../../registry/tools';
 import { ToolDefinition } from '../../types';
+import { useServiceStatus } from '../../context/ServiceStatusContext';
+import { countToolsInMaintenance, isToolInMaintenance } from '../../services/toolAvailability';
 
 interface CategoryViewProps {
   currentCategory: string;
@@ -15,14 +17,16 @@ interface CategoryViewProps {
 
 export const CategoryView: React.FC<CategoryViewProps> = ({
   currentCategory,
-  onSelectCategory,
+  onSelectCategory: _onSelectCategory,
   onSelectTool,
   favorites,
   onToggleFavorite,
   onBack
 }) => {
+  const { isServiceAvailable } = useServiceStatus();
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('all');
+  const [showMaintenance, setShowMaintenance] = useState(false);
 
   const categoryName = currentCategory === 'all'
     ? 'Todas las herramientas'
@@ -30,22 +34,39 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
       || CATEGORIES_CONFIG.find((c) => c.id === currentCategory)?.name
       || 'Todas las herramientas';
 
-  const toolsInCategory = getToolsForGroup(currentCategory);
-  const plannedTools = getPlannedToolsForGroup(currentCategory);
-  const showPlanned = plannedTools.length > 0 && selectedSubcategory === 'all' && !searchFilter.trim();
+  const toolsInCategory = useMemo(() => getToolsForGroup(currentCategory), [currentCategory]);
+  const plannedTools = useMemo(() => getPlannedToolsForGroup(currentCategory), [currentCategory]);
+  const searchActive = searchFilter.trim().length > 0;
+  const searchResults = useMemo(
+    () => (searchActive ? searchTools(searchFilter) : []),
+    [searchActive, searchFilter]
+  );
+  const showPlanned = plannedTools.length > 0 && selectedSubcategory === 'all' && !searchActive;
+  const displayTitle = searchActive ? 'Resultados de búsqueda' : categoryName;
 
   // Extract unique subcategories
-  const subcategories = Array.from(
-    new Set(toolsInCategory.map((t) => t.subcategory).filter(Boolean))
-  ) as string[];
+  const subcategories = useMemo(
+    () => Array.from(new Set(toolsInCategory.map((t) => t.subcategory).filter(Boolean))) as string[],
+    [toolsInCategory]
+  );
 
-  const filteredTools = toolsInCategory.filter((t) => {
-    const matchesSub = selectedSubcategory === 'all' || t.subcategory === selectedSubcategory;
-    const matchesQuery =
-      !searchFilter.trim() ||
-      searchTools(searchFilter).some((match) => match.id === t.id);
-    return matchesSub && matchesQuery;
-  });
+  const maintenanceCount = useMemo(
+    () => countToolsInMaintenance(searchActive ? searchResults : toolsInCategory, isServiceAvailable),
+    [searchActive, searchResults, toolsInCategory, isServiceAvailable]
+  );
+
+  const filteredTools = useMemo(() => {
+    // While searching, results come from every category so the user never
+    // misses a tool because it lives outside the current section.
+    const sourceTools = searchActive ? searchResults : toolsInCategory;
+    return sourceTools.filter((t) => {
+      const matchesSub = searchActive || selectedSubcategory === 'all' || t.subcategory === selectedSubcategory;
+      // Tools whose backend service is in maintenance are hidden by default so
+      // users do not click into a dead action; the toggle reveals them.
+      const matchesMaintenance = showMaintenance || !isToolInMaintenance(t, isServiceAvailable);
+      return matchesSub && matchesMaintenance;
+    });
+  }, [searchActive, searchResults, toolsInCategory, selectedSubcategory, showMaintenance, isServiceAvailable]);
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">
@@ -54,10 +75,20 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            {categoryName}
+            {displayTitle}
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            {filteredTools.length} herramientas disponibles en esta categoría.
+            {searchActive
+              ? `${filteredTools.length} resultados en todas las categorías.`
+              : `${filteredTools.length} herramientas disponibles en esta categoría.`}
+            {maintenanceCount > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-mono font-medium text-amber-300"
+                title={`${maintenanceCount} herramienta(s) dependen de un servicio en mantenimiento y se ocultan por defecto. Las herramientas locales siguen funcionando.`}
+              >
+                <AlertTriangle className="w-2.5 h-2.5" />
+                {maintenanceCount} en mantenimiento
+              </span>
+            )}
           </p>
         </div>
 
@@ -68,40 +99,57 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
             type="text"
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            placeholder="Filtrar herramientas..."
+            placeholder="Buscar en todas las herramientas..."
             className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-[#101218] border border-white/[0.08] text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/50"
           />
         </div>
       </div>
 
-      {/* Subcategories Filter Chips */}
-      {subcategories.length > 0 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-          <button
-            onClick={() => setSelectedSubcategory('all')}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 ${
-              selectedSubcategory === 'all'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-[#101218] text-slate-400 hover:text-white border border-white/[0.06]'
-            }`}
-          >
-            Todas
-          </button>
-          {subcategories.map((sub) => (
+      {/* Subcategories Filter Chips + Maintenance Toggle */}
+      <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1">
+        {subcategories.length > 0 && !searchActive && (
+          <>
             <button
-              key={sub}
-              onClick={() => setSelectedSubcategory(sub)}
+              onClick={() => setSelectedSubcategory('all')}
               className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 ${
-                selectedSubcategory === sub
+                selectedSubcategory === 'all'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-[#101218] text-slate-400 hover:text-white border border-white/[0.06]'
               }`}
             >
-              {sub}
+              Todas
             </button>
-          ))}
-        </div>
-      )}
+            {subcategories.map((sub) => (
+              <button
+                key={sub}
+                onClick={() => setSelectedSubcategory(sub)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 ${
+                  selectedSubcategory === sub
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-[#101218] text-slate-400 hover:text-white border border-white/[0.06]'
+                }`}
+              >
+                {sub}
+              </button>
+            ))}
+          </>
+        )}
+        <label
+          className="flex items-center gap-1.5 shrink-0 px-3 py-1 rounded-lg text-xs font-medium transition-colors bg-[#101218] text-slate-400 hover:text-white border border-white/[0.06] cursor-pointer"
+          title="Las herramientas que dependen de un servicio en mantenimiento se ocultan por defecto. Activa esta opción para verlas atenuadas y saber por qué no están disponibles."
+        >
+          <input
+            type="checkbox"
+            checked={showMaintenance}
+            onChange={(e) => setShowMaintenance(e.target.checked)}
+            className="w-3.5 h-3.5 accent-indigo-500 rounded border-slate-600"
+          />
+          <span className="flex items-center gap-1">
+            <Wrench className="w-3 h-3" />
+            Mostrar en mantenimiento
+          </span>
+        </label>
+      </div>
 
       {/* Tools Grid */}
       {filteredTools.length > 0 ? (
@@ -123,6 +171,7 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
             onClick={() => {
               setSearchFilter('');
               setSelectedSubcategory('all');
+              setShowMaintenance(true);
             }}
             className="mt-3 px-3.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-medium hover:bg-slate-700 transition-colors"
           >

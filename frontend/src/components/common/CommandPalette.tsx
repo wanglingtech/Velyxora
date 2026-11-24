@@ -20,7 +20,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const results = searchTools(query).slice(0, 10);
+  const results = searchTools(query);
 
   useEffect(() => {
     if (isOpen) {
@@ -33,6 +33,19 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   useEffect(() => {
     setSelectedIndex(0);
   }, [query]);
+
+  // Lock the page behind the modal so only the result list scrolls.
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+    };
+  }, [isOpen]);
 
   // Global keyboard shortcut
   useEffect(() => {
@@ -141,7 +154,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           ) : (
             <div className="py-12 text-center text-slate-500">
               <p className="text-sm">No se encontraron herramientas para "{query}".</p>
-              <p className="text-xs mt-1">Prueba con términos como "webp", "comprimir", "wav", "qr" o "json".</p>
+              <p className="text-xs mt-1">Prueba con "webp", "comprimir", "wav", "qr", "json" o "foto".</p>
             </div>
           )}
         </div>

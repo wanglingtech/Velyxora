@@ -11,6 +11,12 @@ const app = readSrc("../src/App.tsx");
 const floating = readSrc("../src/components/common/FloatingSupportButton.tsx");
 const toasts = readSrc("../src/components/common/ToastContainer.tsx");
 const indexHtml = readSrc("../index.html");
+const commandPalette = readSrc("../src/components/common/CommandPalette.tsx");
+
+test("la paleta de búsqueda bloquea el scroll de la página de fondo", () => {
+  assert.match(commandPalette, /document\.body\.style\.overflow = ['"]hidden['"]/);
+  assert.match(commandPalette, /document\.documentElement\.style\.overflow = ['"]hidden['"]/);
+});
 
 test("el Header conserva identidad, menú, cuenta y estado de servicio", () => {
   for (const required of [

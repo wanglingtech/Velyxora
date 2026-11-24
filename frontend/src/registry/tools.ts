@@ -275,6 +275,205 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     popular: false,
     isClientReady: true
   },
+  // --- Additional Image Format Conversions (Client-Side) ---
+  {
+    id: 'webp-to-png',
+    slug: 'webp-to-png',
+    name: 'WebP a PNG',
+    description: 'Convierte imágenes WebP a formato PNG sin pérdida de calidad y con transparencia.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/webp'],
+    outputTypes: ['image/png'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['webp', 'png', 'convertir', 'imagen', 'transparencia', 'lossless'],
+    popular: true,
+    isClientReady: true
+  },
+  {
+    id: 'webp-to-jpg',
+    slug: 'webp-to-jpg',
+    name: 'WebP a JPG',
+    description: 'Convierte imágenes WebP a formato JPEG con fondo opaco y calidad configurable.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/webp'],
+    outputTypes: ['image/jpeg'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['webp', 'jpg', 'jpeg', 'convertir', 'imagen', 'fondo blanco'],
+    popular: true,
+    isClientReady: true
+  },
+  {
+    id: 'gif-to-webp',
+    slug: 'gif-to-webp',
+    name: 'GIF a WebP',
+    description: 'Convierte la primera imagen de un GIF a WebP, más ligero y con mejor calidad.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'Sparkles',
+    inputTypes: ['image/gif'],
+    outputTypes: ['image/webp'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: false,
+    supportsPreview: true,
+    keywords: ['gif', 'webp', 'estático', 'convertir', 'optimizar', 'comprimir'],
+    popular: true,
+    isClientReady: true
+  },
+  {
+    id: 'gif-to-png',
+    slug: 'gif-to-png',
+    name: 'GIF a PNG',
+    description: 'Extrae el primer fotograma de un GIF animado como imagen PNG estática.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/gif'],
+    outputTypes: ['image/png'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: false,
+    supportsPreview: true,
+    keywords: ['gif', 'png', 'fotograma', 'extraer', 'estático', 'convertir'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'gif-to-jpg',
+    slug: 'gif-to-jpg',
+    name: 'GIF a JPG',
+    description: 'Extrae el primer fotograma de un GIF animado como fotografía JPG.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/gif'],
+    outputTypes: ['image/jpeg'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: false,
+    supportsPreview: true,
+    keywords: ['gif', 'jpg', 'jpeg', 'fotograma', 'extraer', 'convertir'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'avif-to-webp',
+    slug: 'avif-to-webp',
+    name: 'AVIF a WebP',
+    description: 'Convierte imágenes AVIF de última generación al formato WebP ampliamente compatible.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'Sparkles',
+    inputTypes: ['image/avif'],
+    outputTypes: ['image/webp'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['avif', 'webp', 'convertir', 'compatibilidad', 'next-gen'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'avif-to-png',
+    slug: 'avif-to-png',
+    name: 'AVIF a PNG',
+    description: 'Convierte imágenes AVIF a PNG sin pérdida preservando transparencia.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/avif'],
+    outputTypes: ['image/png'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['avif', 'png', 'convertir', 'transparencia', 'lossless'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'avif-to-jpg',
+    slug: 'avif-to-jpg',
+    name: 'AVIF a JPG',
+    description: 'Convierte imágenes AVIF a JPEG con fondo opaco para máxima compatibilidad.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/avif'],
+    outputTypes: ['image/jpeg'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['avif', 'jpg', 'jpeg', 'convertir', 'compatibilidad'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'bmp-to-webp',
+    slug: 'bmp-to-webp',
+    name: 'BMP a WebP',
+    description: 'Convierte imágenes BMP sin comprimir a WebP moderno y ligero.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'Sparkles',
+    inputTypes: ['image/bmp'],
+    outputTypes: ['image/webp'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['bmp', 'webp', 'convertir', 'comprimir', 'legacy'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'bmp-to-png',
+    slug: 'bmp-to-png',
+    name: 'BMP a PNG',
+    description: 'Convierte imágenes BMP a PNG con compresión sin pérdida.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/bmp'],
+    outputTypes: ['image/png'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['bmp', 'png', 'convertir', 'lossless', 'legacy'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'bmp-to-jpg',
+    slug: 'bmp-to-jpg',
+    name: 'BMP a JPG',
+    description: 'Convierte imágenes BMP a JPEG comprimido para uso web.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/bmp'],
+    outputTypes: ['image/jpeg'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['bmp', 'jpg', 'jpeg', 'convertir', 'comprimir', 'legacy'],
+    popular: false,
+    isClientReady: true
+  },
 
   // ==================== VIDEO TOOLS ====================
   {
@@ -1176,12 +1375,105 @@ export function getToolsByCategory(category: string): ToolDefinition[] {
   return PUBLIC_TOOL_REGISTRY.filter(t => t.category === category);
 }
 
+const SEARCH_NORMALIZE_MAP: Record<string, string> = {
+  á: "a", é: "e", í: "i", ó: "o", ú: "u", ü: "u", ñ: "n",
+};
+
+/** Lowercase, strip accents and unify separators so "Conversión" matches "conversion". */
+export const normalizeSearchText = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[áéíóúüñ]/g, (char) => SEARCH_NORMALIZE_MAP[char] ?? char)
+    .replace(/[_/\\.,;:()[\]{}|+]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+// Spanish/English variants users type. Each entry expands one token into the
+// vocabulary actually present in the registry, so "foto" also finds "imagen".
+const SEARCH_SYNONYMS: Record<string, string[]> = {
+  foto: ["imagen", "image"],
+  fotos: ["imagen", "image"],
+  fotografia: ["imagen", "image"],
+  imagenes: ["imagen", "image"],
+  img: ["imagen", "image"],
+  videos: ["video", "mp4", "webm"],
+  sonido: ["audio"],
+  musica: ["audio", "mp3"],
+  documento: ["documento", "pdf", "docx"],
+  documentos: ["documento", "pdf", "docx", "documents"],
+  word: ["docx", "documento"],
+  excel: ["xlsx", "hoja"],
+  hoja: ["xlsx", "excel"],
+  comprimir: ["comprimir", "compresion", "optimizar"],
+  compresion: ["comprimir", "compresion", "optimizar"],
+  unir: ["unir", "merge", "combinar"],
+  combinar: ["unir", "merge", "combinar"],
+  cortar: ["recortar", "cortar", "trim"],
+  recortar: ["recortar", "cortar", "trim"],
+  convertir: ["convertir", "conversion"],
+  conversion: ["convertir", "conversion"],
+  codigo: ["codigo", "qr", "barcode"],
+  enlace: ["url", "enlace", "link"],
+  link: ["url", "enlace", "link"],
+  descargar: ["descargar", "descarga", "download"],
+  descarga: ["descargar", "descarga", "download"],
+  texto: ["texto", "text"],
+  utilidades: ["utilidades", "utilities"],
+  desarrollador: ["desarrollador", "developer"],
+};
+
+const SEARCH_STOPWORDS = new Set([
+  "herramienta", "herramientas", "tool", "tools",
+  "de", "del", "la", "el", "los", "las", "un", "una", "para", "con", "en", "y",
+]);
+
+const tokenMatches = (token: string, haystack: string): boolean => {
+  const synonyms = Object.prototype.hasOwnProperty.call(SEARCH_SYNONYMS, token) ? SEARCH_SYNONYMS[token] : [];
+  const variants = [token, ...synonyms];
+  return variants.some((variant) => variant && haystack.includes(variant));
+};
+
 export function searchTools(query: string): ToolDefinition[] {
-  const clean = query.toLowerCase().trim();
+  const clean = normalizeSearchText(query);
   if (!clean) return PUBLIC_TOOL_REGISTRY;
 
-  return PUBLIC_TOOL_REGISTRY.filter(tool => {
-    const haystack = [tool.id, tool.slug, tool.name, tool.description, tool.category, tool.subcategory || '', ...tool.keywords, ...tool.inputTypes, ...tool.outputTypes].join(' ').toLowerCase();
-    return clean.split(/\s+/).every((token) => haystack.includes(token));
+  const tokens = clean.split(" ").filter((token) => token && !SEARCH_STOPWORDS.has(token));
+  if (!tokens.length) return PUBLIC_TOOL_REGISTRY;
+  const scored: Array<{ tool: ToolDefinition; score: number; index: number }> = [];
+
+  PUBLIC_TOOL_REGISTRY.forEach((tool, index) => {
+    const groupNames = TOOLKIT_GROUPS
+      .filter((group) => group.categories.includes(tool.category))
+      .map((group) => group.name);
+    const haystack = normalizeSearchText([
+      tool.id,
+      tool.slug,
+      tool.name,
+      tool.description,
+      tool.category,
+      tool.subcategory || "",
+      ...groupNames,
+      ...tool.keywords,
+      ...tool.inputTypes,
+      ...tool.outputTypes,
+      ...(tool.acceptedExtensions ?? []),
+      ...(tool.acceptedMimeTypes ?? []),
+    ].join(" "));
+
+    if (!tokens.every((token) => tokenMatches(token, haystack))) return;
+
+    const name = normalizeSearchText(tool.name);
+    const keywords = normalizeSearchText(tool.keywords.join(" "));
+    const score =
+      name === clean ? 100
+        : name.startsWith(clean) ? 80
+          : name.includes(clean) ? 60
+            : keywords.includes(clean) ? 40
+              : 20;
+    scored.push({ tool, score, index });
   });
+
+  // Name matches surface first; ties keep the curated registry order.
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
+  return scored.map((entry) => entry.tool);
 }

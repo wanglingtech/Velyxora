@@ -15,6 +15,8 @@ export interface MediaFormatOption {
   bitrate?: number;
   filesize?: number;
   codec?: string;
+  /** Present on synthetic image formats: the browser converts the source file locally. */
+  convertTo?: "image/png" | "image/jpeg" | "image/webp";
 }
 
 export interface MediaMetadata {
