@@ -25,7 +25,7 @@ function setStatusWithLoggerTolerance(jobId: string, status: "DOWNLOADING" | "PR
   }
 }
 
-export async function processMediaDownloadJob(jobId: string, data: { url: string; formatId: string; container: string; type: "video" | "audio"; title: string; billingUserId?: string }): Promise<void> {
+export async function processMediaDownloadJob(jobId: string, data: { url: string; formatId: string; container: string; type: "video" | "audio" | "image"; title: string; billingUserId?: string }): Promise<void> {
   const job = jobManager.getJob(jobId);
   if (!job) return;
   const stem = path.join(ENV.STORAGE_DIR, `download-${jobId}`);
@@ -38,18 +38,20 @@ export async function processMediaDownloadJob(jobId: string, data: { url: string
     if (jobManager.getJob(jobId)?.status === "CANCELLED") { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); return; }
     setStatusWithLoggerTolerance(jobId, "PROCESSING");
     jobManager.updateProgress(jobId, 99, "Validando archivo...");
-    const probe = await probeMedia(outputPath);
-    if (!probe.streams.length) throw new Error("El archivo descargado no contiene streams multimedia válidos.");
+    // Images have no playable streams; ffprobe may still read them but a
+    // failure must not discard a perfectly valid photo download.
+    const probe = data.type === "image" ? null : await probeMedia(outputPath);
+    if (probe && !probe.streams.length) throw new Error("El archivo descargado no contiene streams multimedia válidos.");
     const extension = path.extname(outputPath);
     const filename = sanitizeFilename(`${data.title || "media"}${extension}`);
     const stored = storageService.registerOutput(outputPath, filename, mimeFor(extension), job.ownerId);
     jobManager.updateJob(jobId, { output: {
       fileId: stored.fileId, filename, mimeType: stored.mimeType, size: stored.size,
       path: stored.path, downloadUrl: `/api/download/${stored.fileId}`,
-      duration: probe.duration,
-      width: probe.streams.find((stream) => stream.codecType === "video")?.width,
-      height: probe.streams.find((stream) => stream.codecType === "video")?.height,
-    }, metadata: { probe } });
+      duration: probe?.duration,
+      width: probe?.streams.find((stream) => stream.codecType === "video")?.width,
+      height: probe?.streams.find((stream) => stream.codecType === "video")?.height,
+    }, metadata: probe ? { probe } : { probe: null } });
     jobManager.updateProgress(jobId, 100, "Descarga lista.");
     setStatusWithLoggerTolerance(jobId, "COMPLETED");
   } catch (error: any) {
@@ -82,5 +84,22 @@ export async function processMediaDownloadJob(jobId: string, data: { url: string
 mediaDownloadQueue.process(processMediaDownloadJob);
 
 function mimeFor(extension: string): string {
-  return ({ ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".opus": "audio/ogg", ".webm": "video/webm", ".mp4": "video/mp4" } as Record<string, string>)[extension.toLowerCase()] || "application/octet-stream";
+  return ({
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".opus": "audio/ogg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".webm": "video/webm",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".mkv": "video/x-matroska",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".avif": "image/avif",
+    ".bmp": "image/bmp",
+  } as Record<string, string>)[extension.toLowerCase()] || "application/octet-stream";
 }

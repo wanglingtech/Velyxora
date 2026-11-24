@@ -11,9 +11,11 @@ export type MediaPlatform =
   | 'pinterest'
   | 'generic';
 
+export type MediaStreamType = 'video' | 'audio' | 'image';
+
 export interface MediaStreamFormat {
   formatId: string;
-  type: 'video' | 'audio';
+  type: MediaStreamType;
   container: string;
   extension: string;
   resolution?: string;
@@ -34,7 +36,7 @@ export interface MediaAnalysisResult {
   authorUrl?: string;
   thumbnailUrl?: string;
   durationSeconds?: number;
-  contentType?: string;
+  contentType?: MediaStreamType | string;
   embedHtml?: string;
   formats: MediaStreamFormat[];
   isDirectDownloadPossible: boolean;

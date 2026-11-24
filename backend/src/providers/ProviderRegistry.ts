@@ -1,6 +1,7 @@
 import { IMediaProvider } from "./MediaProvider";
 import { YtDlpProvider } from "./YtDlpProvider";
 import { YouTubeProvider } from "./YouTubeProvider";
+import { directMediaProvider } from "./DirectMediaProvider";
 
 const domain = (name: string) => new RegExp(`(^|\\.)${name.replace(".", "\\.")}$`, "i");
 
@@ -17,6 +18,8 @@ export class ProviderRegistry {
     new YtDlpProvider("soundcloud", "SoundCloud", [domain("soundcloud.com")]),
   ];
   readonly generic = new YtDlpProvider("generic", "Proveedor compatible", [/.*/]);
+  /** Direct file downloads (images, video, audio) for any host not covered above. */
+  readonly direct: IMediaProvider = directMediaProvider;
   find(url: string): IMediaProvider { return this.providers.find((provider) => provider.canHandle(url)) || this.generic; }
 }
 

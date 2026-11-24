@@ -1,0 +1,523 @@
+import React, { useRef, useState } from "react";
+import {
+  ArrowLeft,
+  Globe,
+  Loader2,
+  Wand2,
+  Download,
+  FileArchive,
+  FileText,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2,
+  EyeOff,
+  Rows3,
+} from "lucide-react";
+import { apiClient, type WebpageSnapshot } from "../../services/apiClient";
+import {
+  CAPTURE_SEGMENT_HEIGHT,
+  type CaptureImageFormat,
+  type CapturedSegment,
+  WebpageCaptureError,
+  captureFilename,
+  captureWebpage,
+} from "../../services/webpageCaptureService";
+import { generateBatchZip } from "../../services/conversionEngine";
+import { createPdfFromImages, type PdfOrientation, type PdfPageSize } from "../../services/pdfEngine";
+import { downloadService } from "../../services/downloadService";
+import { pathForView } from "../../services/appRouting";
+import { useAuth } from "../../auth/AuthContext";
+import { toast } from "../common/ToastContainer";
+
+interface WebpageCaptureViewProps {
+  onBack?: () => void;
+  onRequireAuth: (returnTo?: string) => void;
+}
+
+const CAPTURE_WIDTHS = [1024, 1280, 1440, 1600];
+const FORMAT_OPTIONS: Array<{ value: CaptureImageFormat; label: string }> = [
+  { value: "image/png", label: "PNG" },
+  { value: "image/jpeg", label: "JPG" },
+  { value: "image/webp", label: "WebP" },
+];
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const errorMessage = (error: unknown): string =>
+  error instanceof WebpageCaptureError || error instanceof Error
+    ? error.message
+    : "No se pudo completar la captura de la página.";
+
+export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, onRequireAuth }) => {
+  const { user } = useAuth();
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [url, setUrl] = useState("");
+  const [snapshot, setSnapshot] = useState<WebpageSnapshot | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
+
+  const [captureWidth, setCaptureWidth] = useState(1280);
+  const [format, setFormat] = useState<CaptureImageFormat>("image/png");
+  const [quality, setQuality] = useState(90);
+  const [segmentHeight, setSegmentHeight] = useState(CAPTURE_SEGMENT_HEIGHT);
+  const [scale, setScale] = useState(1);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [captureProgress, setCaptureProgress] = useState<{ done: number; total: number } | null>(null);
+  const [segments, setSegments] = useState<CapturedSegment[]>([]);
+  const [skipBlank, setSkipBlank] = useState(true);
+
+  const [pdfPageSize, setPdfPageSize] = useState<PdfPageSize>("A4");
+  const [pdfOrientation, setPdfOrientation] = useState<PdfOrientation>("portrait");
+  const [pdfMargin, setPdfMargin] = useState(24);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const selectedSegments = segments.filter((segment) => !skipBlank || !segment.blank);
+  const blankCount = segments.filter((segment) => segment.blank).length;
+
+  const requireSession = (): boolean => {
+    if (user) return true;
+    toast.info("Inicia sesión para cargar y capturar páginas");
+    onRequireAuth(pathForView("webpage-capture"));
+    return false;
+  };
+
+  const handleLoad = async () => {
+    if (isLoading || isCapturing || !requireSession()) return;
+    const target = url.trim();
+    if (!target) {
+      toast.warning("Escribe la URL de una página web.");
+      return;
+    }
+    setIsLoading(true);
+    setSnapshot(null);
+    setSegments([]);
+    try {
+      const result = await apiClient.fetchWebpageSnapshot(target);
+      setSnapshot(result);
+      setPreviewKey((value) => value + 1);
+      toast.success("Página cargada", result.title || result.finalUrl);
+    } catch (error: unknown) {
+      toast.error("No se pudo cargar la página", errorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCapture = async () => {
+    if (isCapturing || isExporting || !snapshot || !requireSession()) return;
+    const iframe = iframeRef.current;
+    const doc = iframe?.contentDocument;
+    if (!doc?.body || !doc.body.children.length) {
+      toast.error("La vista previa aún no está lista", "Espera un momento e inténtalo de nuevo.");
+      return;
+    }
+    setIsCapturing(true);
+    setCaptureProgress({ done: 0, total: 0 });
+    try {
+      // The iframe keeps its requested layout width so media queries match the
+      // capture width selected by the user.
+      if (iframe) iframe.style.width = `${captureWidth}px`;
+      await sleep(350);
+      const result = await captureWebpage({
+        document: doc,
+        baseUrl: snapshot.finalUrl,
+        format,
+        quality: quality / 100,
+        scale,
+        segmentHeight,
+        onProgress: (done, total) => setCaptureProgress({ done, total }),
+      });
+      setSegments(result);
+      toast.success(
+        `${result.length} pantalla(s) capturada(s)`,
+        result.some((segment) => segment.blank) ? "Algunas pantallas parecen estar en blanco." : "Revisa las miniaturas antes de descargar.",
+      );
+    } catch (error: unknown) {
+      toast.error("No se pudo capturar la página", errorMessage(error));
+    } finally {
+      setIsCapturing(false);
+      setCaptureProgress(null);
+    }
+  };
+
+  const removeSegment = (id: string) => {
+    setSegments((previous) => previous.filter((segment) => segment.id !== id));
+  };
+
+  const handleDownloadImages = async () => {
+    if (!selectedSegments.length || isExporting) {
+      if (!selectedSegments.length) toast.warning("No hay pantallas para descargar.");
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const files = selectedSegments.map((segment) => ({
+        blob: segment.blob,
+        filename: captureFilename(segment.index, format),
+      }));
+      if (files.length === 1) {
+        downloadService.downloadBlob(files[0].blob, files[0].filename);
+      } else {
+        const zip = await generateBatchZip(files);
+        downloadService.downloadBlob(zip, "pagina-web-capturas.zip");
+      }
+      toast.success("Capturas listas", `${files.length} imagen(es) preparadas.`);
+    } catch (error: unknown) {
+      toast.error("No se pudieron preparar las imágenes", errorMessage(error));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!selectedSegments.length || isExporting) {
+      if (!selectedSegments.length) toast.warning("No hay pantallas para incluir en el PDF.");
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const files = selectedSegments.map((segment) =>
+        new File([segment.blob], captureFilename(segment.index, format), { type: format }),
+      );
+      const pdf = await createPdfFromImages(files, {
+        pageSize: pdfPageSize,
+        orientation: pdfOrientation,
+        margin: pdfMargin,
+      });
+      downloadService.downloadBlob(pdf, "pagina-web.pdf");
+      toast.success("PDF generado", `${files.length} página(s) incluidas.`);
+    } catch (error: unknown) {
+      toast.error("No se pudo generar el PDF", errorMessage(error));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const controlsLocked = isCapturing || segments.length > 0;
+
+  return (
+    <div className="w-full max-w-6xl mx-auto space-y-6">
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="min-h-11 px-3 rounded-xl border border-white/10 text-sm text-slate-300 flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-indigo-400"
+        >
+          <ArrowLeft className="w-4 h-4" />Regresar
+        </button>
+      )}
+
+      <div className="text-center space-y-2 pb-2">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs font-semibold">
+          <Globe className="w-3.5 h-3.5" />
+          <span>Página web a imágenes y PDF</span>
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+          Captura una página completa
+        </h2>
+        <p className="text-xs sm:text-sm text-slate-400 max-w-2xl mx-auto">
+          Pega la URL, revisa cómo se ve la página y genera capturas por pantallas en PNG, JPG o WebP, o un PDF con la orientación que elijas.
+        </p>
+        <p className="text-xs text-amber-300">
+          Usa solo páginas públicas o contenido que tengas permiso de capturar.
+        </p>
+      </div>
+
+      {/* URL bar */}
+      <div className="p-2 sm:p-2.5 rounded-2xl bg-[#101218] border border-white/[0.1] shadow-xl flex flex-col sm:flex-row items-center gap-2 focus-within:border-sky-500/50 transition-colors">
+        <input
+          type="url"
+          value={url}
+          onChange={(event) => setUrl(event.target.value)}
+          disabled={isLoading || isCapturing}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void handleLoad();
+            }
+          }}
+          placeholder="https://ejemplo.com/pagina"
+          className="w-full bg-transparent px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none"
+        />
+        <button
+          onClick={handleLoad}
+          disabled={isLoading || isCapturing || !url.trim()}
+          className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-sky-600/30 transition-all shrink-0"
+        >
+          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+          {isLoading ? "Cargando..." : "Cargar página"}
+        </button>
+      </div>
+
+      {/* Preview + capture settings */}
+      {snapshot && (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
+          <div className="rounded-2xl bg-[#101218] border border-white/[0.08] overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06] text-[11px] text-slate-400 gap-3">
+              <span className="truncate" title={snapshot.finalUrl}>{snapshot.title || snapshot.finalUrl}</span>
+              <span className="font-mono shrink-0">{captureWidth}px</span>
+            </div>
+            <div className="bg-white overflow-auto">
+              <iframe
+                key={previewKey}
+                ref={iframeRef}
+                title="Vista previa de la página"
+                srcDoc={snapshot.html}
+                sandbox="allow-same-origin"
+                className="block border-0"
+                style={{ width: captureWidth, height: 560, maxWidth: "100%" }}
+              />
+            </div>
+            <p className="px-3 py-2 text-[10px] text-slate-500 border-t border-white/[0.06]">
+              La vista previa desactiva scripts. Algunos elementos interactivos, videos o tipografías externas pueden verse distintos en la captura.
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[#101218] border border-white/[0.08] p-4 space-y-3 h-fit">
+            <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <Wand2 className="w-3.5 h-3.5" /> Ajustes de captura
+            </h3>
+
+            <label className="block text-[11px] text-slate-400">
+              Ancho de la página
+              <select
+                value={captureWidth}
+                onChange={(event) => setCaptureWidth(Number(event.target.value))}
+                disabled={controlsLocked}
+                className="mt-1 w-full rounded-lg bg-[#08090D] border border-white/[0.1] px-2.5 py-2 text-xs text-slate-200 disabled:opacity-50"
+              >
+                {CAPTURE_WIDTHS.map((width) => (
+                  <option key={width} value={width}>{width} px</option>
+                ))}
+              </select>
+            </label>
+
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-[11px] text-slate-400">
+                Formato
+                <select
+                  value={format}
+                  onChange={(event) => setFormat(event.target.value as CaptureImageFormat)}
+                  disabled={controlsLocked}
+                  className="mt-1 w-full rounded-lg bg-[#08090D] border border-white/[0.1] px-2.5 py-2 text-xs text-slate-200 disabled:opacity-50"
+                >
+                  {FORMAT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-[11px] text-slate-400">
+                Nitidez
+                <select
+                  value={scale}
+                  onChange={(event) => setScale(Number(event.target.value))}
+                  disabled={controlsLocked}
+                  className="mt-1 w-full rounded-lg bg-[#08090D] border border-white/[0.1] px-2.5 py-2 text-xs text-slate-200 disabled:opacity-50"
+                >
+                  <option value={1}>1x</option>
+                  <option value={1.5}>1.5x</option>
+                  <option value={2}>2x</option>
+                </select>
+              </label>
+            </div>
+
+            <label className="block text-[11px] text-slate-400">
+              Calidad {format === "image/png" ? "(sin pérdida)" : `· ${quality}%`}
+              <input
+                type="range"
+                min={40}
+                max={100}
+                value={quality}
+                onChange={(event) => setQuality(Number(event.target.value))}
+                disabled={controlsLocked || format === "image/png"}
+                className="mt-1.5 w-full accent-sky-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer disabled:opacity-40"
+              />
+            </label>
+
+            <label className="block text-[11px] text-slate-400">
+              Alto de cada pantalla
+              <select
+                value={segmentHeight}
+                onChange={(event) => setSegmentHeight(Number(event.target.value))}
+                disabled={controlsLocked}
+                className="mt-1 w-full rounded-lg bg-[#08090D] border border-white/[0.1] px-2.5 py-2 text-xs text-slate-200 disabled:opacity-50"
+              >
+                <option value={1000}>1000 px</option>
+                <option value={1400}>1400 px</option>
+                <option value={1800}>1800 px</option>
+                <option value={2400}>2400 px</option>
+              </select>
+            </label>
+
+            <button
+              onClick={handleCapture}
+              disabled={isCapturing || isExporting}
+              className="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+            >
+              {isCapturing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rows3 className="w-4 h-4" />}
+              {isCapturing
+                ? captureProgress?.total
+                  ? `Capturando ${captureProgress.done} de ${captureProgress.total}...`
+                  : "Preparando captura..."
+                : segments.length ? "Volver a capturar" : "Generar capturas"}
+            </button>
+
+            {segments.length > 0 && (
+              <p className="text-[10px] text-slate-500 leading-snug">
+                Cambiar formato, ancho o nitidez requiere volver a capturar.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Captures */}
+      {segments.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                Pantallas capturadas
+                <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-300">{segments.length}</span>
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {blankCount > 0 ? `${blankCount} parecen estar en blanco. ` : ""}Elimina las que no necesites antes de exportar.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] text-[11px] text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={skipBlank}
+                  onChange={(event) => setSkipBlank(event.target.checked)}
+                  className="w-3.5 h-3.5 accent-sky-500"
+                />
+                <EyeOff className="w-3.5 h-3.5" />
+                Omitir en blanco
+              </label>
+              <button
+                onClick={handleDownloadImages}
+                disabled={isExporting || !selectedSegments.length}
+                className="px-3 py-2 rounded-xl border border-white/10 text-xs text-slate-200 hover:bg-[#161922] disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <FileArchive className="w-3.5 h-3.5" /> Imágenes (ZIP)
+              </button>
+              <button
+                onClick={handleDownloadPdf}
+                disabled={isExporting || !selectedSegments.length}
+                className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <FileText className="w-3.5 h-3.5" /> PDF
+              </button>
+            </div>
+          </div>
+
+          {/* PDF options */}
+          <div className="rounded-xl bg-[#101218] border border-white/[0.08] p-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <label className="block text-[10px] text-slate-400">
+              Tamaño PDF
+              <select
+                value={pdfPageSize}
+                onChange={(event) => setPdfPageSize(event.target.value as PdfPageSize)}
+                disabled={isExporting}
+                className="mt-1 w-full rounded-lg bg-[#08090D] border border-white/[0.1] px-2 py-1.5 text-[11px] text-slate-200"
+              >
+                <option value="A4">A4</option>
+                <option value="Letter">Carta</option>
+                <option value="Fit">Ajustar a la imagen</option>
+              </select>
+            </label>
+            <label className="block text-[10px] text-slate-400">
+              Orientación
+              <select
+                value={pdfOrientation}
+                onChange={(event) => setPdfOrientation(event.target.value as PdfOrientation)}
+                disabled={isExporting || pdfPageSize === "Fit"}
+                className="mt-1 w-full rounded-lg bg-[#08090D] border border-white/[0.1] px-2 py-1.5 text-[11px] text-slate-200 disabled:opacity-50"
+              >
+                <option value="portrait">Vertical</option>
+                <option value="landscape">Horizontal</option>
+              </select>
+            </label>
+            <label className="block text-[10px] text-slate-400">
+              Margen
+              <input
+                type="number"
+                min={0}
+                max={80}
+                value={pdfMargin}
+                onChange={(event) => setPdfMargin(Math.max(0, Math.min(80, Number(event.target.value) || 0)))}
+                disabled={isExporting}
+                className="mt-1 w-full rounded-lg bg-[#08090D] border border-white/[0.1] px-2 py-1.5 text-[11px] text-slate-200"
+              />
+            </label>
+            <div className="flex items-end text-[10px] text-slate-500">
+              {selectedSegments.length} página(s) en el PDF
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {segments.map((segment) => {
+              const omitted = skipBlank && segment.blank;
+              return (
+                <div
+                  key={segment.id}
+                  className={`rounded-2xl border overflow-hidden flex flex-col ${
+                    omitted ? "bg-[#0B0D12] border-amber-500/20 opacity-70" : "bg-[#101218] border-white/[0.08]"
+                  }`}
+                >
+                  <div className="relative bg-[#08090D] max-h-64 overflow-hidden flex items-start justify-center">
+                    <img
+                      src={segment.dataUrl}
+                      alt={`Pantalla ${segment.index + 1}`}
+                      className="w-full h-auto object-top"
+                    />
+                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[10px] font-mono text-slate-200">
+                      #{segment.index + 1}
+                    </span>
+                    {segment.blank && (
+                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-[10px] font-mono text-amber-200 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> EN BLANCO
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-3 flex items-center justify-between gap-2">
+                    <p className="text-[10px] text-slate-500 font-mono">
+                      {segment.width} × {segment.height}px
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      {!segment.blank && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                      <button
+                        onClick={() => removeSegment(segment.id)}
+                        disabled={isExporting}
+                        title="Eliminar esta pantalla"
+                        aria-label={`Eliminar pantalla ${segment.index + 1}`}
+                        className="p-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-red-300 hover:border-red-500/30 disabled:opacity-40"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {!snapshot && (
+        <div className="py-14 text-center rounded-2xl bg-[#101218] border border-dashed border-white/[0.1]">
+          <Globe className="w-10 h-10 mx-auto text-slate-600 mb-2" />
+          <p className="text-sm text-slate-300">Carga una página para empezar.</p>
+          <p className="text-xs text-slate-500 mt-1">Después podrás capturarla por pantallas y descargar imágenes o un PDF.</p>
+        </div>
+      )}
+
+      <div className="rounded-xl bg-[#08090D] border border-white/[0.06] p-4 flex items-start gap-3">
+        <Download className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          Las capturas se generan en tu navegador. La página se carga una sola vez para la vista previa y solo se guardan las imágenes o el PDF que descargues.
+        </p>
+      </div>
+    </div>
+  );
+};

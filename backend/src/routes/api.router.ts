@@ -6,6 +6,7 @@ import formatsRoutes from './formats.routes';
 import uploadsRoutes from './uploads.routes';
 import conversionsRoutes from './conversions.routes';
 import mediaRoutes from './media.routes';
+import webpageRoutes from './webpage.routes';
 import jobsRoutes from './jobs.routes';
 import { streamDownload } from '../controllers/jobsController';
 import { requireProcessingAuth } from '../middleware/auth';
@@ -31,6 +32,7 @@ router.use('/formats', formatsRoutes);
 router.use('/uploads', uploadsRoutes);
 router.use('/conversions', conversionsRoutes);
 router.use('/media', mediaRoutes);
+router.use('/webpage', webpageRoutes);
 router.use('/jobs', jobsRoutes);
 router.get('/download/:fileId', requireProcessingAuth, streamDownload);
 

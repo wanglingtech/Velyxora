@@ -275,6 +275,205 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     popular: false,
     isClientReady: true
   },
+  // --- Additional Image Format Conversions (Client-Side) ---
+  {
+    id: 'webp-to-png',
+    slug: 'webp-to-png',
+    name: 'WebP a PNG',
+    description: 'Convierte imágenes WebP a formato PNG sin pérdida de calidad y con transparencia.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/webp'],
+    outputTypes: ['image/png'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['webp', 'png', 'convertir', 'imagen', 'transparencia', 'lossless'],
+    popular: true,
+    isClientReady: true
+  },
+  {
+    id: 'webp-to-jpg',
+    slug: 'webp-to-jpg',
+    name: 'WebP a JPG',
+    description: 'Convierte imágenes WebP a formato JPEG con fondo opaco y calidad configurable.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/webp'],
+    outputTypes: ['image/jpeg'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['webp', 'jpg', 'jpeg', 'convertir', 'imagen', 'fondo blanco'],
+    popular: true,
+    isClientReady: true
+  },
+  {
+    id: 'gif-to-webp',
+    slug: 'gif-to-webp',
+    name: 'GIF a WebP',
+    description: 'Convierte la primera imagen de un GIF a WebP, más ligero y con mejor calidad.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'Sparkles',
+    inputTypes: ['image/gif'],
+    outputTypes: ['image/webp'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: false,
+    supportsPreview: true,
+    keywords: ['gif', 'webp', 'estático', 'convertir', 'optimizar', 'comprimir'],
+    popular: true,
+    isClientReady: true
+  },
+  {
+    id: 'gif-to-png',
+    slug: 'gif-to-png',
+    name: 'GIF a PNG',
+    description: 'Extrae el primer fotograma de un GIF animado como imagen PNG estática.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/gif'],
+    outputTypes: ['image/png'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: false,
+    supportsPreview: true,
+    keywords: ['gif', 'png', 'fotograma', 'extraer', 'estático', 'convertir'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'gif-to-jpg',
+    slug: 'gif-to-jpg',
+    name: 'GIF a JPG',
+    description: 'Extrae el primer fotograma de un GIF animado como fotografía JPG.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/gif'],
+    outputTypes: ['image/jpeg'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: false,
+    supportsPreview: true,
+    keywords: ['gif', 'jpg', 'jpeg', 'fotograma', 'extraer', 'convertir'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'avif-to-webp',
+    slug: 'avif-to-webp',
+    name: 'AVIF a WebP',
+    description: 'Convierte imágenes AVIF de última generación al formato WebP ampliamente compatible.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'Sparkles',
+    inputTypes: ['image/avif'],
+    outputTypes: ['image/webp'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['avif', 'webp', 'convertir', 'compatibilidad', 'next-gen'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'avif-to-png',
+    slug: 'avif-to-png',
+    name: 'AVIF a PNG',
+    description: 'Convierte imágenes AVIF a PNG sin pérdida preservando transparencia.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/avif'],
+    outputTypes: ['image/png'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['avif', 'png', 'convertir', 'transparencia', 'lossless'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'avif-to-jpg',
+    slug: 'avif-to-jpg',
+    name: 'AVIF a JPG',
+    description: 'Convierte imágenes AVIF a JPEG con fondo opaco para máxima compatibilidad.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/avif'],
+    outputTypes: ['image/jpeg'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['avif', 'jpg', 'jpeg', 'convertir', 'compatibilidad'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'bmp-to-webp',
+    slug: 'bmp-to-webp',
+    name: 'BMP a WebP',
+    description: 'Convierte imágenes BMP sin comprimir a WebP moderno y ligero.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'Sparkles',
+    inputTypes: ['image/bmp'],
+    outputTypes: ['image/webp'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['bmp', 'webp', 'convertir', 'comprimir', 'legacy'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'bmp-to-png',
+    slug: 'bmp-to-png',
+    name: 'BMP a PNG',
+    description: 'Convierte imágenes BMP a PNG con compresión sin pérdida.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/bmp'],
+    outputTypes: ['image/png'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['bmp', 'png', 'convertir', 'lossless', 'legacy'],
+    popular: false,
+    isClientReady: true
+  },
+  {
+    id: 'bmp-to-jpg',
+    slug: 'bmp-to-jpg',
+    name: 'BMP a JPG',
+    description: 'Convierte imágenes BMP a JPEG comprimido para uso web.',
+    category: 'image',
+    subcategory: 'Conversión',
+    icon: 'FileImage',
+    inputTypes: ['image/bmp'],
+    outputTypes: ['image/jpeg'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: true,
+    supportsPreview: true,
+    keywords: ['bmp', 'jpg', 'jpeg', 'convertir', 'comprimir', 'legacy'],
+    popular: false,
+    isClientReady: true
+  },
 
   // ==================== VIDEO TOOLS ====================
   {
@@ -330,6 +529,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     keywords: ['mp4', 'mp3', 'wav', 'extraer audio', 'musica', 'sonido'],
     popular: true,
     requiresServer: true,
+    requiredServices: ['ffmpeg'],
     serverEngineNotice: 'Requiere FFmpeg para codificar bytes MP3 reales.',
     isClientReady: false
   },
@@ -346,18 +546,19 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     processingMode: 'SERVER_SIDE',
     engine: 'server-ffmpeg',
     requiresServer: true,
+    requiredServices: ['ffmpeg'],
     keywords: ['comprimir video', 'h264', 'crf', 'discord', 'reducir mp4'],
     popular: true,
     isClientReady: false
   },
-  { id: 'video-to-wav', slug: 'video-to-wav', name: 'Video a WAV', description: 'Extrae el audio del video como WAV sin compresión.', category: 'video', subcategory: 'Conversión', icon: 'Music', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['audio/wav'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['video','wav','extraer audio'], isClientReady: false },
-  { id: 'video-to-gif', slug: 'video-to-gif', name: 'Video a GIF', description: 'Convierte un fragmento de video en una animación GIF.', category: 'video', subcategory: 'Conversión', icon: 'Film', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['image/gif'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['video','gif','animación'], isClientReady: false },
-  { id: 'video-trimmer', slug: 'video-trimmer', name: 'Recortar video', description: 'Selecciona el inicio y final del fragmento que quieres conservar.', category: 'video', subcategory: 'Edición', icon: 'Scissors', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['recortar','trim','cortar video'], isClientReady: false },
-  { id: 'video-mute', slug: 'video-mute', name: 'Silenciar video', description: 'Elimina completamente la pista de audio y conserva la imagen.', category: 'video', subcategory: 'Edición', icon: 'VolumeX', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['silenciar','quitar audio','mute'], isClientReady: false },
-  { id: 'video-speed', slug: 'video-speed', name: 'Cambiar velocidad de video', description: 'Acelera o ralentiza el video manteniendo audio e imagen sincronizados.', category: 'video', subcategory: 'Edición', icon: 'Gauge', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['velocidad','acelerar','ralentizar'], isClientReady: false },
-  { id: 'video-resize', slug: 'video-resize', name: 'Cambiar resolución de video', description: 'Redimensiona el video a una resolución estándar.', category: 'video', subcategory: 'Edición', icon: 'Maximize2', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['resolución','720p','1080p','redimensionar'], isClientReady: false },
-  { id: 'mp4-to-webm', slug: 'mp4-to-webm', name: 'MP4 a WebM', description: 'Convierte video MP4 al formato WebM.', category: 'video', subcategory: 'Conversión', icon: 'Video', inputTypes: ['video/mp4'], outputTypes: ['video/webm'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['mp4','webm','convertir'], isClientReady: false },
-  { id: 'webm-to-mp4', slug: 'webm-to-mp4', name: 'WebM a MP4', description: 'Convierte video WebM al formato MP4 compatible.', category: 'video', subcategory: 'Conversión', icon: 'Video', inputTypes: ['video/webm'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, supportsPreview: true, keywords: ['webm','mp4','convertir'], isClientReady: false },
+  { id: 'video-to-wav', slug: 'video-to-wav', name: 'Video a WAV', description: 'Extrae el audio del video como WAV sin compresión.', category: 'video', subcategory: 'Conversión', icon: 'Music', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['audio/wav'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['video','wav','extraer audio'], isClientReady: false },
+  { id: 'video-to-gif', slug: 'video-to-gif', name: 'Video a GIF', description: 'Convierte un fragmento de video en una animación GIF.', category: 'video', subcategory: 'Conversión', icon: 'Film', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['image/gif'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['video','gif','animación'], isClientReady: false },
+  { id: 'video-trimmer', slug: 'video-trimmer', name: 'Recortar video', description: 'Selecciona el inicio y final del fragmento que quieres conservar.', category: 'video', subcategory: 'Edición', icon: 'Scissors', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['recortar','trim','cortar video'], isClientReady: false },
+  { id: 'video-mute', slug: 'video-mute', name: 'Silenciar video', description: 'Elimina completamente la pista de audio y conserva la imagen.', category: 'video', subcategory: 'Edición', icon: 'VolumeX', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['silenciar','quitar audio','mute'], isClientReady: false },
+  { id: 'video-speed', slug: 'video-speed', name: 'Cambiar velocidad de video', description: 'Acelera o ralentiza el video manteniendo audio e imagen sincronizados.', category: 'video', subcategory: 'Edición', icon: 'Gauge', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['velocidad','acelerar','ralentizar'], isClientReady: false },
+  { id: 'video-resize', slug: 'video-resize', name: 'Cambiar resolución de video', description: 'Redimensiona el video a una resolución estándar.', category: 'video', subcategory: 'Edición', icon: 'Maximize2', inputTypes: ['video/mp4','video/webm','video/quicktime'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['resolución','720p','1080p','redimensionar'], isClientReady: false },
+  { id: 'mp4-to-webm', slug: 'mp4-to-webm', name: 'MP4 a WebM', description: 'Convierte video MP4 al formato WebM.', category: 'video', subcategory: 'Conversión', icon: 'Video', inputTypes: ['video/mp4'], outputTypes: ['video/webm'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['mp4','webm','convertir'], isClientReady: false },
+  { id: 'webm-to-mp4', slug: 'webm-to-mp4', name: 'WebM a MP4', description: 'Convierte video WebM al formato MP4 compatible.', category: 'video', subcategory: 'Conversión', icon: 'Video', inputTypes: ['video/webm'], outputTypes: ['video/mp4'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], supportsPreview: true, keywords: ['webm','mp4','convertir'], isClientReady: false },
 
   // ==================== AUDIO TOOLS ====================
   {
@@ -411,15 +612,16 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     processingMode: 'HYBRID',
     engine: 'server-ffmpeg',
     requiresServer: true,
+    requiredServices: ['ffmpeg'],
     serverEngineNotice: 'Transcodificación avanzada multiformato provista por servicio FFmpeg backend.',
     keywords: ['mp3', 'flac', 'wav', 'audio converter', 'bitrate'],
     popular: true,
     isClientReady: false
   },
-  { id: 'wav-to-mp3', slug: 'wav-to-mp3', name: 'WAV a MP3', description: 'Convierte audio WAV a MP3 real con bitrate configurable.', category: 'audio', subcategory: 'Conversión', icon: 'Music', inputTypes: ['audio/wav'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, keywords: ['wav','mp3'], isClientReady: false },
-  { id: 'mp3-to-wav', slug: 'mp3-to-wav', name: 'MP3 a WAV', description: 'Convierte audio MP3 a WAV PCM sin compresión.', category: 'audio', subcategory: 'Conversión', icon: 'Music', inputTypes: ['audio/mpeg'], outputTypes: ['audio/wav'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, keywords: ['mp3','wav'], isClientReady: false },
-  { id: 'audio-bitrate', slug: 'audio-bitrate', name: 'Cambiar bitrate de audio', description: 'Equilibra calidad y tamaño. Subir el bitrate no recupera calidad perdida.', category: 'audio', subcategory: 'Optimización', icon: 'SlidersHorizontal', inputTypes: ['audio/mpeg','audio/wav','audio/flac','audio/ogg'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, keywords: ['bitrate','audio','calidad'], isClientReady: false },
-  { id: 'audio-normalize', slug: 'audio-normalize', name: 'Normalizar volumen', description: 'Ajusta automáticamente el audio para obtener un nivel más uniforme.', category: 'audio', subcategory: 'Procesamiento', icon: 'AudioLines', inputTypes: ['audio/mpeg','audio/wav','audio/flac','audio/ogg'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, keywords: ['normalizar','volumen','loudness'], isClientReady: false },
+  { id: 'wav-to-mp3', slug: 'wav-to-mp3', name: 'WAV a MP3', description: 'Convierte audio WAV a MP3 real con bitrate configurable.', category: 'audio', subcategory: 'Conversión', icon: 'Music', inputTypes: ['audio/wav'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], keywords: ['wav','mp3'], isClientReady: false },
+  { id: 'mp3-to-wav', slug: 'mp3-to-wav', name: 'MP3 a WAV', description: 'Convierte audio MP3 a WAV PCM sin compresión.', category: 'audio', subcategory: 'Conversión', icon: 'Music', inputTypes: ['audio/mpeg'], outputTypes: ['audio/wav'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], keywords: ['mp3','wav'], isClientReady: false },
+  { id: 'audio-bitrate', slug: 'audio-bitrate', name: 'Cambiar bitrate de audio', description: 'Equilibra calidad y tamaño. Subir el bitrate no recupera calidad perdida.', category: 'audio', subcategory: 'Optimización', icon: 'SlidersHorizontal', inputTypes: ['audio/mpeg','audio/wav','audio/flac','audio/ogg'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], keywords: ['bitrate','audio','calidad'], isClientReady: false },
+  { id: 'audio-normalize', slug: 'audio-normalize', name: 'Normalizar volumen', description: 'Ajusta automáticamente el audio para obtener un nivel más uniforme.', category: 'audio', subcategory: 'Procesamiento', icon: 'AudioLines', inputTypes: ['audio/mpeg','audio/wav','audio/flac','audio/ogg'], outputTypes: ['audio/mpeg'], processingMode: 'SERVER_SIDE', engine: 'server-ffmpeg', requiresServer: true, requiredServices: ['ffmpeg'], keywords: ['normalizar','volumen','loudness'], isClientReady: false },
   {
     id: 'text-to-speech',
     slug: 'text-to-speech',
@@ -844,6 +1046,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     processingMode: 'HYBRID',
     engine: 'server-ytdlp',
     requiresServer: true,
+    requiredServices: ['ytDlp'],
     serverEngineNotice: 'Análisis de metadatos y embeds activo; la descarga de flujos combinados requiere microservicio yt-dlp + ffmpeg.',
     keywords: ['youtube', 'tiktok', 'instagram', 'twitter', 'facebook', 'descargar video', 'vimeo', 'reels'],
     popular: true,
@@ -943,6 +1146,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     processingMode: 'SERVER_SIDE',
     engine: 'server-libreoffice',
     requiresServer: true,
+    requiredServices: ['libreOffice'],
     serverEngineNotice: 'Requiere LibreOffice headless en el backend.',
     keywords: ['word', 'docx', 'pdf', 'libreoffice', 'convertir documento'],
     popular: true,
@@ -953,7 +1157,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     description: 'Convierte hojas de cálculo XLSX a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Sheet',
     inputTypes: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'], outputTypes: ['application/pdf'],
     acceptedExtensions: ['xlsx'], acceptedMimeTypes: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
-    processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true,
+    processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, requiredServices: ['libreOffice'],
     serverEngineNotice: 'Requiere LibreOffice headless en el backend.', keywords: ['excel', 'xlsx', 'pdf', 'libreoffice'], popular: true, isClientReady: true
   },
   {
@@ -961,17 +1165,17 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     description: 'Convierte presentaciones PPTX a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Presentation',
     inputTypes: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'], outputTypes: ['application/pdf'],
     acceptedExtensions: ['pptx'], acceptedMimeTypes: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'],
-    processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true,
+    processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, requiredServices: ['libreOffice'],
     serverEngineNotice: 'Requiere LibreOffice headless en el backend.', keywords: ['powerpoint', 'pptx', 'pdf', 'libreoffice'], popular: true, isClientReady: true
   },
   {
-    id: 'odt-to-pdf', slug: 'odt-to-pdf', name: 'OpenDocument (ODT) a PDF', description: 'Convierte documentos ODT a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'FileText', inputTypes: ['application/vnd.oasis.opendocument.text'], outputTypes: ['application/pdf'], acceptedExtensions: ['odt'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.text'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['odt','opendocument','writer','pdf'], isClientReady: true
+    id: 'odt-to-pdf', slug: 'odt-to-pdf', name: 'OpenDocument (ODT) a PDF', description: 'Convierte documentos ODT a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'FileText', inputTypes: ['application/vnd.oasis.opendocument.text'], outputTypes: ['application/pdf'], acceptedExtensions: ['odt'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.text'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, requiredServices: ['libreOffice'], keywords: ['odt','opendocument','writer','pdf'], isClientReady: true
   },
   {
-    id: 'ods-to-pdf', slug: 'ods-to-pdf', name: 'OpenDocument (ODS) a PDF', description: 'Convierte hojas ODS a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Sheet', inputTypes: ['application/vnd.oasis.opendocument.spreadsheet'], outputTypes: ['application/pdf'], acceptedExtensions: ['ods'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.spreadsheet'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['ods','opendocument','calc','pdf'], isClientReady: true
+    id: 'ods-to-pdf', slug: 'ods-to-pdf', name: 'OpenDocument (ODS) a PDF', description: 'Convierte hojas ODS a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Sheet', inputTypes: ['application/vnd.oasis.opendocument.spreadsheet'], outputTypes: ['application/pdf'], acceptedExtensions: ['ods'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.spreadsheet'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, requiredServices: ['libreOffice'], keywords: ['ods','opendocument','calc','pdf'], isClientReady: true
   },
   {
-    id: 'odp-to-pdf', slug: 'odp-to-pdf', name: 'OpenDocument (ODP) a PDF', description: 'Convierte presentaciones ODP a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Presentation', inputTypes: ['application/vnd.oasis.opendocument.presentation'], outputTypes: ['application/pdf'], acceptedExtensions: ['odp'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.presentation'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, keywords: ['odp','opendocument','impress','pdf'], isClientReady: true
+    id: 'odp-to-pdf', slug: 'odp-to-pdf', name: 'OpenDocument (ODP) a PDF', description: 'Convierte presentaciones ODP a PDF mediante LibreOffice.', category: 'documents', subcategory: 'Conversión', icon: 'Presentation', inputTypes: ['application/vnd.oasis.opendocument.presentation'], outputTypes: ['application/pdf'], acceptedExtensions: ['odp'], acceptedMimeTypes: ['application/vnd.oasis.opendocument.presentation'], processingMode: 'SERVER_SIDE', engine: 'server-libreoffice', requiresServer: true, requiredServices: ['libreOffice'], keywords: ['odp','opendocument','impress','pdf'], isClientReady: true
   },
 
   // ==================== UTILITIES ====================
@@ -1171,12 +1375,105 @@ export function getToolsByCategory(category: string): ToolDefinition[] {
   return PUBLIC_TOOL_REGISTRY.filter(t => t.category === category);
 }
 
+const SEARCH_NORMALIZE_MAP: Record<string, string> = {
+  á: "a", é: "e", í: "i", ó: "o", ú: "u", ü: "u", ñ: "n",
+};
+
+/** Lowercase, strip accents and unify separators so "Conversión" matches "conversion". */
+export const normalizeSearchText = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[áéíóúüñ]/g, (char) => SEARCH_NORMALIZE_MAP[char] ?? char)
+    .replace(/[_/\\.,;:()[\]{}|+]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+// Spanish/English variants users type. Each entry expands one token into the
+// vocabulary actually present in the registry, so "foto" also finds "imagen".
+const SEARCH_SYNONYMS: Record<string, string[]> = {
+  foto: ["imagen", "image"],
+  fotos: ["imagen", "image"],
+  fotografia: ["imagen", "image"],
+  imagenes: ["imagen", "image"],
+  img: ["imagen", "image"],
+  videos: ["video", "mp4", "webm"],
+  sonido: ["audio"],
+  musica: ["audio", "mp3"],
+  documento: ["documento", "pdf", "docx"],
+  documentos: ["documento", "pdf", "docx", "documents"],
+  word: ["docx", "documento"],
+  excel: ["xlsx", "hoja"],
+  hoja: ["xlsx", "excel"],
+  comprimir: ["comprimir", "compresion", "optimizar"],
+  compresion: ["comprimir", "compresion", "optimizar"],
+  unir: ["unir", "merge", "combinar"],
+  combinar: ["unir", "merge", "combinar"],
+  cortar: ["recortar", "cortar", "trim"],
+  recortar: ["recortar", "cortar", "trim"],
+  convertir: ["convertir", "conversion"],
+  conversion: ["convertir", "conversion"],
+  codigo: ["codigo", "qr", "barcode"],
+  enlace: ["url", "enlace", "link"],
+  link: ["url", "enlace", "link"],
+  descargar: ["descargar", "descarga", "download"],
+  descarga: ["descargar", "descarga", "download"],
+  texto: ["texto", "text"],
+  utilidades: ["utilidades", "utilities"],
+  desarrollador: ["desarrollador", "developer"],
+};
+
+const SEARCH_STOPWORDS = new Set([
+  "herramienta", "herramientas", "tool", "tools",
+  "de", "del", "la", "el", "los", "las", "un", "una", "para", "con", "en", "y",
+]);
+
+const tokenMatches = (token: string, haystack: string): boolean => {
+  const synonyms = Object.prototype.hasOwnProperty.call(SEARCH_SYNONYMS, token) ? SEARCH_SYNONYMS[token] : [];
+  const variants = [token, ...synonyms];
+  return variants.some((variant) => variant && haystack.includes(variant));
+};
+
 export function searchTools(query: string): ToolDefinition[] {
-  const clean = query.toLowerCase().trim();
+  const clean = normalizeSearchText(query);
   if (!clean) return PUBLIC_TOOL_REGISTRY;
 
-  return PUBLIC_TOOL_REGISTRY.filter(tool => {
-    const haystack = [tool.id, tool.slug, tool.name, tool.description, tool.category, tool.subcategory || '', ...tool.keywords, ...tool.inputTypes, ...tool.outputTypes].join(' ').toLowerCase();
-    return clean.split(/\s+/).every((token) => haystack.includes(token));
+  const tokens = clean.split(" ").filter((token) => token && !SEARCH_STOPWORDS.has(token));
+  if (!tokens.length) return PUBLIC_TOOL_REGISTRY;
+  const scored: Array<{ tool: ToolDefinition; score: number; index: number }> = [];
+
+  PUBLIC_TOOL_REGISTRY.forEach((tool, index) => {
+    const groupNames = TOOLKIT_GROUPS
+      .filter((group) => group.categories.includes(tool.category))
+      .map((group) => group.name);
+    const haystack = normalizeSearchText([
+      tool.id,
+      tool.slug,
+      tool.name,
+      tool.description,
+      tool.category,
+      tool.subcategory || "",
+      ...groupNames,
+      ...tool.keywords,
+      ...tool.inputTypes,
+      ...tool.outputTypes,
+      ...(tool.acceptedExtensions ?? []),
+      ...(tool.acceptedMimeTypes ?? []),
+    ].join(" "));
+
+    if (!tokens.every((token) => tokenMatches(token, haystack))) return;
+
+    const name = normalizeSearchText(tool.name);
+    const keywords = normalizeSearchText(tool.keywords.join(" "));
+    const score =
+      name === clean ? 100
+        : name.startsWith(clean) ? 80
+          : name.includes(clean) ? 60
+            : keywords.includes(clean) ? 40
+              : 20;
+    scored.push({ tool, score, index });
   });
+
+  // Name matches surface first; ties keep the curated registry order.
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
+  return scored.map((entry) => entry.tool);
 }

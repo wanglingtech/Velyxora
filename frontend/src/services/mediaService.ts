@@ -31,6 +31,29 @@ const createAdapter = (
   },
 });
 
+// Direct image/video/audio file URLs (e.g., https://site.com/photo.jpg, https://cdn.site/video.mp4)
+// Uses the backend's DirectMediaProvider which validates and streams the file directly.
+const createDirectMediaAdapter = (): MediaAdapter => ({
+  id: 'direct-media',
+  name: 'Enlace directo',
+  matches: (url) => {
+    try {
+      const parsed = new URL(url);
+      const pathname = parsed.pathname.toLowerCase();
+      // Match common image/video/audio file extensions in the URL path
+      return /\.(jpg|jpeg|png|webp|gif|avif|bmp|mp4|webm|mov|mkv|mp3|m4a|ogg|wav|flac|opus)(\?|$)/i.test(pathname);
+    } catch {
+      return false;
+    }
+  },
+  async analyze(url) {
+    const analysis = await apiClient.analyzeMediaUrl(url);
+    return normalizeMediaAnalysis(analysis, 'Enlace directo');
+  },
+});
+
+const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "avif", "bmp"]);
+
 const extractEmbedUrl = (embedHtml?: string): string | undefined => {
   if (!embedHtml) return undefined;
   const match = embedHtml.match(/\bsrc=["']([^"']+)["']/i);
@@ -48,8 +71,9 @@ export const normalizeMediaAnalysis = (
     const declaredType = format.type || format.kind;
     const hasVideo = format.hasVideo === true || (Boolean(format.vcodec) && format.vcodec !== 'none') || declaredType === 'video';
     const hasAudio = format.hasAudio === true || (Boolean(format.acodec) && format.acodec !== 'none') || declaredType === 'audio';
-    if (!formatId || !extension || (!hasVideo && !hasAudio)) return [];
-    const type: 'video' | 'audio' = hasVideo ? 'video' : 'audio';
+    const isImage = declaredType === 'image' || (!hasVideo && !hasAudio && IMAGE_EXTENSIONS.has(extension));
+    if (!formatId || !extension || (!hasVideo && !hasAudio && !isImage)) return [];
+    const type: 'video' | 'audio' | 'image' = hasVideo ? 'video' : hasAudio ? 'audio' : 'image';
     const qualityLabel = format.qualityLabel || format.formatNote || format.format_note || format.label || format.resolution;
     return [{ ...format, formatId, extension, type, hasVideo, hasAudio, qualityLabel }];
   }) : [];
@@ -79,7 +103,9 @@ export const normalizeMediaAnalysis = (
         ? "Video + audio"
         : format.hasVideo
           ? "Video"
-          : "Audio",
+          : format.hasAudio
+            ? "Audio"
+            : "Imagen",
     resolution: format.resolution,
     qualityLabel: format.qualityLabel,
     qualityBadge: format.qualityLabel,
@@ -105,6 +131,59 @@ export const normalizeMediaAnalysis = (
 
 export const selectInitialMediaFormat = (metadata: MediaMetadata): MediaFormatOption | null =>
   metadata.availableFormats[0] ?? null;
+
+export const isImageMedia = (metadata: MediaMetadata): boolean =>
+  metadata.availableFormats.some((format) => format.type === 'image');
+
+/** Formats the browser can encode locally for an image already downloaded or linked. */
+export const IMAGE_CONVERSION_FORMATS = [
+  { mime: "image/png", extension: "png", label: "PNG" },
+  { mime: "image/jpeg", extension: "jpg", label: "JPG" },
+  { mime: "image/webp", extension: "webp", label: "WebP" },
+] as const;
+
+const normalizeExtension = (extension: string): string => {
+  const value = extension.toLowerCase();
+  return value === "jpeg" ? "jpg" : value;
+};
+
+/**
+ * Adds "download as PNG/JPG/WebP" choices to image results. Videos and audio
+ * keep their provider formats only. Conversions are performed in the browser
+ * after the original file is fetched, so no extra provider call is invented.
+ */
+export const withImageConversionFormats = (metadata: MediaMetadata): MediaMetadata => {
+  const source = metadata.availableFormats.find(
+    (format) => format.type === "image" && !format.convertTo,
+  );
+  if (!source) return metadata;
+
+  const sourceExtension = normalizeExtension(source.extension);
+  const taken = new Set(
+    metadata.availableFormats.map((format) => normalizeExtension(format.extension)),
+  );
+  const conversions: MediaFormatOption[] = IMAGE_CONVERSION_FORMATS
+    .filter((output) => output.extension !== sourceExtension && !taken.has(output.extension))
+    .map((output) => ({
+      id: `convert:${output.mime}`,
+      extension: output.extension,
+      label: `${output.label} convertido`,
+      formatNote: `${output.label} convertido`,
+      streamType: "Imagen",
+      qualityLabel: output.label,
+      type: "image",
+      hasVideo: false,
+      hasAudio: false,
+      convertTo: output.mime,
+    }));
+
+  if (!conversions.length) return metadata;
+  return { ...metadata, availableFormats: [...metadata.availableFormats, ...conversions] };
+};
+
+/** Picks the real provider format used as the source for a local conversion. */
+export const findImageConversionSource = (metadata: MediaMetadata): MediaFormatOption | null =>
+  metadata.availableFormats.find((format) => format.type === "image" && !format.convertTo) ?? null;
 
 export const EMPTY_MEDIA_FORMATS_MESSAGE = 'No se encontraron formatos compatibles para este contenido.';
 
@@ -151,6 +230,7 @@ export const ALL_MEDIA_ADAPTERS: MediaAdapter[] = [
   createAdapter("reddit", "Reddit", ["reddit.com"]),
   createAdapter("twitch", "Twitch", ["twitch.tv"]),
   createAdapter("soundcloud", "SoundCloud", ["soundcloud.com"]),
+  createDirectMediaAdapter(),
   createAdapter("generic", "Otros sitios compatibles", []),
 ];
 

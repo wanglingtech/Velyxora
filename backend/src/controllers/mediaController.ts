@@ -52,7 +52,7 @@ export async function analyzeMedia(req: Request, res: Response): Promise<void> {
 
 export async function processMedia(req: Request, res: Response): Promise<void> {
   const { url, formatId, container, type, title } = req.body || {};
-  if (typeof url !== 'string' || typeof formatId !== 'string' || typeof container !== 'string' || (type !== 'video' && type !== 'audio')) {
+  if (typeof url !== 'string' || typeof formatId !== 'string' || typeof container !== 'string' || (type !== 'video' && type !== 'audio' && type !== 'image')) {
     res.status(HTTP_STATUS.BAD_REQUEST).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Se requieren url y formatId válidos.' }, timestamp: new Date().toISOString() });
     return;
   }

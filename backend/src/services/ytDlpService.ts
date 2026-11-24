@@ -22,7 +22,7 @@ export type RawInfo = {
 export type FormatDiagnostics = {
   rawFormatsCount: number; afterIdFilter: number; afterExtensionFilter: number;
   afterCodecFilter: number; afterDeduplication: number; normalizedFormatsCount: number;
-  videoCount: number; audioCount: number; combinedCount: number;
+  videoCount: number; audioCount: number; combinedCount: number; imageCount: number;
 };
 
 export class YtDlpError extends Error {
@@ -71,6 +71,13 @@ export type TikTokStagingExtractionDiagnostics = StagingRuntimeDiagnostics & {
 };
 
 const DIAGNOSTIC_BUFFER_LIMIT = 64 * 1024;
+
+// A cold `yt-dlp --version` can take far longer than a healthy command on
+// Windows (PyInstaller bootstrap + antivirus scanning); observed runs range
+// from ~6s up to ~30s. The probe must not report a working engine as missing,
+// so it gets a generous deadline and a single retry instead of the 5s default.
+const VERSION_PROBE_TIMEOUT_MS = 30_000;
+const VERSION_PROBE_ATTEMPTS = 2;
 
 export type YouTubeRuntimeDiagnostic = {
   stage: YouTubeDiagnosticStage;
@@ -410,6 +417,18 @@ export function friendlyError(stderr: string, stage: YtDlpStage, provider?: Medi
   if (provider === "youtube" && isYouTubeBotVerification(value)) {
     return new YtDlpError("PROVIDER_TEMPORARILY_RESTRICTED", YOUTUBE_TEMPORARILY_RESTRICTED_MESSAGE);
   }
+  if (/account authentication is required|only works when logged-?in|use --cookies(?:-from-browser)?\b|requires? (?:an? )?account(?: authentication)?/i.test(value)) {
+    return new YtDlpError(
+      "PROVIDER_REQUIRES_AUTH",
+      "Esta plataforma exige una sesión iniciada para acceder a este contenido. Solo se admiten recursos públicos.",
+    );
+  }
+  if (/failed to decrypt with dpapi|failed to (?:open|read|copy|decrypt) (?:the )?cookies|unable to (?:open|read) cookies/i.test(value)) {
+    return new YtDlpError("PROVIDER_COOKIES_UNAVAILABLE", "No fue posible leer las cookies configuradas en el servidor.");
+  }
+  if (/cookies? file .*does not exist|(?:unable to|can(?:no|')t) (?:find|locate) (?:the )?cookies? file|cookies file is not a valid/i.test(value)) {
+    return new YtDlpError("PROVIDER_COOKIES_UNAVAILABLE", "La configuración de cookies del servidor no es válida.");
+  }
   if (value.includes("requested format is not available") || value.includes("no video formats")) {
     return stage === "process"
       ? new YtDlpError("FORMAT_UNAVAILABLE", "El formato seleccionado ya no está disponible.")
@@ -424,19 +443,32 @@ export function friendlyError(stderr: string, stage: YtDlpStage, provider?: Medi
 const hasUsableCodec = (codec: unknown): boolean =>
   typeof codec === "string" && !["", "none", "unknown"].includes(codec.trim().toLowerCase());
 
+// yt-dlp exposes photo posts (Instagram carousels, tweets, pins) as formats
+// without any audio/video codec. Without this allowlist they were discarded and
+// the UI reported "no downloadable formats" for perfectly valid images.
+export const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "avif", "bmp"]);
+
+export const isImageFormat = (format: RawFormat): boolean =>
+  !hasUsableCodec(format.vcodec) && !hasUsableCodec(format.acodec)
+  && typeof format.ext === "string" && IMAGE_EXTENSIONS.has(format.ext.trim().toLowerCase());
+
 export function normalizeFormatsWithDiagnostics(formats: RawFormat[] = []): { formats: MediaStreamFormat[]; diagnostics: FormatDiagnostics } {
   const normalized: MediaStreamFormat[] = [];
   const seen = new Set<string>();
   const withId = formats.filter((item) => typeof item.format_id === "string" && item.format_id.trim());
   const withExtension = withId.filter((item) => typeof item.ext === "string" && item.ext.trim());
-  const withCodec = withExtension.filter((item) => hasUsableCodec(item.vcodec) || hasUsableCodec(item.acodec));
+  const withCodec = withExtension.filter((item) => hasUsableCodec(item.vcodec) || hasUsableCodec(item.acodec) || isImageFormat(item));
   for (const item of withCodec) {
     const formatId = item.format_id!;
     const extension = item.ext!;
     const hasVideo = hasUsableCodec(item.vcodec);
     const hasAudio = hasUsableCodec(item.acodec);
-    const type = hasVideo ? "video" : "audio";
-    const resolution = hasVideo && item.height ? `${item.height}p` : undefined;
+    const image = !hasVideo && !hasAudio && isImageFormat(item);
+    if (!hasVideo && !hasAudio && !image) continue;
+    const type: MediaStreamFormat["type"] = hasVideo ? "video" : hasAudio ? "audio" : "image";
+    const resolution = hasVideo && item.height
+      ? `${item.height}p`
+      : image && item.width && item.height ? `${item.width}x${item.height}` : undefined;
     const bitrate = Math.round(item.abr || item.tbr || 0) || undefined;
     const key = `${formatId}:${type}:${extension}`;
     if (seen.has(key)) continue;
@@ -445,7 +477,7 @@ export function normalizeFormatsWithDiagnostics(formats: RawFormat[] = []): { fo
       formatId, type, container: extension, extension,
       resolution, qualityLabel: item.format_note || resolution || (bitrate ? `${bitrate} kbps` : extension.toUpperCase()),
       hasVideo, hasAudio, estimatedSize: item.filesize || item.filesize_approx,
-      codec: hasVideo ? item.vcodec : item.acodec, fps: item.fps, bitrate,
+      codec: hasVideo ? item.vcodec : hasAudio ? item.acodec : undefined, fps: item.fps, bitrate,
     });
   }
   const afterDeduplication = normalized.length;
@@ -463,6 +495,7 @@ export function normalizeFormatsWithDiagnostics(formats: RawFormat[] = []): { fo
     videoCount: sorted.filter((format) => format.hasVideo).length,
     audioCount: sorted.filter((format) => format.hasAudio && !format.hasVideo).length,
     combinedCount: sorted.filter((format) => format.hasVideo && format.hasAudio).length,
+    imageCount: sorted.filter((format) => format.type === "image").length,
   } };
 }
 
@@ -490,6 +523,16 @@ function isYouTubeBotVerification(stderr: string): boolean {
 
 const COMMON_ARGS = ["--ignore-config", "--no-playlist", "--js-runtimes", "node"];
 
+/**
+ * yt-dlp global flag for a Netscape-format cookies file. Platforms such as
+ * Reddit, Vimeo, Instagram and Facebook require a logged-in session; the file
+ * is optional and kept out of the repo. An empty value disables the flag.
+ */
+export function buildCookieArgs(cookiesFile: string | undefined): string[] {
+  const file = cookiesFile?.trim();
+  return file ? ["--cookies", file] : [];
+}
+
 export const buildAnalyzeArgs = (url: string, providerArgs: readonly string[] = []): string[] => [
   ...COMMON_ARGS,
   ...providerArgs,
@@ -502,11 +545,14 @@ export const buildAnalyzeArgs = (url: string, providerArgs: readonly string[] = 
 
 export function parseAnalysis(data: RawInfo, requestedUrl: string, platform: MediaPlatform): MediaAnalysisResult {
   const formats = normalizeFormats(data.formats);
+  const rawFormats = data.formats || [];
+  const hasVideo = rawFormats.some((format) => hasUsableCodec(format.vcodec));
+  const hasImage = !hasVideo && rawFormats.some(isImageFormat);
   return {
     url: data.webpage_url || requestedUrl, platform, title: data.title || "Contenido multimedia",
     author: data.uploader || data.channel || "Autor no disponible", authorUrl: data.uploader_url,
     thumbnailUrl: selectThumbnail(data), durationSeconds: data.duration,
-    contentType: (data.formats || []).some((format) => format.vcodec && format.vcodec !== "none") ? "video" : "audio",
+    contentType: hasVideo ? "video" : hasImage ? "image" : "audio",
     formats, isDirectDownloadPossible: formats.length > 0,
     requiresExternalExtractor: true,
     notice: formats.length
@@ -530,7 +576,7 @@ export function buildDownloadArgs(
   url: string,
   formatId: string,
   container: string,
-  type: "video" | "audio",
+  type: "video" | "audio" | "image",
   outputStem: string,
   providerArgs: readonly string[] = [],
 ): string[] {
@@ -550,6 +596,8 @@ function recordYouTubeHealthFailure(operationId: number | null, error: unknown):
 
 class YtDlpService {
   private version?: string;
+  private versionProbe?: Promise<string | null>;
+  private cookiesWarningLogged = false;
   private stagingRuntimeDiagnostics?: Promise<StagingRuntimeDiagnostics>;
 
   async isAvailable(): Promise<boolean> {
@@ -558,10 +606,33 @@ class YtDlpService {
 
   async getVersion(): Promise<string | null> {
     if (this.version) return this.version;
-    try {
-      this.version = (await this.run(["--ignore-config", "--version"], "diagnostic", undefined, 5000)).stdout.trim();
-      return this.version || null;
-    } catch { return null; }
+    // Deduplicate concurrent callers (startup warm-up + health request) so a
+    // slow probe is not spawned twice. Failures are not cached, so a later
+    // call retries.
+    const probe = this.versionProbe ?? this.probeVersion();
+    this.versionProbe = probe;
+    const detected = await probe.finally(() => {
+      if (this.versionProbe === probe) this.versionProbe = undefined;
+    });
+    if (detected) this.version = detected;
+    return detected;
+  }
+
+  private async probeVersion(): Promise<string | null> {
+    for (let attempt = 1; attempt <= VERSION_PROBE_ATTEMPTS; attempt += 1) {
+      try {
+        const { stdout } = await this.run(["--ignore-config", "--version"], "diagnostic", undefined, VERSION_PROBE_TIMEOUT_MS);
+        const version = stdout.trim();
+        if (version) return version;
+      } catch (error) {
+        logger.warn("YT_DLP_VERSION_PROBE_FAILED", {
+          attempt,
+          maxAttempts: VERSION_PROBE_ATTEMPTS,
+          reason: error instanceof YtDlpError ? error.code : "unknown",
+        });
+      }
+    }
+    return null;
   }
 
   async analyze(url: string, platform: MediaPlatform, providerArgs: readonly string[] = []): Promise<MediaAnalysisResult> {
@@ -622,7 +693,7 @@ class YtDlpService {
     const stagingEnabled = shouldEnableTikTokStagingDiagnostics(ENV.MEDIA_STAGING_DIAGNOSTICS, platform, stage);
     const [args] = buildAnalyzeExecutionPlan(url, stagingEnabled, providerArgs);
     const diagnosticStage: YouTubeDiagnosticStage = stage === "analyze" ? "analyze" : "revalidate-format";
-    const result = await this.run(args, stage, undefined, 30_000, undefined, platform, diagnosticStage);
+    const result = await this.run(args, stage, undefined, ENV.YT_DLP_ANALYZE_TIMEOUT_MS, undefined, platform, diagnosticStage);
     const data = JSON.parse(result.stdout) as RawInfo;
     if (shouldEnableYouTubeDiagnostics(ENV.YOUTUBE_DIAGNOSTICS_ENABLED, platform) && diagnosticStage === "revalidate-format") {
       for (const format of buildYouTubeRawFormatDiagnostics(data.formats)) {
@@ -632,7 +703,7 @@ class YtDlpService {
     return { data, warningCategories: result.warningCategories, stagingTrace: result.stagingTrace };
   }
 
-  async download(url: string, formatId: string, container: string, type: "video" | "audio", outputStem: string, signal?: AbortSignal, onProgress?: (value: number) => void, platform?: MediaPlatform, providerArgs: readonly string[] = []): Promise<string> {
+  async download(url: string, formatId: string, container: string, type: "video" | "audio" | "image", outputStem: string, signal?: AbortSignal, onProgress?: (value: number) => void, platform?: MediaPlatform, providerArgs: readonly string[] = []): Promise<string> {
     const healthOperation = platform === "youtube" ? youtubeProviderHealthService.beginOperation() : null;
     const args = buildDownloadArgs(url, formatId, container, type, outputStem, providerArgs);
     logger.info("YT_DLP_STAGE", { stage: "process" });
@@ -667,6 +738,22 @@ class YtDlpService {
     });
   }
 
+  /**
+   * Only pass `--cookies` when the configured file actually exists; otherwise
+   * yt-dlp fails every operation with a confusing extractor error. Missing
+   * files are reported once so the misconfiguration stays visible.
+   */
+  private resolveCookieArgs(): string[] {
+    const args = buildCookieArgs(ENV.YT_DLP_COOKIES_FILE);
+    if (!args.length) return [];
+    if (fs.existsSync(args[1])) return args;
+    if (!this.cookiesWarningLogged) {
+      this.cookiesWarningLogged = true;
+      logger.warn("YT_DLP_COOKIES_FILE_MISSING", { path: args[1] });
+    }
+    return [];
+  }
+
   private getStagingRuntimeDiagnostics(): Promise<StagingRuntimeDiagnostics> {
     if (!this.stagingRuntimeDiagnostics) {
       const diagnosticScript = [
@@ -689,7 +776,8 @@ class YtDlpService {
     const stagingEnabled = shouldEnableTikTokStagingDiagnostics(ENV.MEDIA_STAGING_DIAGNOSTICS, provider, stage);
     const youtubeDiagnosticsEnabled = shouldEnableYouTubeDiagnostics(ENV.YOUTUBE_DIAGNOSTICS_ENABLED, provider) && Boolean(youtubeStage);
     const runtime = stagingEnabled ? await this.getStagingRuntimeDiagnostics() : undefined;
-    const effectiveArgs = buildEffectiveYtDlpArgs(args, ENV.YOUTUBE_DIAGNOSTICS_ENABLED, provider, youtubeStage);
+    const cookieArgs = stage === "diagnostic" ? [] : this.resolveCookieArgs();
+    const effectiveArgs = [...cookieArgs, ...buildEffectiveYtDlpArgs(args, ENV.YOUTUBE_DIAGNOSTICS_ENABLED, provider, youtubeStage)];
     const startedAt = Date.now();
     return new Promise((resolve, reject) => {
       const child = spawn(ENV.YT_DLP_PATH, effectiveArgs, { windowsHide: true, shell: false });

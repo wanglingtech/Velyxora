@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   MAX_IMAGE_DIMENSION,
   MAX_IMAGE_PIXELS,
+  resolveCanvasConversionTarget,
   resolveCanvasOutputFormat,
   validateOutputDimensions,
 } from "../src/services/conversionEngine";
@@ -21,6 +22,32 @@ test("resolveCanvasOutputFormat solo produce formatos que el navegador puede gen
   // Unsupported inputs must fall back to PNG instead of claiming success.
   for (const unsupported of ["image/gif", "image/svg+xml", "image/bmp", "", undefined]) {
     assert.deepEqual(resolveCanvasOutputFormat(unsupported), { mime: "image/png", extension: "png" }, String(unsupported));
+  }
+});
+
+test("resolveCanvasConversionTarget respeta el primer formato realmente generable", () => {
+  assert.deepEqual(resolveCanvasConversionTarget(["image/png"]), { mime: "image/png", extension: "png" });
+  assert.deepEqual(resolveCanvasConversionTarget(["image/jpeg", "image/png"]), { mime: "image/jpeg", extension: "jpg" });
+  assert.deepEqual(resolveCanvasConversionTarget(["image/gif", "image/webp"]), { mime: "image/webp", extension: "webp" });
+
+  // Nothing encodable: the runner must fail explicitly, not mislabel a PNG.
+  assert.equal(resolveCanvasConversionTarget(["image/gif"]), null);
+  assert.equal(resolveCanvasConversionTarget([]), null);
+});
+
+test("cada conversión de imagen registrada apunta a un formato que el navegador puede generar", () => {
+  const conversions = PUBLIC_TOOL_REGISTRY.filter(
+    (tool) => tool.category === "image" && tool.subcategory === "Conversión",
+  );
+  assert.ok(conversions.length >= 12, "el catálogo debe cubrir la matriz de conversiones");
+
+  for (const tool of conversions) {
+    const target = resolveCanvasConversionTarget(tool.outputTypes);
+    assert.ok(target, `${tool.id} declara un formato que el motor no puede generar`);
+    assert.ok(
+      ["png", "jpg", "webp"].includes(target.extension),
+      `${tool.id} debe producir una extensión real (${target.extension})`,
+    );
   }
 });
 

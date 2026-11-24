@@ -25,7 +25,7 @@ async function e2eConvert(inputPath: string, inputName: string, mime: string, to
   const started = await request(backendApp).post("/api/conversions").send({ fileId: upload.body.data.fileId, toolId, targetFormat, options });
   assert.equal(started.status, 202, started.body?.error?.message);
   let job: any;
-  for (let attempt = 0; attempt < 200; attempt += 1) {
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
     job = (await request(backendApp).get(`/api/jobs/${started.body.data.id}`)).body.data;
     if (["COMPLETED", "FAILED"].includes(job.status)) break;
     await new Promise((resolve) => setTimeout(resolve, 30));

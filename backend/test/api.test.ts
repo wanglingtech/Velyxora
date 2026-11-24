@@ -111,7 +111,7 @@ test("POST /api/media/analyze rejects unsupported providers deterministically", 
   assert.strictEqual(res.status, 422);
   const body = res.body as any;
   assert.strictEqual(body.success, false);
-  assert.strictEqual(body.error.code, "ANALYSIS_FAILED");
+  assert.strictEqual(body.error.code, "UNSUPPORTED_URL");
 });
 
 test("POST /api/media/analyze validates malformed input", async () => {

@@ -1,10 +1,12 @@
-import React from "react";
-import { Sparkles, Shield, Zap, Layers, ArrowRight } from "lucide-react";
+import React, { useMemo } from "react";
+import { Sparkles, Shield, Zap, Layers, ArrowRight, AlertTriangle } from "lucide-react";
 import { UniversalInput } from "../common/UniversalInput";
 import { ToolCard } from "../common/ToolCard";
 import { SmartFileInspector } from "../common/SmartFileInspector";
 import { PUBLIC_TOOL_REGISTRY, TOOLKIT_GROUPS } from "../../registry/tools";
 import { ToolDefinition, DetectedFileInfo } from "../../types";
+import { useServiceStatus } from "../../context/ServiceStatusContext";
+import { countToolsInMaintenance } from "../../services/toolAvailability";
 
 interface HomeViewProps {
   onSelectTool: (tool: ToolDefinition, file?: File) => void;
@@ -27,9 +29,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onClearDetectedFile,
   onFileDetected,
 }) => {
-  const popularTools = PUBLIC_TOOL_REGISTRY.filter((t) => t.popular).slice(
-    0,
-    8,
+  const { isServiceAvailable } = useServiceStatus();
+  const popularTools = useMemo(() => PUBLIC_TOOL_REGISTRY.filter((t) => t.popular).slice(0, 8), []);
+  const popularMaintenanceCount = useMemo(
+    () => countToolsInMaintenance(popularTools, isServiceAvailable),
+    [popularTools, isServiceAvailable]
   );
 
   return (
@@ -70,18 +74,26 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
       {/* Popular Tools Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
               Herramientas populares
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-400 flex items-center gap-1">
               Las utilidades más frecuentes listas para usar.
+              {popularMaintenanceCount > 0 && (
+                <span className="ml-2 inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-mono font-medium text-amber-300"
+                  title={`${popularMaintenanceCount} herramienta(s) populares dependen de un servicio en mantenimiento. Las herramientas locales siguen funcionando.`}
+                >
+                  <AlertTriangle className="w-2.5 h-2.5" />
+                  {popularMaintenanceCount} en mantenimiento
+                </span>
+              )}
             </p>
           </div>
           <button
             onClick={() => onSelectCategory("all")}
-            className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 transition-colors"
+            className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 transition-colors shrink-0"
           >
             <span>Ver catálogo completo ({PUBLIC_TOOL_REGISTRY.length})</span>
             <ArrowRight className="w-3.5 h-3.5" />

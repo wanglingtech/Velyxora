@@ -36,6 +36,27 @@ test('búsqueda cubre formatos y aliases sin duplicados', () => {
   }
 });
 
+test('búsqueda es global, ignora acentos y entiende sinónimos en español', () => {
+  // "foto" is not present in most image tools, but the synonym maps to "imagen".
+  assert.ok(searchTools('foto').some((tool) => tool.id === 'png-to-jpg'));
+  assert.ok(searchTools('imagenes convertir').some((tool) => tool.id === 'png-to-jpg'));
+  assert.ok(searchTools('conversion webp png').some((tool) => tool.id === 'webp-to-png'));
+
+  // Accents/case must not change the result set.
+  assert.deepEqual(
+    searchTools('CONVERSIÓN').map((tool) => tool.id),
+    searchTools('conversion').map((tool) => tool.id),
+  );
+
+  // Stopwords and the full registry stay reachable.
+  assert.equal(searchTools('herramientas').length, PUBLIC_TOOL_REGISTRY.length);
+  assert.equal(searchTools('   ').length, PUBLIC_TOOL_REGISTRY.length);
+
+  // Name matches rank before description-only matches.
+  const pngResults = searchTools('png');
+  assert.equal(pngResults[0].id, 'png-to-jpg');
+});
+
 test('password-generator resuelve al runner de texto funcional', () => {
   assert.equal(getToolRunnerKind(getToolById('password-generator')!), 'text');
 });

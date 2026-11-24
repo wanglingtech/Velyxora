@@ -1,3 +1,7 @@
+// Media analysis/processing runs a real yt-dlp extraction (25-90s for YouTube),
+// so it must outlive the generic 8s API deadline.
+const MEDIA_LONG_REQUEST_TIMEOUT_MS = 130_000;
+
 export interface BackendHealth {
   status: "ok" | "degraded" | "error";
   version: string;
@@ -54,6 +58,12 @@ export interface ConversionJobResponse {
   error?: string;
 }
 
+export interface WebpageSnapshot {
+  html: string;
+  finalUrl: string;
+  title?: string;
+}
+
 export interface MediaAnalysisResponse {
   url: string;
   platform: string;
@@ -68,8 +78,8 @@ export interface MediaAnalysisResponse {
     formatId?: string;
     format_id?: string;
     id?: string;
-    type?: "video" | "audio";
-    kind?: "video" | "audio";
+    type?: "video" | "audio" | "image";
+    kind?: "video" | "audio" | "image";
     container?: string;
     extension?: string;
     ext?: string;
@@ -213,12 +223,13 @@ export class ApiClient {
     // flight and would be reused through the dedupe map.
     register: async (email: string, password: string, displayName?: string) => {
       const data = await this.request<any>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, displayName }) });
-      this.invalidate('auth:me');
+      // NO invalidar 'auth:me' — login/register ya devuelven user autenticado.
+      // Invalidar causaba race condition: /auth/me en vuelo (sin auth) devolvía 401 y pisaba user válido.
       return data.user;
     },
     login: async (email: string, password: string) => {
       const data = await this.request<any>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-      this.invalidate('auth:me');
+      // NO invalidar 'auth:me' — mismo rationale que register.
       return data.user;
     },
     me: () => this.deduped('auth:me', () => this.request<any>('/auth/me').then((result) => result.user)),
@@ -407,22 +418,50 @@ export class ApiClient {
   }
 
   /**
-   * Safe media URL analysis
+   * Safe media URL analysis.
+   *
+   * yt-dlp metadata extraction is slow on purpose-built environments (YouTube
+   * with the Node JS runtime takes 25-90s), so this request needs its own
+   * deadline. The generic 8s API timeout used to abort the browser request
+   * while the server was still working, which looked like "nothing happens".
    */
   async analyzeMediaUrl(url: string): Promise<MediaAnalysisResponse> {
     return this.request<MediaAnalysisResponse>("/media/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
-    });
+    }, MEDIA_LONG_REQUEST_TIMEOUT_MS);
   }
 
-  async startMediaDownload(params: { url: string; formatId: string; container: string; type: "video" | "audio"; title: string }): Promise<ConversionJobResponse> {
+  async startMediaDownload(params: { url: string; formatId: string; container: string; type: "video" | "audio" | "image"; title: string }): Promise<ConversionJobResponse> {
     return this.request<ConversionJobResponse>("/media/process", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
-    });
+    }, MEDIA_LONG_REQUEST_TIMEOUT_MS);
+  }
+
+  async fetchWebpageSnapshot(url: string): Promise<WebpageSnapshot> {
+    return this.request<WebpageSnapshot>("/webpage/snapshot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    }, MEDIA_LONG_REQUEST_TIMEOUT_MS);
+  }
+
+  /** Loads an image referenced by a snapshot through the backend to avoid CORS. */
+  async fetchWebpageAsset(url: string): Promise<Blob> {
+    let response: Response;
+    try {
+      response = await fetch(
+        `${this.baseUrl}/webpage/asset?url=${encodeURIComponent(url)}`,
+        { credentials: "include" },
+      );
+    } catch {
+      throw new Error("No se pudo cargar una imagen de la página.");
+    }
+    if (!response.ok) throw new Error(`No se pudo cargar una imagen de la página (HTTP ${response.status}).`);
+    return response.blob();
   }
 
   async downloadFile(fileId: string): Promise<{ blob: Blob; filename: string; contentType: string }> {

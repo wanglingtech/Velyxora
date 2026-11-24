@@ -36,6 +36,11 @@ const nodeEnv = process.env.NODE_ENV || "development";
 export const parseBooleanFlag = (value: string | undefined): boolean =>
   value?.trim().toLowerCase() === "true";
 
+const unverifiedYouTubeDevMode = parseBooleanFlag(process.env.YOUTUBE_ALLOW_UNVERIFIED_DEV);
+if (nodeEnv === "production" && unverifiedYouTubeDevMode) {
+  throw new Error("YOUTUBE_ALLOW_UNVERIFIED_DEV no está permitido en producción.");
+}
+
 const parseBoundedMegabytes = (name: string, value: string | undefined, fallback: number): number => {
   const megabytes = value === undefined || value.trim() === "" ? fallback : Number(value);
   if (!Number.isFinite(megabytes) || megabytes < 1 || megabytes > 16_384) {
@@ -65,7 +70,17 @@ export const ENV = {
   FFMPEG_TIMEOUT_MS: Number(process.env.FFMPEG_TIMEOUT_MS || 10 * 60 * 1000),
   YT_DLP_PATH: process.env.YT_DLP_PATH || "yt-dlp",
   YT_DLP_TIMEOUT_MS: Number(process.env.YT_DLP_TIMEOUT_MS || 10 * 60 * 1000),
+  // YouTube metadata extraction with the Node JS runtime can take 30-60s on
+  // cold starts (outliers above 90s were observed); the old hard-coded 30s cap
+  // aborted valid analyses.
+  YT_DLP_ANALYZE_TIMEOUT_MS: Number(process.env.YT_DLP_ANALYZE_TIMEOUT_MS || 120 * 1000),
+  // Optional Netscape-format cookies file for platforms that require a session
+  // (Reddit, Vimeo, Instagram, Facebook). Empty disables it.
+  YT_DLP_COOKIES_FILE: process.env.YT_DLP_COOKIES_FILE || "",
   YOUTUBE_PO_TOKEN_PROVIDER_URL: process.env.YOUTUBE_PO_TOKEN_PROVIDER_URL || "",
+  // Local-only escape hatch: let YouTube run without the PO token provider in
+  // development. Rejected outright when NODE_ENV=production.
+  YOUTUBE_ALLOW_UNVERIFIED_DEV: unverifiedYouTubeDevMode,
   YOUTUBE_DIAGNOSTICS_ENABLED: parseBooleanFlag(process.env.YOUTUBE_DIAGNOSTICS_ENABLED),
   MEDIA_STAGING_DIAGNOSTICS: process.env.MEDIA_STAGING_DIAGNOSTICS === "true",
   LIBREOFFICE_PATH: process.env.LIBREOFFICE_PATH || "soffice",

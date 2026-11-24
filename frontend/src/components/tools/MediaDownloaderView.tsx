@@ -12,36 +12,45 @@ import {
   Layers,
   Sparkles,
   Info,
+  Images,
 } from "lucide-react";
 import {
   ALL_MEDIA_ADAPTERS,
   EMPTY_MEDIA_FORMATS_MESSAGE,
   canStartMediaAnalyze,
   completedMediaOutput,
+  findImageConversionSource,
   findMatchingMediaAdapter,
+  isImageMedia,
   mediaAnalyzeErrorMessage,
   mediaDownloadStartErrorMessage,
   mediaFormatActionLabel,
   selectInitialMediaFormat,
   shouldShowMediaThumbnail,
+  withImageConversionFormats,
 } from "../../services/mediaService";
 import { MediaMetadata, MediaFormatOption } from "../../types/media";
 import { toast } from "../common/ToastContainer";
 import { apiClient, type ConversionJobResponse } from "../../services/apiClient";
 import { pathForView } from "../../services/appRouting";
 import { downloadService } from "../../services/downloadService";
+import { convertImage } from "../../services/conversionEngine";
 import { useAuth } from "../../auth/AuthContext";
+
+const MEDIA_GROUP_LABELS = { video: "VIDEO", audio: "AUDIO", image: "IMAGEN" } as const;
 
 interface MediaDownloaderViewProps {
   initialUrl?: string;
   onBack?: () => void;
   onRequireAuth: (returnTo?: string) => void;
+  onOpenBulkImages?: () => void;
 }
 
 export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
   initialUrl = "",
   onBack,
   onRequireAuth,
+  onOpenBulkImages,
 }) => {
   const { user } = useAuth();
   const [url, setUrl] = useState(initialUrl);
@@ -83,7 +92,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
     setThumbnailFailed(false);
 
     try {
-      const meta = await adapter.analyze(targetUrl);
+      const meta = withImageConversionFormats(await adapter.analyze(targetUrl));
       const initialFormat = selectInitialMediaFormat(meta);
       setSelectedFormat(initialFormat);
       setMetadata(meta);
@@ -104,14 +113,21 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
   const handleDownloadAction = async () => {
     if (!selectedFormat || !metadata || actionRef.current) return;
     if (!user) { toast.info("Inicia sesión para continuar"); onRequireAuth(pathForView("media-downloader")); return; }
+    // "Convertir a X" downloads the original image once and re-encodes it locally.
+    const conversion = selectedFormat.convertTo;
+    const requestFormat = conversion ? findImageConversionSource(metadata) : selectedFormat;
+    if (!requestFormat) {
+      toast.error("Formato no disponible", "Vuelve a analizar el enlace para actualizar los formatos.");
+      return;
+    }
     actionRef.current = true;
     setIsProcessing(true);
     try {
       let job = await apiClient.startMediaDownload({
         url: metadata.originalUrl,
-        formatId: selectedFormat.id,
-        container: selectedFormat.extension,
-        type: selectedFormat.type || (selectedFormat.hasVideo ? "video" : "audio"),
+        formatId: requestFormat.id,
+        container: requestFormat.extension,
+        type: requestFormat.type || (requestFormat.hasVideo ? "video" : requestFormat.hasAudio ? "audio" : "image"),
         title: metadata.title,
       });
       setDownloadJob(job);
@@ -121,7 +137,19 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
         setDownloadJob(job);
         if (job.status === "COMPLETED") {
           const output = completedMediaOutput(job)!;
-          await downloadService.downloadBackendFile(output.fileId, output.filename);
+          if (conversion) {
+            const original = await downloadService.getBackendFile(output.fileId);
+            const namedFile = new File([original.blob], output.filename || `imagen.${requestFormat.extension}`, {
+              type: original.contentType || original.blob.type || "image/*",
+            });
+            const converted = await convertImage(namedFile, {
+              format: conversion,
+              quality: conversion === "image/png" ? undefined : 0.92,
+            });
+            downloadService.downloadBlob(converted.blob, converted.filename);
+          } else {
+            await downloadService.downloadBackendFile(output.fileId, output.filename);
+          }
           return;
         }
         if (job.status === "CANCELLED") { return; }
@@ -141,6 +169,10 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
     finally { cancelRef.current = false; }
   };
 
+  const imagePreviewUrl = metadata
+    ? metadata.thumbnailUrl || (isImageMedia(metadata) ? metadata.originalUrl : undefined)
+    : undefined;
+
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
       {onBack && <button onClick={onBack} className="min-h-11 px-3 rounded-xl border border-white/10 text-sm text-slate-300 flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-indigo-400"><ArrowLeft className="w-4 h-4" />Regresar</button>}
@@ -148,13 +180,13 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
       <div className="text-center space-y-2 pb-4">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold">
           <DownloadCloud className="w-3.5 h-3.5" />
-          <span>Universal Media Downloader & Analyzer</span>
+          <span>Analizador y descargador de medios</span>
         </div>
         <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-          Descarga autorizada de medios digitales
+          Descarga videos, audio e imágenes
         </h2>
         <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
-          Pega una URL pública compatible para analizar y descargar los formatos disponibles.
+          Pega una URL pública para ver los formatos disponibles y descargar el archivo. Las imágenes también se pueden convertir a PNG, JPG o WebP.
         </p>
         <p className="text-xs text-amber-300">Usa esta herramienta solo con contenido público o que tengas permiso para descargar.</p>
       </div>
@@ -178,7 +210,7 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
               handleAnalyze();
             }
           }}
-          placeholder="Pega el enlace del video (YouTube, TikTok, Vimeo, Instagram, X...)"
+          placeholder="Pega el enlace de un video, audio o imagen (YouTube, TikTok, Vimeo o URL directa)"
           className="w-full bg-transparent px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none"
         />
 
@@ -216,6 +248,18 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
         ))}
       </div>
 
+      {onOpenBulkImages && (
+        <div className="flex justify-center">
+          <button
+            onClick={onOpenBulkImages}
+            className="px-4 py-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 text-emerald-200 text-xs font-semibold flex items-center gap-2 hover:bg-emerald-500/15 transition-colors"
+          >
+            <Images className="w-4 h-4" />
+            Descargar varias imágenes por URL
+          </button>
+        </div>
+      )}
+
       {/* Loading Skeleton */}
       {isAnalyzing && (
         <div className="p-6 rounded-2xl bg-[#101218] border border-white/[0.08] animate-pulse space-y-4">
@@ -240,15 +284,26 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
                   allowFullScreen
                 />
               </div>
-            ) : shouldShowMediaThumbnail(metadata.thumbnailUrl, thumbnailFailed) ? (
-              <div className="relative w-full aspect-video max-h-[320px] overflow-hidden">
-                <img
-                  src={metadata.thumbnailUrl}
-                  alt={metadata.title}
-                  className="w-full h-full object-cover"
-                  onError={() => setThumbnailFailed(true)}
-                />
-              </div>
+            ) : shouldShowMediaThumbnail(imagePreviewUrl, thumbnailFailed) ? (
+              isImageMedia(metadata) ? (
+                <div className="relative w-full max-h-[420px] bg-[#08090D] overflow-hidden flex items-center justify-center">
+                  <img
+                    src={imagePreviewUrl}
+                    alt={metadata.title}
+                    className="w-full max-h-[420px] object-contain"
+                    onError={() => setThumbnailFailed(true)}
+                  />
+                </div>
+              ) : (
+                <div className="relative w-full aspect-video max-h-[320px] overflow-hidden">
+                  <img
+                    src={imagePreviewUrl}
+                    alt={metadata.title}
+                    className="w-full h-full object-cover"
+                    onError={() => setThumbnailFailed(true)}
+                  />
+                </div>
+              )
             ) : (
               <div className="w-full py-16 flex flex-col items-center justify-center text-slate-500">
                 <Play className="w-12 h-12 mb-2 text-indigo-400 opacity-60" />
@@ -305,9 +360,9 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
                     {EMPTY_MEDIA_FORMATS_MESSAGE}
                   </p>
                 )}
-                {(["video", "audio"] as const).map((group) => (
+                {(["video", "audio", "image"] as const).map((group) => (
                   <div key={group} className="space-y-2">
-                    <h5 className="text-[11px] font-bold tracking-widest text-indigo-300">{group.toUpperCase()}</h5>
+                    <h5 className="text-[11px] font-bold tracking-widest text-indigo-300">{MEDIA_GROUP_LABELS[group]}</h5>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {metadata.availableFormats.filter((fmt) => fmt.type === group).map((fmt) => {
                   const isSelected = selectedFormat?.id === fmt.id;
@@ -364,13 +419,13 @@ export const MediaDownloaderView: React.FC<MediaDownloaderViewProps> = ({
                 <Server className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
                 <div className="text-xs">
                   <p className="font-semibold text-white">
-                    Estado de la Arquitectura de Descarga
+                    Estado de la descarga
                   </p>
                   <p className="text-slate-400 mt-0.5 leading-relaxed">
                     {metadata.engineDetails.legalNote}
                   </p>
                   <p className="text-[11px] text-slate-500 mt-1 font-mono">
-                    yt-dlp descarga el formato seleccionado; FFmpeg combina o convierte cuando es necesario y FFprobe valida el resultado.
+                    Si eliges un formato convertido, descargamos el original y lo convertimos en tu navegador.
                   </p>
                 </div>
               </div>

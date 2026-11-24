@@ -3,6 +3,8 @@ import {
   Home,
   DownloadCloud,
   Image,
+  Images,
+  Globe,
   Video,
   Music,
   Files,
@@ -164,6 +166,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/20 text-sky-300 font-bold">
                 URL
+              </span>
+            </button>
+
+            <button
+              onClick={() => handleNav('image-downloader')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                activeView === 'image-downloader'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                  : 'text-slate-300 hover:text-white hover:bg-[#101218]'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Images className="w-4 h-4 text-emerald-400" />
+                <span>Descargar Imágenes</span>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 font-bold">
+                LOTE
+              </span>
+            </button>
+
+            <button
+              onClick={() => handleNav('webpage-capture')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                activeView === 'webpage-capture'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                  : 'text-slate-300 hover:text-white hover:bg-[#101218]'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Globe className="w-4 h-4 text-cyan-400" />
+                <span>Página web a capturas</span>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-300 font-bold">
+                HTML
               </span>
             </button>
           </div>
