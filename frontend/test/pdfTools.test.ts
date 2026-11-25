@@ -15,6 +15,16 @@ import {
   getToolById,
   getToolRunnerKind,
 } from "../src/registry/tools";
+import {
+  PDF_IMAGE_MAX_PAGES,
+  PDF_IMAGE_MAX_PIXELS,
+  clampPdfRenderScale,
+  getPdfImageFormat,
+  getPdfImageResolution,
+  pdfImageFilename,
+  pdfImagesZipFilename,
+  resolvePdfImagePages,
+} from "../src/services/pdfImagePlan";
 
 const makePdf = async (pages: number, name = "fixture.pdf"): Promise<File> => {
   const document = await PDFDocument.create();
@@ -83,4 +93,36 @@ test("merge-pdf y split-pdf son públicas, cliente y del runner pdf", () => {
     assert.equal(getToolRunnerKind(tool!), "pdf", `${id} debe resolver al runner pdf`);
     assert.equal(plannedIds.has(id), false, `${id} no debe seguir como planificada`);
   }
+});
+
+test("pdf-to-images es pública, cliente y del runner pdf", () => {
+  const tool = getToolById("pdf-to-images");
+  assert.ok(tool, "pdf-to-images debe ser pública");
+  assert.equal(tool!.category, "pdf");
+  assert.equal(tool!.processingMode, "CLIENT_SIDE");
+  assert.equal(Boolean(tool!.requiresServer), false);
+  assert.equal(getToolRunnerKind(tool!), "pdf");
+  assert.equal(
+    PLANNED_TOOL_REGISTRY.some((planned) => planned.id === "pdf-to-images"),
+    false,
+    "pdf-to-images ya no debe estar planificada",
+  );
+});
+
+test("el plan de PDF a imágenes limita tamaño, páginas y nombres", () => {
+  assert.equal(resolvePdfImagePages("1-3,5", 10).length, 4);
+  assert.throws(() => resolvePdfImagePages("1-", PDF_IMAGE_MAX_PAGES + 1), /hasta/i);
+
+  const scale = clampPdfRenderScale(4000, 4000, 4);
+  assert.ok(scale < 4, "un póster enorme debe reducirse");
+  assert.ok(4000 * scale * (4000 * scale) <= PDF_IMAGE_MAX_PIXELS + 1);
+  assert.equal(clampPdfRenderScale(10, 10, 0.01), 0.25);
+
+  assert.equal(pdfImageFilename(3, "png"), "pagina-03.png");
+  assert.equal(pdfImageFilename(12, "jpeg"), "pagina-12.jpg");
+  assert.equal(pdfImageFilename(7, "webp"), "pagina-07.webp");
+  assert.equal(pdfImagesZipFilename("Mi Documento.pdf"), "Mi-Documento-paginas.zip");
+  assert.equal(pdfImagesZipFilename(""), "documento-paginas.zip");
+  assert.equal(getPdfImageFormat("webp").mime, "image/webp");
+  assert.equal(getPdfImageResolution("alta").scale, 150 / 72);
 });

@@ -64,6 +64,18 @@ export interface WebpageSnapshot {
   title?: string;
 }
 
+export interface WebpageCapabilities {
+  browserCapture: boolean;
+}
+
+export interface WebpageFullCapture {
+  blob: Blob;
+  pageWidth: number;
+  pageHeight: number;
+  scale: number;
+  title?: string;
+}
+
 export interface MediaAnalysisResponse {
   url: string;
   platform: string;
@@ -447,6 +459,91 @@ export class ApiClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
     }, MEDIA_LONG_REQUEST_TIMEOUT_MS);
+  }
+
+  async webpageCapabilities(): Promise<WebpageCapabilities> {
+    return this.request<WebpageCapabilities>("/webpage/capabilities", { method: "GET" }, 15_000);
+  }
+
+  /**
+   * Renders the page with the optional headless browser on the server and
+   * returns a full-page PNG. The UI slices it into screens locally so it can
+   * reuse previews, blank detection, ZIP and PDF exports.
+   */
+  async captureWebpagePage(
+    params: { url: string; width: number; scale: number },
+    csrfRetry = true,
+  ): Promise<WebpageFullCapture> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90_000);
+    try {
+      const csrf = this.csrfToken();
+      const response = await fetch(`${this.baseUrl}/webpage/capture`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+        },
+        body: JSON.stringify(params),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        let code: string | undefined;
+        let message: string | undefined;
+        try {
+          const payload = await response.json();
+          code = payload?.error?.code;
+          message = payload?.error?.message;
+        } catch {
+          // Non-JSON error bodies are mapped to a generic message below.
+        }
+        if (response.status === 403 && code === "CSRF_INVALID" && csrfRetry) {
+          this.csrf = "";
+          await this.request("/auth/me", {}, 15_000, false);
+          return this.captureWebpagePage(params, false);
+        }
+        throw new ApiError(
+          message || "No se pudo capturar la página completa.",
+          response.status,
+          code,
+        );
+      }
+
+      const blob = await response.blob();
+      if (!blob.size) throw new ApiError("La captura llegó vacía.", 502, "EMPTY_CAPTURE");
+      const headerNumber = (name: string, fallback: number): number => {
+        const value = Number(response.headers.get(name));
+        return Number.isFinite(value) && value > 0 ? value : fallback;
+      };
+      const encodedTitle = response.headers.get("x-page-title");
+      return {
+        blob,
+        pageWidth: headerNumber("x-page-width", params.width),
+        pageHeight: headerNumber("x-page-height", 900),
+        scale: headerNumber("x-page-scale", params.scale),
+        title: encodedTitle ? decodeURIComponent(encodedTitle) : undefined,
+      };
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new ApiError(
+          "La página tardó demasiado en capturarse. Prueba con otra URL.",
+          504,
+          "CAPTURE_TIMEOUT",
+        );
+      }
+      if (error instanceof TypeError) {
+        throw new ApiError(
+          "Backend no disponible: no se pudo iniciar la captura.",
+          503,
+          "BACKEND_UNAVAILABLE",
+        );
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   /** Loads an image referenced by a snapshot through the backend to avoid CORS. */

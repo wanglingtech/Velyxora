@@ -9,9 +9,10 @@ import {
   Sparkles,
   FileText,
   CheckCircle2,
-  AlertCircle,
   Scissors,
   Layers,
+  Images,
+  Image as ImageIcon,
 } from "lucide-react";
 import { ToolDefinition } from "../../../types";
 import {
@@ -23,6 +24,19 @@ import {
   parsePdfPageRange,
   splitPdfIntoZip,
 } from "../../../services/pdfEngine";
+import {
+  PDF_IMAGE_FORMATS,
+  PDF_IMAGE_RESOLUTIONS,
+  getPdfImageResolution,
+  pdfImagesZipFilename,
+  resolvePdfImagePages,
+  type PdfImageFormatId,
+} from "../../../services/pdfImagePlan";
+import {
+  renderPdfToImages,
+  type RenderedPdfImage,
+} from "../../../services/pdfImageEngine";
+import { generateBatchZip } from "../../../services/conversionEngine";
 import { historyService } from "../../../services/historyService";
 import { toast } from "../../common/ToastContainer";
 import { formatFileSize } from "../../../services/detectionService";
@@ -74,6 +88,135 @@ export const PdfToolRunner: React.FC<PdfToolRunnerProps> = ({
   const [splitMode, setSplitMode] = useState<"range" | "each">("range");
   const [splitRange, setSplitRange] = useState<string>("1-");
   const [splitPageCount, setSplitPageCount] = useState<number | null>(null);
+
+  // PDF to images state
+  const [pdfImagesFile, setPdfImagesFile] = useState<File | null>(null);
+  const [pdfImagesPageCount, setPdfImagesPageCount] = useState<number | null>(null);
+  const [pdfImagesRange, setPdfImagesRange] = useState<string>("1-");
+  const [pdfImagesFormat, setPdfImagesFormat] = useState<PdfImageFormatId>("png");
+  const [pdfImagesResolution, setPdfImagesResolution] = useState<string>("normal");
+  const [pdfImagesQuality, setPdfImagesQuality] = useState<number>(90);
+  const [pdfImagesProgress, setPdfImagesProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const [renderedImages, setRenderedImages] = useState<
+    Array<RenderedPdfImage & { downloadUrl: string }>
+  >([]);
+  const [zipResult, setZipResult] = useState<{ url: string; filename: string } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      renderedImages.forEach((image) => URL.revokeObjectURL(image.downloadUrl));
+    };
+  }, [renderedImages]);
+
+  useEffect(() => {
+    return () => {
+      if (zipResult) URL.revokeObjectURL(zipResult.url);
+    };
+  }, [zipResult]);
+
+  const resetPdfImagesResult = () => {
+    setRenderedImages([]);
+    setZipResult(null);
+  };
+
+  const handleSelectPdfImagesFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!isPdfFile(file)) {
+      toast.error("Selecciona un archivo PDF válido.");
+      return;
+    }
+    await loadPdfImagesFile(file);
+  };
+
+  const loadPdfImagesFile = async (file: File) => {
+    resetPdfImagesResult();
+    setPdfImagesFile(file);
+    setPdfImagesPageCount(null);
+    setPdfImagesRange("1-");
+    try {
+      const count = await getPdfPageCount(file, "El PDF");
+      setPdfImagesPageCount(count);
+    } catch (error: any) {
+      setPdfImagesFile(null);
+      toast.error(error?.message || "El PDF no pudo leerse.");
+    }
+  };
+
+  useEffect(() => {
+    if (tool.id !== "pdf-to-images") return;
+    if (!initialFile || !isPdfFile(initialFile)) return;
+    void loadPdfImagesFile(initialFile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool.id, initialFile]);
+
+  const handleConvertPdfToImages = async () => {
+    if (!pdfImagesFile || !pdfImagesPageCount) return;
+    let pages: number[];
+    try {
+      pages = resolvePdfImagePages(pdfImagesRange, pdfImagesPageCount);
+    } catch (error: any) {
+      toast.error(error?.message || "Revisa el rango de páginas.");
+      return;
+    }
+
+    resetPdfImagesResult();
+    setIsProcessing(true);
+    setPdfImagesProgress({ done: 0, total: pages.length });
+    try {
+      const resolution = getPdfImageResolution(pdfImagesResolution);
+      const images = await renderPdfToImages(pdfImagesFile, {
+        pages,
+        format: pdfImagesFormat,
+        resolutionScale: resolution.scale,
+        quality: pdfImagesQuality,
+        onProgress: (done, total) => setPdfImagesProgress({ done, total }),
+      });
+      const withUrls = images.map((image) => ({
+        ...image,
+        downloadUrl: URL.createObjectURL(image.blob),
+      }));
+      setRenderedImages(withUrls);
+
+      if (withUrls.length > 1) {
+        const zip = await generateBatchZip(
+          withUrls.map((image) => ({ blob: image.blob, filename: image.filename })),
+        );
+        setZipResult({
+          url: URL.createObjectURL(zip),
+          filename: pdfImagesZipFilename(pdfImagesFile.name),
+        });
+      }
+
+      historyService.addItem({
+        toolId: tool.id,
+        toolName: tool.name,
+        category: "pdf",
+        inputName: pdfImagesFile.name,
+        inputSize: pdfImagesFile.size,
+        outputName:
+          withUrls.length > 1
+            ? pdfImagesZipFilename(pdfImagesFile.name)
+            : withUrls[0].filename,
+        outputSize: withUrls.reduce((acc, image) => acc + image.blob.size, 0),
+        processingMode: "CLIENT_SIDE",
+        status: "COMPLETED",
+      });
+      toast.success(
+        `${withUrls.length} página(s) convertida(s)`,
+        withUrls.length > 1 ? "Descárgalas por separado o en un ZIP." : "Revisa la vista previa antes de descargar.",
+      );
+    } catch (error: any) {
+      toast.error(error?.message || "No se pudieron convertir las páginas.");
+    } finally {
+      setIsProcessing(false);
+      setPdfImagesProgress(null);
+    }
+  };
 
   const isPdfFile = (file: File) =>
     file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -694,6 +837,173 @@ export const PdfToolRunner: React.FC<PdfToolRunnerProps> = ({
                 <Scissors className="w-8 h-8 text-slate-500" />
                 <p className="text-xs text-slate-400">Selecciona un PDF y el modo para obtener el resultado.</p>
               </>
+            )}
+          </div>
+        </div>
+      )}
+      {tool.id === "pdf-to-images" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="p-6 rounded-2xl bg-[#101218] border border-white/[0.08] space-y-4">
+            <div>
+              <label className="text-xs text-slate-300 block mb-1.5">Archivo PDF</label>
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={handleSelectPdfImagesFile}
+                className="w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-3 file:py-2 file:text-white"
+              />
+              {pdfImagesFile && pdfImagesPageCount !== null && (
+                <p className="mt-2 text-[11px] text-slate-400">
+                  {pdfImagesFile.name} · {pdfImagesPageCount} páginas
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-300 block mb-1.5">Páginas (ej: 1-3,5,8-)</label>
+              <input
+                type="text"
+                value={pdfImagesRange}
+                onChange={(event) => {
+                  setPdfImagesRange(event.target.value);
+                  resetPdfImagesResult();
+                }}
+                placeholder="1-"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#08090D] border border-white/[0.08] text-xs text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-300 block mb-1.5">Formato</label>
+              <div className="grid grid-cols-3 gap-2">
+                {PDF_IMAGE_FORMATS.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => {
+                      setPdfImagesFormat(option.id);
+                      resetPdfImagesResult();
+                    }}
+                    className={`py-2 rounded-xl text-xs font-medium border transition-colors ${
+                      pdfImagesFormat === option.id
+                        ? "bg-indigo-600 text-white border-indigo-500"
+                        : "bg-[#08090D] text-slate-300 border-white/[0.06] hover:border-white/20"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-300 block mb-1.5">Calidad de imagen</label>
+              <select
+                value={pdfImagesResolution}
+                onChange={(event) => {
+                  setPdfImagesResolution(event.target.value);
+                  resetPdfImagesResult();
+                }}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#08090D] border border-white/[0.08] text-xs text-white focus:outline-none focus:border-indigo-500"
+              >
+                {PDF_IMAGE_RESOLUTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {pdfImagesFormat !== "png" && (
+              <div>
+                <label className="text-xs text-slate-300 block mb-1.5">
+                  Compresión · {pdfImagesQuality}%
+                </label>
+                <input
+                  type="range"
+                  min={40}
+                  max={100}
+                  step={5}
+                  value={pdfImagesQuality}
+                  onChange={(event) => setPdfImagesQuality(Number(event.target.value))}
+                  className="w-full accent-indigo-500"
+                />
+              </div>
+            )}
+
+            <button
+              onClick={handleConvertPdfToImages}
+              disabled={!pdfImagesFile || !pdfImagesPageCount || isProcessing}
+              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
+            >
+              <Images className="w-4 h-4" />
+              <span>
+                {pdfImagesProgress
+                  ? `Convirtiendo ${pdfImagesProgress.done}/${pdfImagesProgress.total}...`
+                  : isProcessing
+                    ? "Procesando..."
+                    : "Convertir a imágenes"}
+              </span>
+            </button>
+          </div>
+
+          <div className="lg:col-span-2 p-6 rounded-2xl bg-[#101218] border border-white/[0.08] space-y-4">
+            {renderedImages.length > 0 ? (
+              <>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{renderedImages.length} imagen(es) lista(s)</span>
+                  </div>
+                  {zipResult && (
+                    <a
+                      href={zipResult.url}
+                      download={zipResult.filename}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Descargar todo (ZIP)</span>
+                    </a>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[560px] overflow-y-auto pr-1">
+                  {renderedImages.map((image) => (
+                    <div
+                      key={image.pageNumber}
+                      className="rounded-xl border border-white/[0.08] bg-[#08090D] overflow-hidden"
+                    >
+                      <img
+                        src={image.previewUrl}
+                        alt={`Página ${image.pageNumber}`}
+                        className="w-full h-40 object-contain bg-white"
+                        loading="lazy"
+                      />
+                      <div className="p-2 space-y-1.5">
+                        <p className="text-[10px] text-slate-400 truncate">
+                          Página {image.pageNumber} · {image.width}×{image.height}
+                        </p>
+                        <a
+                          href={image.downloadUrl}
+                          download={image.filename}
+                          className="w-full py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 text-[10px] font-semibold flex items-center justify-center gap-1.5"
+                        >
+                          <Download className="w-3 h-3" />
+                          Descargar
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-full min-h-[220px] flex flex-col items-center justify-center text-center gap-3">
+                <ImageIcon className="w-8 h-8 text-slate-500" />
+                <p className="text-xs text-slate-400">
+                  Selecciona un PDF, elige el rango y el formato para ver cada página como imagen.
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  El archivo se procesa en tu navegador: no se sube a ningún servidor.
+                </p>
+              </div>
             )}
           </div>
         </div>

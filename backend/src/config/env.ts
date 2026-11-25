@@ -85,6 +85,9 @@ export const ENV = {
   MEDIA_STAGING_DIAGNOSTICS: process.env.MEDIA_STAGING_DIAGNOSTICS === "true",
   LIBREOFFICE_PATH: process.env.LIBREOFFICE_PATH || "soffice",
   LIBREOFFICE_TIMEOUT_MS: Number(process.env.LIBREOFFICE_TIMEOUT_MS || 10 * 60 * 1000),
+  // Optional full-page capture engine. Empty means auto-detect Chrome/Chromium.
+  CAPTURE_BROWSER_PATH: process.env.CAPTURE_BROWSER_PATH || "",
+  CAPTURE_BROWSER_NO_SANDBOX: parseBooleanFlag(process.env.CAPTURE_BROWSER_NO_SANDBOX),
   RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: 1000,
   TRUST_PROXY: process.env.TRUST_PROXY === "true" ? 1 : false,

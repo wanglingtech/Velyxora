@@ -129,6 +129,23 @@ const STYLE_PROPERTIES = [
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+const CAPTURE_RENDER_TIMEOUT_MS = 20_000;
+const CAPTURE_BLOB_TIMEOUT_MS = 25_000;
+
+const withCaptureTimeout = async <T>(task: Promise<T>, ms: number, message: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      task,
+      new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new WebpageCaptureError(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
 const waitForResources = async (doc: Document): Promise<void> => {
   try {
     await Promise.race([doc.fonts?.ready ?? Promise.resolve(), sleep(2500)]);
@@ -248,11 +265,15 @@ const renderSvgToCanvas = async (
   try {
     const image = new Image();
     image.decoding = "async";
-    await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new WebpageCaptureError("La página no se pudo convertir en imagen. Prueba con otra URL o con menos contenido."));
-      image.src = url;
-    });
+    await withCaptureTimeout(
+      new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new WebpageCaptureError("La página no se pudo convertir en imagen. Prueba con otra URL o con menos contenido."));
+        image.src = url;
+      }),
+      CAPTURE_RENDER_TIMEOUT_MS,
+      "La captura tardó demasiado en prepararse. Prueba con una página más sencilla.",
+    );
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(width * scale));
     canvas.height = Math.max(1, Math.round(height * scale));
@@ -408,3 +429,184 @@ export const captureWebpage = async (options: CaptureOptions): Promise<CapturedS
 
   return captured;
 };
+
+/* -------------------------------------------------------------------------- */
+/* Server-rendered full-page capture                                           */
+/* -------------------------------------------------------------------------- */
+
+export interface BrowserCaptureOptions {
+  url: string;
+  width: number;
+  format: CaptureImageFormat;
+  quality: number;
+  scale: number;
+  segmentHeight?: number;
+  maxSegments?: number;
+  onProgress?: (done: number, total: number) => void;
+}
+
+interface LoadedCaptureImage {
+  source: CanvasImageSource;
+  width: number;
+  height: number;
+  release: () => void;
+}
+
+const loadCaptureImage = async (blob: Blob): Promise<LoadedCaptureImage> => {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(blob);
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        release: () => bitmap.close(),
+      };
+    } catch {
+      // Older browsers fall back to an HTMLImageElement below.
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+  image.decoding = "sync";
+  try {
+    await withCaptureTimeout(
+      new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new WebpageCaptureError("La captura del servidor no se pudo leer."));
+        image.src = url;
+      }),
+      CAPTURE_RENDER_TIMEOUT_MS,
+      "La captura del servidor tardó demasiado en abrirse.",
+    );
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+  return {
+    source: image,
+    width: image.naturalWidth,
+    height: image.naturalHeight,
+    release: () => URL.revokeObjectURL(url),
+  };
+};
+
+/**
+ * Splits the full-page image produced by the server into the same vertical
+ * screens the basic capture generates, so previews, ZIP and PDF exports keep
+ * working unchanged.
+ */
+export const sliceCapturedImage = async (
+  blob: Blob,
+  options: {
+    pageWidth: number;
+    pageHeight: number;
+    format: CaptureImageFormat;
+    quality: number;
+    segmentHeight?: number;
+    maxSegments?: number;
+    onProgress?: (done: number, total: number) => void;
+  },
+): Promise<CapturedSegment[]> => {
+  const loaded = await loadCaptureImage(blob);
+  try {
+    if (!loaded.width || !loaded.height) {
+      throw new WebpageCaptureError("La captura del servidor llegó vacía.");
+    }
+    const pageHeight = Math.max(1, Math.round(options.pageHeight || loaded.height));
+    const ratioY = loaded.height / pageHeight;
+    const plans = computeCaptureSegments(
+      pageHeight,
+      options.segmentHeight ?? CAPTURE_SEGMENT_HEIGHT,
+      options.maxSegments ?? MAX_CAPTURE_SEGMENTS,
+    ).filter((plan) => Math.round(plan.top * ratioY) < loaded.height);
+
+    const captured: CapturedSegment[] = [];
+    for (const plan of plans) {
+      const sourceY = Math.min(loaded.height - 1, Math.round(plan.top * ratioY));
+      const sourceHeight = Math.max(
+        1,
+        Math.min(loaded.height - sourceY, Math.round(plan.height * ratioY)),
+      );
+      const canvas = document.createElement("canvas");
+      canvas.width = loaded.width;
+      canvas.height = sourceHeight;
+      const context = canvas.getContext("2d");
+      if (!context) throw new WebpageCaptureError("Tu navegador no permitió preparar la captura.");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(
+        loaded.source,
+        0,
+        sourceY,
+        loaded.width,
+        sourceHeight,
+        0,
+        0,
+        loaded.width,
+        sourceHeight,
+      );
+
+      const segmentBlob = await withCaptureTimeout(
+        canvasToBlob(canvas, options.format, options.quality),
+        CAPTURE_BLOB_TIMEOUT_MS,
+        "No se pudo generar la imagen de esta pantalla.",
+      );
+      captured.push({
+        id: `capture-${plan.index}-${Date.now()}`,
+        index: plan.index,
+        top: plan.top,
+        width: canvas.width,
+        height: canvas.height,
+        blob: segmentBlob,
+        dataUrl: await blobToDataUrl(segmentBlob),
+        blank: canvasIsBlank(canvas),
+      });
+      options.onProgress?.(captured.length, plans.length);
+      await sleep(0);
+    }
+
+    if (!captured.length) {
+      throw new WebpageCaptureError("La captura del servidor no contiene pantallas.");
+    }
+    return captured;
+  } finally {
+    loaded.release();
+  }
+};
+
+/** Full-page capture through the server's optional browser engine. */
+export const captureWebpageWithBrowser = async (
+  options: BrowserCaptureOptions,
+): Promise<CapturedSegment[]> => {
+  const page = await apiClient.captureWebpagePage({
+    url: options.url,
+    width: options.width,
+    scale: options.scale,
+  });
+  return sliceCapturedImage(page.blob, {
+    pageWidth: page.pageWidth,
+    pageHeight: page.pageHeight,
+    format: options.format,
+    quality: options.quality,
+    segmentHeight: options.segmentHeight,
+    maxSegments: options.maxSegments,
+    onProgress: options.onProgress,
+  });
+};
+
+/**
+ * True when the basic preview is only the HTML shell of a JavaScript app: very
+ * little text and no meaningful media. Used to explain the difference between
+ * the basic preview and the full capture.
+ */
+export const pageLooksScriptDriven = (doc: Document): boolean => {
+  const body = doc.body;
+  if (!body) return true;
+  const text = (body.innerText || body.textContent || "").replace(/\s+/g, " ").trim();
+  const media = body.querySelectorAll("img,canvas,video,svg,iframe").length;
+  const elements = body.getElementsByTagName("*").length;
+  return text.length < 240 && media < 3 && elements < 120;
+};
+

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Globe,
@@ -12,8 +12,9 @@ import {
   CheckCircle2,
   EyeOff,
   Rows3,
+  Zap,
 } from "lucide-react";
-import { apiClient, type WebpageSnapshot } from "../../services/apiClient";
+import { ApiError, apiClient, type WebpageSnapshot } from "../../services/apiClient";
 import {
   CAPTURE_SEGMENT_HEIGHT,
   type CaptureImageFormat,
@@ -21,6 +22,8 @@ import {
   WebpageCaptureError,
   captureFilename,
   captureWebpage,
+  captureWebpageWithBrowser,
+  pageLooksScriptDriven,
 } from "../../services/webpageCaptureService";
 import { generateBatchZip } from "../../services/conversionEngine";
 import { createPdfFromImages, type PdfOrientation, type PdfPageSize } from "../../services/pdfEngine";
@@ -48,6 +51,12 @@ const errorMessage = (error: unknown): string =>
     ? error.message
     : "No se pudo completar la captura de la página.";
 
+const isBrowserUnavailable = (error: unknown): boolean =>
+  error instanceof ApiError &&
+  (error.code === "BROWSER_UNAVAILABLE" ||
+    error.code === "BACKEND_UNAVAILABLE" ||
+    error.code === "CAPTURE_FAILED_UNSUPPORTED");
+
 export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, onRequireAuth }) => {
   const { user } = useAuth();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -55,6 +64,8 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
   const [snapshot, setSnapshot] = useState<WebpageSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
+  const [previewShell, setPreviewShell] = useState(false);
+  const [browserCapture, setBrowserCapture] = useState<boolean | null>(null);
 
   const [captureWidth, setCaptureWidth] = useState(1280);
   const [format, setFormat] = useState<CaptureImageFormat>("image/png");
@@ -73,6 +84,25 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
 
   const selectedSegments = segments.filter((segment) => !skipBlank || !segment.blank);
   const blankCount = segments.filter((segment) => segment.blank).length;
+
+  useEffect(() => {
+    if (!user) {
+      setBrowserCapture(null);
+      return;
+    }
+    let active = true;
+    apiClient
+      .webpageCapabilities()
+      .then((capabilities) => {
+        if (active) setBrowserCapture(capabilities.browserCapture);
+      })
+      .catch(() => {
+        if (active) setBrowserCapture(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   const requireSession = (): boolean => {
     if (user) return true;
@@ -107,31 +137,72 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
     if (isCapturing || isExporting || !snapshot || !requireSession()) return;
     const iframe = iframeRef.current;
     const doc = iframe?.contentDocument;
-    if (!doc?.body || !doc.body.children.length) {
-      toast.error("La vista previa aún no está lista", "Espera un momento e inténtalo de nuevo.");
-      return;
-    }
     setIsCapturing(true);
     setCaptureProgress({ done: 0, total: 0 });
+    let usedBrowser = false;
     try {
-      // The iframe keeps its requested layout width so media queries match the
-      // capture width selected by the user.
-      if (iframe) iframe.style.width = `${captureWidth}px`;
-      await sleep(350);
-      const result = await captureWebpage({
-        document: doc,
-        baseUrl: snapshot.finalUrl,
-        format,
-        quality: quality / 100,
-        scale,
-        segmentHeight,
-        onProgress: (done, total) => setCaptureProgress({ done, total }),
-      });
+      let result: CapturedSegment[] | null = null;
+
+      if (browserCapture !== false) {
+        try {
+          result = await captureWebpageWithBrowser({
+            url: snapshot.finalUrl,
+            width: captureWidth,
+            format,
+            quality: quality / 100,
+            scale,
+            segmentHeight,
+            onProgress: (done, total) => setCaptureProgress({ done, total }),
+          });
+          usedBrowser = true;
+        } catch (error: unknown) {
+          if (!isBrowserUnavailable(error)) throw error;
+          setBrowserCapture(false);
+          toast.info(
+            "Captura básica",
+            "El navegador completo no está disponible. Se usará la vista cargada de la página.",
+          );
+        }
+      }
+
+      if (!result) {
+        if (!doc?.body || !doc.body.children.length) {
+          throw new WebpageCaptureError(
+            "La vista previa aún no está lista. Espera un momento e inténtalo de nuevo.",
+          );
+        }
+        // The iframe keeps its requested layout width so media queries match the
+        // capture width selected by the user.
+        if (iframe) iframe.style.width = `${captureWidth}px`;
+        await sleep(350);
+        result = await captureWebpage({
+          document: doc,
+          baseUrl: snapshot.finalUrl,
+          format,
+          quality: quality / 100,
+          scale,
+          segmentHeight,
+          onProgress: (done, total) => setCaptureProgress({ done, total }),
+        });
+      }
+
       setSegments(result);
-      toast.success(
-        `${result.length} pantalla(s) capturada(s)`,
-        result.some((segment) => segment.blank) ? "Algunas pantallas parecen estar en blanco." : "Revisa las miniaturas antes de descargar.",
-      );
+      const blankScreens = result.filter((segment) => segment.blank).length;
+      if (blankScreens === result.length) {
+        toast.warning(
+          `${result.length} pantalla(s) en blanco`,
+          usedBrowser
+            ? "La página no mostró contenido. Comprueba que sea pública e inténtalo de nuevo."
+            : "La página parece cargar su contenido con JavaScript y la captura básica no ejecuta scripts.",
+        );
+      } else {
+        toast.success(
+          `${result.length} pantalla(s) capturada(s)`,
+          blankScreens > 0
+            ? "Algunas pantallas parecen estar en blanco."
+            : "Revisa las miniaturas antes de descargar.",
+        );
+      }
     } catch (error: unknown) {
       toast.error("No se pudo capturar la página", errorMessage(error));
     } finally {
@@ -265,16 +336,36 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
                 sandbox="allow-same-origin"
                 className="block border-0"
                 style={{ width: captureWidth, height: 560, maxWidth: "100%" }}
+                onLoad={() => {
+                  const previewDocument = iframeRef.current?.contentDocument;
+                  if (previewDocument) setPreviewShell(pageLooksScriptDriven(previewDocument));
+                }}
               />
             </div>
             <p className="px-3 py-2 text-[10px] text-slate-500 border-t border-white/[0.06]">
-              La vista previa desactiva scripts. Algunos elementos interactivos, videos o tipografías externas pueden verse distintos en la captura.
+              {previewShell
+                ? browserCapture === false
+                  ? "Esta página carga su contenido con JavaScript y la captura completa no está disponible ahora. La vista básica puede salir incompleta."
+                  : "La vista previa no ejecuta JavaScript. La captura completa sí renderiza la página real, con sus estilos y fuentes."
+                : "La vista previa desactiva scripts. Algunos elementos interactivos, videos o tipografías externas pueden verse distintos en la captura."}
             </p>
           </div>
 
           <div className="rounded-2xl bg-[#101218] border border-white/[0.08] p-4 space-y-3 h-fit">
             <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
               <Wand2 className="w-3.5 h-3.5" /> Ajustes de captura
+              {browserCapture !== null && (
+                <span
+                  className={`ml-auto px-2 py-0.5 rounded-full text-[9px] font-semibold normal-case tracking-normal border flex items-center gap-1 ${
+                    browserCapture
+                      ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
+                      : "bg-amber-500/10 border-amber-500/25 text-amber-300"
+                  }`}
+                >
+                  <Zap className="w-2.5 h-2.5" />
+                  {browserCapture ? "Renderizado completo" : "Vista básica"}
+                </span>
+              )}
             </h3>
 
             <label className="block text-[11px] text-slate-400">

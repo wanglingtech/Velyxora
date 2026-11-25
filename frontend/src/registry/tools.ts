@@ -1132,6 +1132,26 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     isClientReady: true
   },
   {
+    id: 'pdf-to-images',
+    slug: 'pdf-to-images',
+    name: 'PDF a Imágenes',
+    description: 'Convierte cada página de un PDF en una imagen PNG, JPG o WebP sin subir el archivo.',
+    category: 'pdf',
+    subcategory: 'Conversión',
+    icon: 'Images',
+    inputTypes: ['application/pdf'],
+    outputTypes: ['image/png', 'image/jpeg', 'image/webp', 'application/zip'],
+    acceptedExtensions: ['pdf'],
+    acceptedMimeTypes: ['application/pdf'],
+    processingMode: 'CLIENT_SIDE',
+    engine: 'browser-canvas',
+    supportsBatch: false,
+    supportsPreview: true,
+    keywords: ['pdf a imagen', 'pdf a png', 'pdf a jpg', 'pdf a webp', 'paginas a imagen', 'exportar paginas'],
+    popular: true,
+    isClientReady: true
+  },
+  {
     id: 'word-to-pdf',
     slug: 'word-to-pdf',
     name: 'Word (DOCX) a PDF',
@@ -1322,7 +1342,6 @@ export interface PlannedTool {
 export const PLANNED_TOOL_REGISTRY: PlannedTool[] = [
   { id: 'compress-pdf', name: 'Comprimir PDF', description: 'Reduce el tamaño de un PDF localmente.', group: 'documents', icon: 'Minimize2' },
   { id: 'pdf-to-word', name: 'PDF a Word (DOCX)', description: 'Conversión de PDF a documento editable.', group: 'documents', icon: 'FileText' },
-  { id: 'pdf-to-images', name: 'PDF a Imágenes', description: 'Exporta las páginas de un PDF como imágenes.', group: 'documents', icon: 'Images' },
   { id: 'speech-to-text', name: 'Voz a Texto', description: 'Transcripción de audio a texto (requiere un motor de reconocimiento).', group: 'audio-speech', icon: 'AudioLines' },
 ];
 
@@ -1355,7 +1374,7 @@ export function getToolRunnerKind(tool: ToolDefinition): ToolRunnerKind | null {
   if (tool.id === 'sticker-maker') return 'sticker-maker';
   if (['url-shortener','icon-maker','social-text-studio','emoji-tool'].includes(tool.id)) return 'creative';
   if (tool.id === 'password-generator') return 'text';
-  if (['images-to-pdf', 'text-to-pdf', 'merge-pdf', 'split-pdf'].includes(tool.id)) return 'pdf';
+  if (['images-to-pdf', 'text-to-pdf', 'merge-pdf', 'split-pdf', 'pdf-to-images'].includes(tool.id)) return 'pdf';
   if (tool.id === 'barcode-generator') return 'barcode';
   if (tool.id === 'qr-generator') return 'qr';
   if (['svg-to-png','svg-to-jpg','image-filters','image-watermark','color-picker-image','image-to-base64'].includes(tool.id)) return 'image-advanced';
