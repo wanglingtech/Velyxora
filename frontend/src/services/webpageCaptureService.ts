@@ -442,8 +442,27 @@ export interface BrowserCaptureOptions {
   scale: number;
   segmentHeight?: number;
   maxSegments?: number;
+  crop?: CaptureCropRegion | null;
   onProgress?: (done: number, total: number) => void;
 }
+
+/** Full-page capture returned by the server for previewing before slicing. */
+export interface BrowserCapturedPage {
+  blob: Blob;
+  pageWidth: number;
+  pageHeight: number;
+  scale: number;
+  title?: string;
+}
+
+/** Renders the whole page with the server browser engine and returns the PNG. */
+export const captureFullPageWithBrowser = async (options: {
+  url: string;
+  width: number;
+  scale: number;
+}): Promise<BrowserCapturedPage> => {
+  return apiClient.captureWebpagePage(options);
+};
 
 interface LoadedCaptureImage {
   source: CanvasImageSource;
@@ -492,10 +511,40 @@ const loadCaptureImage = async (blob: Blob): Promise<LoadedCaptureImage> => {
   };
 };
 
+/** Region of the page to keep, in CSS pixels (same units as pageWidth/pageHeight). */
+export interface CaptureCropRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const clampValue = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, value));
+
+/** Normalizes a crop selection so it always fits inside the captured page. */
+export const resolveCaptureRegion = (
+  pageWidth: number,
+  pageHeight: number,
+  crop?: CaptureCropRegion | null,
+): CaptureCropRegion => {
+  const width = Math.max(1, Math.round(pageWidth));
+  const height = Math.max(1, Math.round(pageHeight));
+  if (!crop) return { x: 0, y: 0, width, height };
+  const x = clampValue(Math.round(crop.x), 0, width - 1);
+  const y = clampValue(Math.round(crop.y), 0, height - 1);
+  return {
+    x,
+    y,
+    width: clampValue(Math.round(crop.width), 1, width - x),
+    height: clampValue(Math.round(crop.height), 1, height - y),
+  };
+};
+
 /**
  * Splits the full-page image produced by the server into the same vertical
  * screens the basic capture generates, so previews, ZIP and PDF exports keep
- * working unchanged.
+ * working unchanged. An optional crop region keeps only the selected area.
  */
 export const sliceCapturedImage = async (
   blob: Blob,
@@ -506,6 +555,7 @@ export const sliceCapturedImage = async (
     quality: number;
     segmentHeight?: number;
     maxSegments?: number;
+    crop?: CaptureCropRegion | null;
     onProgress?: (done: number, total: number) => void;
   },
 ): Promise<CapturedSegment[]> => {
@@ -514,23 +564,37 @@ export const sliceCapturedImage = async (
     if (!loaded.width || !loaded.height) {
       throw new WebpageCaptureError("La captura del servidor llegó vacía.");
     }
+    const pageWidth = Math.max(1, Math.round(options.pageWidth || loaded.width));
     const pageHeight = Math.max(1, Math.round(options.pageHeight || loaded.height));
+    const ratioX = loaded.width / pageWidth;
     const ratioY = loaded.height / pageHeight;
+
+    const region = resolveCaptureRegion(pageWidth, pageHeight, options.crop);
+    const regionX = region.x;
+    const regionY = region.y;
+    const regionWidth = region.width;
+    const regionHeight = region.height;
+
     const plans = computeCaptureSegments(
-      pageHeight,
+      regionHeight,
       options.segmentHeight ?? CAPTURE_SEGMENT_HEIGHT,
       options.maxSegments ?? MAX_CAPTURE_SEGMENTS,
     ).filter((plan) => Math.round(plan.top * ratioY) < loaded.height);
 
     const captured: CapturedSegment[] = [];
     for (const plan of plans) {
-      const sourceY = Math.min(loaded.height - 1, Math.round(plan.top * ratioY));
+      const sourceX = Math.round(regionX * ratioX);
+      const sourceWidth = Math.max(1, Math.round(regionWidth * ratioX));
+      const sourceY = Math.min(
+        loaded.height - 1,
+        Math.round((regionY + plan.top) * ratioY),
+      );
       const sourceHeight = Math.max(
         1,
         Math.min(loaded.height - sourceY, Math.round(plan.height * ratioY)),
       );
       const canvas = document.createElement("canvas");
-      canvas.width = loaded.width;
+      canvas.width = sourceWidth;
       canvas.height = sourceHeight;
       const context = canvas.getContext("2d");
       if (!context) throw new WebpageCaptureError("Tu navegador no permitió preparar la captura.");
@@ -538,13 +602,13 @@ export const sliceCapturedImage = async (
       context.fillRect(0, 0, canvas.width, canvas.height);
       context.drawImage(
         loaded.source,
-        0,
+        sourceX,
         sourceY,
-        loaded.width,
+        sourceWidth,
         sourceHeight,
         0,
         0,
-        loaded.width,
+        sourceWidth,
         sourceHeight,
       );
 
@@ -556,7 +620,7 @@ export const sliceCapturedImage = async (
       captured.push({
         id: `capture-${plan.index}-${Date.now()}`,
         index: plan.index,
-        top: plan.top,
+        top: regionY + plan.top,
         width: canvas.width,
         height: canvas.height,
         blob: segmentBlob,
@@ -592,6 +656,7 @@ export const captureWebpageWithBrowser = async (
     quality: options.quality,
     segmentHeight: options.segmentHeight,
     maxSegments: options.maxSegments,
+    crop: options.crop,
     onProgress: options.onProgress,
   });
 };

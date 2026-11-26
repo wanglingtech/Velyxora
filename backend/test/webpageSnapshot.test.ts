@@ -28,6 +28,18 @@ test("el snapshot funciona cuando el HTML no declara <head>", () => {
   assert.ok(html.startsWith('<base href="https://example.com/">'));
 });
 
+test("el snapshot elimina scripts para que la vista previa no ensucie la consola", () => {
+  const html = sanitizeSnapshotHtml(
+    '<html><head><script>window.x=1</script></head><body><script src="https://cdn.example/app.js"></script><noscript>off</noscript><p>Hola</p></body></html>',
+    "https://example.com/",
+  );
+  assert.doesNotMatch(html, /<script/i);
+  assert.doesNotMatch(html, /<\/script>/i);
+  assert.doesNotMatch(html, /cdn\.example\/app\.js/);
+  assert.doesNotMatch(html, /<noscript/i);
+  assert.match(html, /<p>Hola<\/p>/);
+});
+
 test("las URLs no http(s) se rechazan antes de salir a la red", async () => {
   await assert.rejects(() => fetchWebpageSnapshot("ftp://example.com/page"), (error: unknown) => {
     assert.ok(error instanceof WebpageFetchError);

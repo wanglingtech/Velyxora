@@ -83,6 +83,8 @@ const openPdf = async (file: Blob): Promise<PDFDocumentProxy> => {
     return await pdfjs.getDocument({
       data,
       useSystemFonts: true,
+      // 0 = only errors, silences harmless font-repair warnings in the console.
+      verbosity: 0,
     }).promise;
   } catch (error) {
     const name = (error as { name?: string })?.name;

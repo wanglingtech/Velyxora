@@ -29,8 +29,11 @@ export const MAX_CAPTURE_PIXEL_WIDTH = 4000;
 export const MAX_CAPTURE_PIXEL_HEIGHT = 16_000;
 
 const NAVIGATION_TIMEOUT_MS = 30_000;
-const STABLE_LAYOUT_TRIES = 40;
-const STABLE_LAYOUT_DELAY_MS = 350;
+// The load event is a secondary signal: rendering waits for network idle, so
+// this only bounds how long a never-firing load event is kept pending.
+const LOAD_EVENT_TIMEOUT_MS = 20_000;
+const STABLE_LAYOUT_TRIES = 24;
+const STABLE_LAYOUT_DELAY_MS = 250;
 const CONNECT_TIMEOUT_MS = 15_000;
 
 export interface BrowserCaptureRequest {
@@ -410,7 +413,7 @@ const launchBrowser = async (width: number): Promise<LaunchedBrowser> => {
   return { process: child, cdp, userDataDir };
 };
 
-const stopBrowser = async (browser: LaunchedBrowser): Promise<void> => {
+const stopBrowser = (browser: LaunchedBrowser): void => {
   try {
     browser.cdp.close();
   } catch {
@@ -421,10 +424,13 @@ const stopBrowser = async (browser: LaunchedBrowser): Promise<void> => {
   } catch {
     // ignore
   }
-  await sleep(150);
-  await fsp
-    .rm(browser.userDataDir, { recursive: true, force: true, maxRetries: 8, retryDelay: 150 })
-    .catch(() => undefined);
+  // Windows keeps the profile locked until Chrome exits, and the response must
+  // not wait on that: the temp directory is removed in the background.
+  void browser.process.once("exit", () => {
+    void fsp
+      .rm(browser.userDataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
+      .catch(() => undefined);
+  });
 };
 
 const buildRequestGuard = () => {
@@ -463,6 +469,49 @@ const findContentSize = async (cdp: CdpConnection, sessionId: string): Promise<{
   };
 };
 
+/**
+ * Waits until the page stops making requests. The `load` event fires only after
+ * every tracked resource, which ad-heavy sites delay far beyond the point where
+ * the real content is painted; request activity is the honest signal.
+ *
+ * Idle is measured by the absence of new network events instead of a pending
+ * request count: beacons and long-lived connections never "finish" and would
+ * otherwise force every capture to hit the timeout.
+ */
+const waitForNetworkIdle = async (
+  cdp: CdpConnection,
+  sessionId: string,
+  options: { idleMs: number; timeoutMs: number; minWaitMs?: number },
+): Promise<void> => {
+  let lastActivity = Date.now();
+  const earliestReturn = Date.now() + (options.minWaitMs ?? 0);
+  const touch = () => {
+    lastActivity = Date.now();
+  };
+  const offs = [
+    cdp.on("Network.requestWillBeSent", (_params, eventSession) => {
+      if (eventSession === sessionId) touch();
+    }),
+    cdp.on("Network.loadingFinished", (_params, eventSession) => {
+      if (eventSession === sessionId) touch();
+    }),
+    cdp.on("Network.loadingFailed", (_params, eventSession) => {
+      if (eventSession === sessionId) touch();
+    }),
+  ];
+
+  const deadline = Date.now() + options.timeoutMs;
+
+  try {
+    while (Date.now() < deadline) {
+      if (Date.now() >= earliestReturn && Date.now() - lastActivity >= options.idleMs) return;
+      await sleep(120);
+    }
+  } finally {
+    for (const off of offs) off();
+  }
+};
+
 const waitForStableLayout = async (cdp: CdpConnection, sessionId: string): Promise<{ width: number; height: number }> => {
   let previous = -1;
   let stableRounds = 0;
@@ -484,15 +533,18 @@ const preparePage = async (cdp: CdpConnection, sessionId: string): Promise<void>
   const scripts = [
     `(async () => {
       const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-      try { await Promise.race([document.fonts && document.fonts.ready, pause(2500)]); } catch {}
+      try { await Promise.race([document.fonts && document.fonts.ready, pause(2000)]); } catch {}
       const step = Math.max(400, Math.floor(window.innerHeight * 0.85));
       const limit = Math.min(document.documentElement.scrollHeight || 0, 60000);
-      for (let y = 0; y < limit; y += step) {
+      // Lazy content needs a few scroll passes, but an ad-heavy page must not
+      // keep the capture waiting: cap the work to a short time budget.
+      let pauses = 0;
+      for (let y = 0; y < limit && pauses < 20; y += step, pauses += 1) {
         window.scrollTo(0, y);
-        await pause(120);
+        await pause(70);
       }
       window.scrollTo(0, 0);
-      await pause(250);
+      await pause(200);
       return true;
     })()`,
     `(() => {
@@ -535,7 +587,12 @@ export const captureWebpageScreenshot = async (
   );
   const requestedScale = Math.min(3, Math.max(0.5, request.scale || 1));
 
+  const startedAt = Date.now();
+  const mark = (label: string) =>
+    logger.info("capture-timing", `${label} ${Date.now() - startedAt}ms`);
+
   const browser = await launchBrowser(requestedWidth);
+  mark("browser-launched");
   let targetId: string | null = null;
 
   try {
@@ -552,6 +609,7 @@ export const captureWebpageScreenshot = async (
     await Promise.all([
       browser.cdp.send("Page.enable", {}, sessionId),
       browser.cdp.send("Runtime.enable", {}, sessionId),
+      browser.cdp.send("Network.enable", {}, sessionId),
       browser.cdp.send("Emulation.setScrollbarsHidden", { hidden: true }, sessionId),
     ]);
 
@@ -593,7 +651,13 @@ export const captureWebpageScreenshot = async (
       sessionId,
     );
 
-    const loadEvent = browser.cdp.waitFor("Page.loadEventFired", sessionId, NAVIGATION_TIMEOUT_MS).catch(() => null);
+    const loadEvent = browser.cdp.waitFor("Page.loadEventFired", sessionId, LOAD_EVENT_TIMEOUT_MS).catch(() => null);
+    // Listener starts before navigating so the first requests are observed.
+    const idleWait = waitForNetworkIdle(browser.cdp, sessionId, {
+      idleMs: 900,
+      timeoutMs: 20_000,
+      minWaitMs: 2_500,
+    });
     const navigation = await browser.cdp.send<{ errorText?: string; frameId?: string }>(
       "Page.navigate",
       { url: request.url },
@@ -606,10 +670,17 @@ export const captureWebpageScreenshot = async (
         "No se pudo abrir esa página. Comprueba el enlace e inténtalo de nuevo.",
       );
     }
-    await loadEvent;
+    // Network idle covers both the initial paint and the async data that fills
+    // in placeholders, which the load event can miss behind slow trackers.
+    await Promise.all([loadEvent, idleWait]);
+    mark("network-idle");
 
     await preparePage(browser.cdp, sessionId);
+    mark("prepare-page");
+    await waitForNetworkIdle(browser.cdp, sessionId, { idleMs: 500, timeoutMs: 4_000 });
+    mark("lazy-settled");
     const sourceSize = await waitForStableLayout(browser.cdp, sessionId);
+    mark("stable-layout");
     const geometry = clampCaptureGeometry(sourceSize.width || requestedWidth, sourceSize.height, requestedScale);
 
     await browser.cdp.send(
@@ -658,6 +729,7 @@ export const captureWebpageScreenshot = async (
         "La página no se pudo convertir en imagen. Prueba con otra URL o con menos contenido.",
       );
     }
+    mark("screenshot");
 
     offRequest();
     offDialog();
@@ -681,8 +753,9 @@ export const captureWebpageScreenshot = async (
     );
   } finally {
     if (targetId) {
-      await browser.cdp.send("Target.closeTarget", { targetId }).catch(() => undefined);
+      await browser.cdp.send("Target.closeTarget", { targetId }, undefined, 5_000).catch(() => undefined);
     }
-    await stopBrowser(browser);
+    stopBrowser(browser);
+    mark("cleanup");
   }
 };
