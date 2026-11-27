@@ -20,6 +20,20 @@ export default defineConfig(() => {
     build: {
       outDir: path.resolve(__dirname, 'dist'),
       emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler')) return 'react-vendor';
+            if (id.includes('lucide-react')) return 'icons';
+            if (id.includes('pdfjs-dist')) return 'pdfjs';
+            if (id.includes('pdf-lib')) return 'pdf-lib';
+            if (id.includes('jszip')) return 'zip';
+            if (id.includes('qrcode')) return 'qrcode';
+            return 'vendor';
+          },
+        },
+      },
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

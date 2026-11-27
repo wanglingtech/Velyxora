@@ -3,15 +3,9 @@ import {
   DownloadCloud,
   ArrowRight,
   ArrowLeft,
-  Shield,
-  AlertTriangle,
   Play,
-  CheckCircle,
   ExternalLink,
   Server,
-  Layers,
-  Sparkles,
-  Info,
   Images,
 } from "lucide-react";
 import {
@@ -30,12 +24,12 @@ import {
   withImageConversionFormats,
 } from "../../services/mediaService";
 import { MediaMetadata, MediaFormatOption } from "../../types/media";
-import { toast } from "../common/ToastContainer";
+import { toast } from "../common/toast";
 import { apiClient, type ConversionJobResponse } from "../../services/apiClient";
 import { pathForView } from "../../services/appRouting";
 import { downloadService } from "../../services/downloadService";
 import { convertImage } from "../../services/conversionEngine";
-import { useAuth } from "../../auth/AuthContext";
+import { useAuth } from "../../auth/authContextValue";
 
 const MEDIA_GROUP_LABELS = { video: "VIDEO", audio: "AUDIO", image: "IMAGEN" } as const;
 

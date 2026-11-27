@@ -5,6 +5,7 @@ import {
   captureFilename,
   computeCaptureSegments,
   isMostlyBlankPixels,
+  resolveCaptureRegion,
 } from "../src/services/webpageCaptureService";
 import { pathForView, routeFromPath, sanitizeReturnTo } from "../src/services/appRouting";
 
@@ -38,6 +39,30 @@ test("captureFilename usa la extensión real del formato elegido", () => {
   assert.equal(captureFilename(0, "image/png"), "pagina-01.png");
   assert.equal(captureFilename(9, "image/jpeg"), "pagina-10.jpg");
   assert.equal(captureFilename(2, "image/webp"), "pagina-03.webp");
+});
+
+test("resolveCaptureRegion devuelve la página completa sin recorte", () => {
+  assert.deepEqual(resolveCaptureRegion(1280, 4000, null), { x: 0, y: 0, width: 1280, height: 4000 });
+  assert.deepEqual(resolveCaptureRegion(1280, 4000), { x: 0, y: 0, width: 1280, height: 4000 });
+});
+
+test("resolveCaptureRegion recorta y limita el área seleccionada", () => {
+  assert.deepEqual(
+    resolveCaptureRegion(1280, 4000, { x: 100, y: 200, width: 500, height: 900 }),
+    { x: 100, y: 200, width: 500, height: 900 },
+  );
+
+  // Out-of-bounds selections are clamped to the page.
+  assert.deepEqual(
+    resolveCaptureRegion(1280, 4000, { x: 1200, y: 3900, width: 900, height: 900 }),
+    { x: 1200, y: 3900, width: 80, height: 100 },
+  );
+
+  // Negative/zero sizes fall back to at least one pixel.
+  assert.deepEqual(
+    resolveCaptureRegion(1280, 4000, { x: -50, y: -50, width: 0, height: 0 }),
+    { x: 0, y: 0, width: 1, height: 1 },
+  );
 });
 
 test("el módulo HTML a capturas tiene ruta propia y es un destino de retorno seguro", () => {

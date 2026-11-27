@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ArrowLeft, RotateCcw, Settings } from "lucide-react";
 import { settingsService } from "../../services/settingsService";
 import { UserSettings } from "../../types";
-import { toast } from "../common/ToastContainer";
+import { toast } from "../common/toast";
 
 export const SettingsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [settings, setSettings] = useState<UserSettings>(settingsService.getSettings());

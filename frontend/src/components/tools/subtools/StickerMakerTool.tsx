@@ -5,7 +5,7 @@ import { downloadService } from "../../../services/downloadService";
 import { historyService } from "../../../services/historyService";
 import { shareService } from "../../../services/shareService";
 import { formatFileSize } from "../../../services/detectionService";
-import { toast } from "../../common/ToastContainer";
+import { toast } from "../../common/toast";
 import {
   DEFAULT_STICKER_EDIT,
   generateSticker,

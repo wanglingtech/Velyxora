@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, Heart, Globe, Server, HardDrive, Code2, ShieldCheck, ExternalLink, QrCode, X, Copy } from 'lucide-react';
 import { VelyxoraLogo } from '../logo/VelyxoraLogo';
 import { IconRenderer } from '../common/IconRenderer';
-import { toast } from '../common/ToastContainer';
+import { toast } from '../common/toast';
 import {
   SUPPORT_REGIONS,
   getSupportMethods,

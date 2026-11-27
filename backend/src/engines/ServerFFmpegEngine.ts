@@ -207,10 +207,6 @@ export class ServerFFmpegEngine extends BaseConversionEngine {
         // Parse duration and time progress from FFmpeg stderr
         const timeMatch = text.match(/time=(\d{2}):(\d{2}):(\d{2}\.\d{2})/);
         if (timeMatch && onProgress) {
-          const hours = parseInt(timeMatch[1], 10);
-          const minutes = parseInt(timeMatch[2], 10);
-          const seconds = parseFloat(timeMatch[3]);
-          const currentSeconds = hours * 3600 + minutes * 60 + seconds;
           onProgress(-1, `Processing timestamp: ${timeMatch[0]}`);
         }
       });

@@ -11,7 +11,7 @@ import {
 import { ProcessingJob } from "../../types";
 import { formatFileSize } from "../../services/detectionService";
 import { downloadService } from "../../services/downloadService";
-import { toast } from "./ToastContainer";
+import { toast } from "./toast";
 import { shareService } from "../../services/shareService";
 
 interface JobProgressViewProps {

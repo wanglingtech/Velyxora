@@ -1,51 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
-
-export type ToastType = 'success' | 'error' | 'warning' | 'info';
-
-export interface ToastMessage {
-  id: string;
-  type: ToastType;
-  title: string;
-  message?: string;
-  duration?: number;
-}
-
-type ToastListener = (toast: ToastMessage) => void;
-const listeners: Set<ToastListener> = new Set();
-let lastToastFingerprint = '';
-let lastToastAt = 0;
-
-export const toast = {
-  show(title: string, message?: string, type: ToastType = 'info', duration: number = 4000) {
-    const fingerprint = `${type}\u0000${title}\u0000${message || ''}`;
-    const now = Date.now();
-    if (fingerprint === lastToastFingerprint && now - lastToastAt < 750) return;
-    lastToastFingerprint = fingerprint;
-    lastToastAt = now;
-    const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const msg: ToastMessage = { id, type, title, message, duration };
-    listeners.forEach(l => l(msg));
-  },
-  success(title: string, message?: string) {
-    this.show(title, message, 'success');
-  },
-  error(title: string, message?: string) {
-    this.show(title, message, 'error', 5000);
-  },
-  warning(title: string, message?: string) {
-    this.show(title, message, 'warning', 4500);
-  },
-  info(title: string, message?: string) {
-    this.show(title, message, 'info');
-  }
-};
+import { subscribeToasts, type ToastMessage } from './toast';
 
 export const ToastContainer: React.FC = () => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   useEffect(() => {
-    const handler: ToastListener = (newToast) => {
+    return subscribeToasts((newToast) => {
       setToasts((prev) => [...prev, newToast]);
 
       if (newToast.duration) {
@@ -53,12 +14,7 @@ export const ToastContainer: React.FC = () => {
           setToasts((prev) => prev.filter((t) => t.id !== newToast.id));
         }, newToast.duration);
       }
-    };
-
-    listeners.add(handler);
-    return () => {
-      listeners.delete(handler);
-    };
+    });
   }, []);
 
   const removeToast = (id: string) => {

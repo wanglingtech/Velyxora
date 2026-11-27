@@ -98,7 +98,7 @@ class StorageService {
       if (fs.existsSync(record.path)) {
         fs.unlinkSync(record.path);
       }
-    } catch (err: any) {
+    } catch {
       logger.warn('STORAGE_DELETE_FAILED', { fileId });
     }
 

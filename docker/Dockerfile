@@ -45,8 +45,12 @@ ENV NODE_ENV=production \
     FFPROBE_PATH=ffprobe \
     LIBREOFFICE_PATH=soffice \
     YT_DLP_PATH=yt-dlp \
+    CAPTURE_BROWSER_PATH=/usr/bin/chromium \
+    CAPTURE_BROWSER_NO_SANDBOX=true \
     PATH="/opt/velyxora-ytdlp/bin:${PATH}"
 
+# Chromium habilita la captura completa de páginas que renderizan con
+# JavaScript. Es opcional: sin él la vista usa la captura HTML básica.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ffmpeg \
@@ -55,6 +59,7 @@ RUN apt-get update \
         libreoffice-calc \
         libreoffice-impress \
         ca-certificates \
+        chromium \
         curl \
         python3 \
         python3-venv \

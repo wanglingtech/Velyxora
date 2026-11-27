@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Download, Copy, Check, Barcode as BarcodeIcon, Sparkles } from 'lucide-react';
+import { Download, Copy, Check } from 'lucide-react';
 import { ToolDefinition } from '../../../types';
 import { renderCode128ToCanvas, generateBarcode } from '../../../services/barcodeEngine';
-import { toast } from '../../common/ToastContainer';
+import { toast } from '../../common/toast';
 
 interface BarcodeToolRunnerProps {
   tool: ToolDefinition;
 }
 
-export const BarcodeToolRunner: React.FC<BarcodeToolRunnerProps> = ({ tool }) => {
+export const BarcodeToolRunner: React.FC<BarcodeToolRunnerProps> = () => {
   const [barcodeText, setBarcodeText] = useState<string>('VELYX-8942-PRO');
   const [barWidth, setBarWidth] = useState<number>(2);
   const [barHeight, setBarHeight] = useState<number>(90);
@@ -72,7 +72,7 @@ export const BarcodeToolRunner: React.FC<BarcodeToolRunnerProps> = ({ tool }) =>
         setTimeout(() => setCopied(false), 2000);
         toast.success('¡Imagen copiada al portapapeles!');
       });
-    } catch (err) {
+    } catch {
       toast.error('No se pudo copiar la imagen directamente');
     }
   };

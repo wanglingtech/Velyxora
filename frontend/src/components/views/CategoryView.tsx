@@ -3,7 +3,7 @@ import { Search, ArrowLeft, AlertTriangle, Wrench } from 'lucide-react';
 import { ToolCard, ComingSoonCard } from '../common/ToolCard';
 import { CATEGORIES_CONFIG, getToolkitGroup, getToolsForGroup, getPlannedToolsForGroup, searchTools } from '../../registry/tools';
 import { ToolDefinition } from '../../types';
-import { useServiceStatus } from '../../context/ServiceStatusContext';
+import { useServiceStatus } from '../../context/serviceStatusContextValue';
 import { countToolsInMaintenance, isToolInMaintenance } from '../../services/toolAvailability';
 
 interface CategoryViewProps {

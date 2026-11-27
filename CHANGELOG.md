@@ -20,6 +20,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Removed the legacy credits and payment runtime (plans, ledger, payment
   orders, manual review artifacts) from the application and database schema.
 - Added service status controls.
+- CI now installs with `npm ci` and the committed root `package-lock.json`,
+  matching the documented package manager instead of the unused pnpm setup.
+- The frontend imports only the icons it uses through
+  `frontend/src/components/common/iconMap.ts`. The previous namespace import
+  pulled every Lucide icon into the main bundle (about 850 kB); vendor chunks
+  are now split in `vite.config.ts`.
 
 ### Added
 
@@ -29,6 +35,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Community health and documentation files: `CONTRIBUTING.md`, `SECURITY.md`,
   `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, `SUPPORT.md`, GitHub issue/PR templates
   and a CI workflow.
+- Webpage capture (`/webpage-capture`) renders public pages in headless Chrome,
+  shows the real full-page preview, supports drag-to-select area, and exports
+  PNG/JPG/WebP screens or a PDF. See `docs/markdown/WEBPAGE_CAPTURE.md`.
 
 ### Fixed
 
@@ -42,6 +51,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the mount-time restore can no longer overwrite a newer session.
 - Rate limiting no longer applies to HTML pages and static assets, which used
   to exhaust the API budget and return 429 during normal navigation.
+- Webpage capture waits for network idle before screenshotting, so
+  JavaScript-driven pages render fully instead of showing skeletons. The
+  sanitized snapshot no longer strips visible content needed by the preview,
+  and no iframe is used, eliminating the `about:srcdoc` console/CORS errors.
+- Cleared all ESLint warnings; `npm run lint` now reports zero problems.
+- Removed unused imports and state that produced TypeScript/ESLint noise, and
+  fixed the password generator effect and the URL paste handler dependencies.
 
 ### Notes
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../../services/apiClient';
-import { useAuth } from '../../auth/AuthContext';
+import { useAuth } from '../../auth/authContextValue';
 
 const field = 'min-h-12 w-full rounded-xl border border-white/10 bg-black/25 px-4 text-sm outline-none focus:border-indigo-500';
 export function FeedbackView({ kind, onBack }: { kind: 'complaint' | 'suggestion'; onBack: () => void }) {

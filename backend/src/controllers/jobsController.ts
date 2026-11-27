@@ -85,7 +85,7 @@ export async function streamDownload(req: Request, res: Response): Promise<void>
         // Interrupted downloads remain available until TTL cleanup for retry.
       }
     });
-  } catch (err: any) {
+  } catch {
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
