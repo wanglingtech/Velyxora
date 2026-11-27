@@ -4,11 +4,7 @@ import { ToolDefinition } from '../../types';
 import { IconRenderer } from './IconRenderer';
 import { CapabilityBadge } from './Badge';
 import { PlannedTool } from '../../registry/tools';
-<<<<<<< HEAD
 import { useServiceStatus } from '../../context/serviceStatusContextValue';
-=======
-import { useServiceStatus } from '../../context/ServiceStatusContext';
->>>>>>> origin/main
 import { getMissingServices, maintenanceTooltip } from '../../services/toolAvailability';
 
 interface ToolCardProps {

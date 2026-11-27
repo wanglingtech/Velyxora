@@ -6,15 +6,12 @@ import {
   fetchWebpageSnapshot,
   sanitizeSnapshotHtml,
 } from "../src/services/webpageSnapshotService";
-<<<<<<< HEAD
 import {
   MAX_CAPTURE_PIXEL_HEIGHT,
   MAX_CAPTURE_PIXEL_WIDTH,
   clampCaptureGeometry,
   isBrowserCaptureAvailable,
 } from "../src/services/browserCaptureService";
-=======
->>>>>>> origin/main
 
 test("el snapshot inyecta una base segura y elimina navegación automática", () => {
   const html = sanitizeSnapshotHtml(
@@ -31,7 +28,6 @@ test("el snapshot funciona cuando el HTML no declara <head>", () => {
   assert.ok(html.startsWith('<base href="https://example.com/">'));
 });
 
-<<<<<<< HEAD
 test("el snapshot elimina scripts para que la vista previa no ensucie la consola", () => {
   const html = sanitizeSnapshotHtml(
     '<html><head><script>window.x=1</script></head><body><script src="https://cdn.example/app.js"></script><noscript>off</noscript><p>Hola</p></body></html>',
@@ -44,8 +40,6 @@ test("el snapshot elimina scripts para que la vista previa no ensucie la consola
   assert.match(html, /<p>Hola<\/p>/);
 });
 
-=======
->>>>>>> origin/main
 test("las URLs no http(s) se rechazan antes de salir a la red", async () => {
   await assert.rejects(() => fetchWebpageSnapshot("ftp://example.com/page"), (error: unknown) => {
     assert.ok(error instanceof WebpageFetchError);
@@ -66,7 +60,6 @@ test("los hosts privados siguen bloqueados para snapshots", async () => {
     return true;
   });
 });
-<<<<<<< HEAD
 
 test("la captura con navegador mantiene el raster dentro de límites", () => {
   assert.deepEqual(clampCaptureGeometry(1280, 2000, 1), { width: 1280, height: 2000, scale: 1 });
@@ -88,5 +81,3 @@ test("la captura con navegador mantiene el raster dentro de límites", () => {
   assert.ok(tall.scale <= 1);
   assert.equal(typeof isBrowserCaptureAvailable(), "boolean");
 });
-=======
->>>>>>> origin/main

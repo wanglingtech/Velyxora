@@ -5,11 +5,7 @@ import { ToolCard } from "../common/ToolCard";
 import { SmartFileInspector } from "../common/SmartFileInspector";
 import { PUBLIC_TOOL_REGISTRY, TOOLKIT_GROUPS } from "../../registry/tools";
 import { ToolDefinition, DetectedFileInfo } from "../../types";
-<<<<<<< HEAD
 import { useServiceStatus } from "../../context/serviceStatusContextValue";
-=======
-import { useServiceStatus } from "../../context/ServiceStatusContext";
->>>>>>> origin/main
 import { countToolsInMaintenance } from "../../services/toolAvailability";
 
 interface HomeViewProps {

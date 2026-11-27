@@ -64,7 +64,6 @@ export interface WebpageSnapshot {
   title?: string;
 }
 
-<<<<<<< HEAD
 export interface WebpageCapabilities {
   browserCapture: boolean;
 }
@@ -77,8 +76,6 @@ export interface WebpageFullCapture {
   title?: string;
 }
 
-=======
->>>>>>> origin/main
 export interface MediaAnalysisResponse {
   url: string;
   platform: string;
@@ -464,7 +461,6 @@ export class ApiClient {
     }, MEDIA_LONG_REQUEST_TIMEOUT_MS);
   }
 
-<<<<<<< HEAD
   async webpageCapabilities(): Promise<WebpageCapabilities> {
     return this.request<WebpageCapabilities>("/webpage/capabilities", { method: "GET" }, 15_000);
   }
@@ -550,8 +546,6 @@ export class ApiClient {
     }
   }
 
-=======
->>>>>>> origin/main
   /** Loads an image referenced by a snapshot through the backend to avoid CORS. */
   async fetchWebpageAsset(url: string): Promise<Blob> {
     let response: Response;

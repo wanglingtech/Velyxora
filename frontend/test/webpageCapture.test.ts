@@ -5,10 +5,7 @@ import {
   captureFilename,
   computeCaptureSegments,
   isMostlyBlankPixels,
-<<<<<<< HEAD
   resolveCaptureRegion,
-=======
->>>>>>> origin/main
 } from "../src/services/webpageCaptureService";
 import { pathForView, routeFromPath, sanitizeReturnTo } from "../src/services/appRouting";
 
@@ -44,7 +41,6 @@ test("captureFilename usa la extensión real del formato elegido", () => {
   assert.equal(captureFilename(2, "image/webp"), "pagina-03.webp");
 });
 
-<<<<<<< HEAD
 test("resolveCaptureRegion devuelve la página completa sin recorte", () => {
   assert.deepEqual(resolveCaptureRegion(1280, 4000, null), { x: 0, y: 0, width: 1280, height: 4000 });
   assert.deepEqual(resolveCaptureRegion(1280, 4000), { x: 0, y: 0, width: 1280, height: 4000 });
@@ -69,8 +65,6 @@ test("resolveCaptureRegion recorta y limita el área seleccionada", () => {
   );
 });
 
-=======
->>>>>>> origin/main
 test("el módulo HTML a capturas tiene ruta propia y es un destino de retorno seguro", () => {
   assert.deepEqual(routeFromPath("/webpage-capture"), { view: "webpage-capture" });
   assert.equal(pathForView("webpage-capture"), "/webpage-capture");
