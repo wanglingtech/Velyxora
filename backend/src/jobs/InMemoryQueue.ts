@@ -1,5 +1,4 @@
 import { EventEmitter } from 'events';
-import { JobRecord } from '../types/jobs';
 import { logger } from '../utils/logger';
 
 export interface IJobQueue {

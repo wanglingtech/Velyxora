@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   ArrowLeft,
   Settings,
@@ -9,8 +9,6 @@ import {
   Copy,
   Check,
   RefreshCw,
-  Eye,
-  Layers,
 } from "lucide-react";
 import { ToolDefinition, ProcessingJob } from "../../types";
 import { jobService } from "../../services/jobService";
@@ -19,7 +17,6 @@ import { getToolRunnerKind } from "../../registry/tools";
 import { getHumanFileFormats, getToolAcceptAttribute, validateFileForTool } from "../../services/fileValidation";
 import {
   convertImage,
-  cropImage,
   extractVideoFrame,
   trimAndExportWav,
   generateFaviconPackage,
@@ -30,7 +27,7 @@ import {
 } from "../../services/conversionEngine";
 import { JobProgressView } from "../common/JobProgressView";
 import { CapabilityBadge } from "../common/Badge";
-import { toast } from "../common/ToastContainer";
+import { toast } from "../common/toast";
 import { apiClient } from "../../services/apiClient";
 import { pathForView } from "../../services/appRouting";
 import { requiresServerAuthentication } from "../../config/execution";
@@ -47,7 +44,7 @@ import { ImageAdvancedTools } from "./subtools/ImageAdvancedTools";
 import { DataAndCodeTools } from "./subtools/DataAndCodeTools";
 import { UtilitiesToolRunner } from "./subtools/UtilitiesToolRunner";
 import { StickerMakerTool } from "./subtools/StickerMakerTool";
-import { useAuth } from "../../auth/AuthContext";
+import { useAuth } from "../../auth/authContextValue";
 const CreativeTools = React.lazy(() => import("./subtools/CreativeTools").then((module) => ({ default: module.CreativeTools })));
 
 interface ToolRunnerProps {
@@ -137,8 +134,8 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
   const [generatedPass, setGeneratedPass] = useState<string>("");
 
   // Batch Files
-  const [batchFiles, setBatchFiles] = useState<File[]>([]);
-  const [isBatchMode, setIsBatchMode] = useState<boolean>(false);
+  const [batchFiles] = useState<File[]>([]);
+  const [isBatchMode] = useState<boolean>(false);
 
   // Subscribe to job events
   useEffect(() => {
@@ -212,14 +209,7 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
     }
   }, [qrValue, qrType, wifiSsid, wifiPass, qrColor, qrBgColor, tool.id]);
 
-  // Generate initial password
-  useEffect(() => {
-    if (tool.id === "password-generator") {
-      generateSecurePassword();
-    }
-  }, [tool.id]);
-
-  const generateSecurePassword = () => {
+  const generateSecurePassword = useCallback(() => {
     let charset = "abcdefghijklmnopqrstuvwxyz";
     if (useUpper) charset += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     if (useNumbers) charset += "0123456789";
@@ -232,7 +222,14 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
       pass += charset[array[i] % charset.length];
     }
     setGeneratedPass(pass);
-  };
+  }, [useUpper, useNumbers, useSymbols, passLength]);
+
+  // Generate initial password
+  useEffect(() => {
+    if (tool.id === "password-generator") {
+      generateSecurePassword();
+    }
+  }, [tool.id, generateSecurePassword]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -1313,7 +1310,6 @@ export const ToolRunner: React.FC<ToolRunnerProps> = ({
                         value={passLength}
                         onChange={(e) => {
                           setPassLength(Number(e.target.value));
-                          generateSecurePassword();
                         }}
                         className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
                       />

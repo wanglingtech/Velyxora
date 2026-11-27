@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getJobById, deleteJobById, streamDownload } from '../controllers/jobsController';
+import { getJobById, deleteJobById } from '../controllers/jobsController';
 import { requireProcessingAuth } from '../middleware/auth';
 
 const router = Router();

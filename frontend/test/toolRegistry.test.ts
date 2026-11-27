@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CATEGORIES_CONFIG, PUBLIC_TOOL_REGISTRY, getToolById, getToolRunnerKind, searchTools } from '../src/registry/tools';
+import { CATEGORIES_CONFIG, PLANNED_TOOL_REGISTRY, PUBLIC_TOOL_REGISTRY, TOOL_REGISTRY, getToolById, getToolRunnerKind, searchTools } from '../src/registry/tools';
+import { SUPPORT_METHODS } from '../src/config/supportMethods';
+import { ICON_MAP } from '../src/components/common/iconMap';
 
 test('todas las herramientas públicas tienen metadata, categoría, ruta y runner', () => {
   const categories = new Set(CATEGORIES_CONFIG.map((category) => category.id));
@@ -59,4 +61,15 @@ test('búsqueda es global, ignora acentos y entiende sinónimos en español', ()
 
 test('password-generator resuelve al runner de texto funcional', () => {
   assert.equal(getToolRunnerKind(getToolById('password-generator')!), 'text');
+});
+
+test('todos los iconos referenciados existen en el mapa explícito', () => {
+  const names = new Set<string>([
+    ...TOOL_REGISTRY.map((tool) => tool.icon),
+    ...PLANNED_TOOL_REGISTRY.map((tool) => tool.icon),
+    ...SUPPORT_METHODS.map((method) => method.icon),
+  ]);
+  for (const name of names) {
+    assert.ok(name in ICON_MAP, `Icono sin definir: ${name}`);
+  }
 });

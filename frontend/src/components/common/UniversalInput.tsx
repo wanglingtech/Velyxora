@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { UploadCloud, Link as LinkIcon, FileText, ArrowRight, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { UploadCloud, Link as LinkIcon, ArrowRight, Loader2 } from 'lucide-react';
 import { detectFile } from '../../services/detectionService';
 import { DetectedFileInfo } from '../../types';
 import { findMatchingMediaAdapter } from '../../services/mediaService';
@@ -35,6 +35,24 @@ export const UniversalInput: React.FC<UniversalInputProps> = ({
     }
   }, [urlInput]);
 
+  const processSingleFile = useCallback(async (file: File) => {
+    setIsAnalyzing(true);
+    try {
+      const info = await detectFile(file);
+      onFileDetected?.(info);
+    } catch (err) {
+      console.error('File detection error', err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [onFileDetected]);
+
+  const analyzeUrl = useCallback((url: string) => {
+    const target = url.trim();
+    if (!target) return;
+    onUrlDetected?.(target);
+  }, [onUrlDetected]);
+
   // Handle Clipboard Paste (Ctrl+V)
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
@@ -56,26 +74,14 @@ export const UniversalInput: React.FC<UniversalInputProps> = ({
         if (pastedText && (pastedText.startsWith('http://') || pastedText.startsWith('https://'))) {
           e.preventDefault();
           setUrlInput(pastedText);
-          handleAnalyzeUrl(pastedText);
+          analyzeUrl(pastedText);
         }
       }
     };
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, []);
-
-  const processSingleFile = async (file: File) => {
-    setIsAnalyzing(true);
-    try {
-      const info = await detectFile(file);
-      onFileDetected?.(info);
-    } catch (err) {
-      console.error('File detection error', err);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
+  }, [processSingleFile, analyzeUrl]);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -111,9 +117,7 @@ export const UniversalInput: React.FC<UniversalInputProps> = ({
   };
 
   const handleAnalyzeUrl = (urlToAnalyze?: string) => {
-    const target = urlToAnalyze || urlInput;
-    if (!target.trim()) return;
-    onUrlDetected?.(target.trim());
+    analyzeUrl(urlToAnalyze || urlInput);
   };
 
   return (

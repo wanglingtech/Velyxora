@@ -1,12 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Sparkles,
   Download,
   Copy,
   Check,
-  Pipette,
-  Layers,
-  Code,
   Image as ImageIcon,
   RotateCcw,
   Sliders
@@ -18,7 +14,7 @@ import {
   applyWatermark,
   extractDominantColors
 } from '../../../services/conversionEngine';
-import { toast } from '../../common/ToastContainer';
+import { toast } from '../../common/toast';
 import { formatFileSize } from '../../../services/detectionService';
 
 interface ImageAdvancedToolsProps {
@@ -66,8 +62,6 @@ export const ImageAdvancedTools: React.FC<ImageAdvancedToolsProps> = ({
 
   // Dominant Colors state
   const [palette, setPalette] = useState<Array<{ hex: string; rgb: string; percentage: number }>>([]);
-  const [pickedColor, setPickedColor] = useState<{ hex: string; rgb: string } | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Base64 state
   const [base64Uri, setBase64Uri] = useState<string>('');

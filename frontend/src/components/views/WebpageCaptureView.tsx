@@ -32,8 +32,8 @@ import { generateBatchZip } from "../../services/conversionEngine";
 import { createPdfFromImages, type PdfOrientation, type PdfPageSize } from "../../services/pdfEngine";
 import { downloadService } from "../../services/downloadService";
 import { pathForView } from "../../services/appRouting";
-import { useAuth } from "../../auth/AuthContext";
-import { toast } from "../common/ToastContainer";
+import { useAuth } from "../../auth/authContextValue";
+import { toast } from "../common/toast";
 
 interface WebpageCaptureViewProps {
   onBack?: () => void;

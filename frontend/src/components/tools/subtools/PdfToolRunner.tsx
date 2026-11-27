@@ -38,7 +38,7 @@ import {
 } from "../../../services/pdfImageEngine";
 import { generateBatchZip } from "../../../services/conversionEngine";
 import { historyService } from "../../../services/historyService";
-import { toast } from "../../common/ToastContainer";
+import { toast } from "../../common/toast";
 import { formatFileSize } from "../../../services/detectionService";
 
 interface PdfToolRunnerProps {

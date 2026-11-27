@@ -10,7 +10,7 @@ import {
   validateWhatsAppMessage,
   WHATSAPP_MESSAGE_MAX_LENGTH,
 } from '../../../services/whatsappService';
-import { toast } from '../../common/ToastContainer';
+import { toast } from '../../common/toast';
 
 interface WhatsappToolsProps {
   tool: ToolDefinition;

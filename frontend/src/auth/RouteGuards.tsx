@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from './authContextValue';
 
 export function ProtectedRoute({ children, fallback }: { children: React.ReactNode; fallback: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();

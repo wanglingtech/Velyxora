@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Copy, Download, Heart, Search } from 'lucide-react';
 import { ToolDefinition } from '../../../types';
 import { apiClient } from '../../../services/apiClient';
-import { toast } from '../../common/ToastContainer';
+import { toast } from '../../common/toast';
 
 const EMOJIS=[['😀','feliz sonrisa','Caras'],['😂','risa lágrimas','Caras'],['😍','amor corazón','Caras'],['🤔','pensando duda','Caras'],['❤️','corazón amor','Símbolos'],['✅','check correcto','Símbolos'],['⚠️','alerta advertencia','Símbolos'],['⭐','estrella favorito','Símbolos'],['👍','pulgar bien','Gestos'],['👏','aplausos','Gestos'],['🙏','gracias manos','Gestos'],['💪','fuerza brazo','Gestos'],['🚀','cohete lanzamiento','Objetos'],['💡','idea bombilla','Objetos'],['📱','teléfono móvil','Objetos'],['💻','computadora','Objetos'],['🔥','fuego tendencia','Naturaleza'],['✨','brillos magia','Naturaleza'],['🌈','arcoíris','Naturaleza'],['🌍','mundo planeta','Naturaleza']] as const;
 const PRESETS={Instagram:[1080,1080],Story:[1080,1920],X:[1200,675],LinkedIn:[1200,627]} as const;

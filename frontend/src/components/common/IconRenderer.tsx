@@ -1,5 +1,5 @@
 import React from 'react';
-import * as LucideIcons from 'lucide-react';
+import { resolveIcon } from './iconMap';
 
 interface IconRendererProps {
   name: string;
@@ -8,6 +8,6 @@ interface IconRendererProps {
 }
 
 export const IconRenderer: React.FC<IconRendererProps> = ({ name, className = '', size = 18 }) => {
-  const IconComponent = (LucideIcons as any)[name] || LucideIcons.Wrench;
+  const IconComponent = resolveIcon(name);
   return <IconComponent className={className} size={size} />;
 };

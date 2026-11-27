@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, ArrowRight, CornerDownLeft } from 'lucide-react';
+import { Search, X, CornerDownLeft } from 'lucide-react';
 import { searchTools } from '../../registry/tools';
 import { ToolDefinition } from '../../types';
 import { IconRenderer } from './IconRenderer';

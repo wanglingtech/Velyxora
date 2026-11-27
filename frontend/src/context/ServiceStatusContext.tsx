@@ -1,21 +1,9 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient, BackendHealth } from '../services/apiClient';
 import type { RequiredService } from '../services/toolAvailability';
+import { ServiceStatusContext, type ServiceStatusContextValue } from './serviceStatusContextValue';
 
 const HEALTH_REFRESH_INTERVAL_MS = 30_000;
-
-interface ServiceStatusContextValue {
-  health: BackendHealth | null;
-  /**
-   * Whether a backend service required by a tool is usable right now.
-   * Optimistic while the first health probe is in flight so cards do not
-   * flash as "maintenance"; unavailable once the backend is unreachable.
-   */
-  isServiceAvailable: (service: RequiredService) => boolean;
-  refresh: () => Promise<void>;
-}
-
-const ServiceStatusContext = createContext<ServiceStatusContextValue | null>(null);
 
 export const ServiceStatusProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [health, setHealth] = useState<BackendHealth | null>(null);
@@ -68,10 +56,4 @@ export const ServiceStatusProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   return <ServiceStatusContext.Provider value={value}>{children}</ServiceStatusContext.Provider>;
-};
-
-export const useServiceStatus = (): ServiceStatusContextValue => {
-  const ctx = useContext(ServiceStatusContext);
-  if (!ctx) throw new Error('useServiceStatus must be used within ServiceStatusProvider');
-  return ctx;
 };

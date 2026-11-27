@@ -1,20 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Ratio,
-  Clock,
-  HardDrive,
   Video,
   Copy,
   Check,
-  RefreshCw,
-  Sparkles,
-  Info,
-  Calendar
+  RefreshCw
 } from 'lucide-react';
 import { ToolDefinition } from '../../../types';
 import { inspectVideoMetadata } from '../../../services/conversionEngine';
 import { formatFileSize, formatDuration } from '../../../services/detectionService';
-import { toast } from '../../common/ToastContainer';
+import { toast } from '../../common/toast';
 import { apiClient } from '../../../services/apiClient';
 
 interface UtilitiesToolRunnerProps {
@@ -38,9 +32,6 @@ export const UtilitiesToolRunner: React.FC<UtilitiesToolRunnerProps> = ({
   // Timestamp States
   const [epochInput, setEpochInput] = useState<string>(Math.floor(Date.now() / 1000).toString());
   const [parsedDate, setParsedDate] = useState<Date>(new Date());
-  const [customDateStr, setCustomDateStr] = useState<string>(
-    new Date().toISOString().slice(0, 16)
-  );
 
   // Storage Unit Converter States
   const [unitVal, setUnitVal] = useState<number>(10);

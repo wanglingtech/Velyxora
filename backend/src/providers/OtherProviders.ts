@@ -94,7 +94,7 @@ export class FacebookProvider extends BaseMediaProvider {
   readonly name = 'Facebook';
   readonly domainPatterns = [/(^|\.)facebook\.com$/i, /(^|\.)fb\.watch$/i];
 
-  extractId(url: string): string | null {
+  extractId(_url: string): string | null {
     return 'fb-video';
   }
 
@@ -146,7 +146,7 @@ export class PinterestProvider extends BaseMediaProvider {
   readonly name = 'Pinterest';
   readonly domainPatterns = [/(^|\.)pinterest\.com$/i, /(^|\.)pin\.it$/i];
 
-  extractId(url: string): string | null {
+  extractId(_url: string): string | null {
     return 'pin';
   }
 

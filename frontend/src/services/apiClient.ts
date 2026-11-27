@@ -362,7 +362,7 @@ export class ApiClient {
             } else {
               reject(new Error(json.error?.message || "Upload failed"));
             }
-          } catch (err: any) {
+          } catch {
             reject(new Error("Invalid JSON response from server"));
           }
         } else {

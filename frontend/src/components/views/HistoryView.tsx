@@ -5,7 +5,7 @@ import { settingsService } from "../../services/settingsService";
 import { HistoryItem, ToolDefinition } from "../../types";
 import { formatFileSize } from "../../services/detectionService";
 import { getToolById } from "../../registry/tools";
-import { toast } from "../common/ToastContainer";
+import { toast } from "../common/toast";
 
 interface Props { onSelectTool: (tool: ToolDefinition) => void; onBack: () => void; authenticated?: boolean; }
 type Filter = "ALL" | HistoryItem["status"];

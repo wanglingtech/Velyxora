@@ -3,26 +3,19 @@ import {
   Copy,
   Check,
   Download,
-  FileCode,
   Table,
-  FileSpreadsheet,
-  Palette,
-  GitCompare,
-  Sparkles,
-  ArrowRight
+  Sparkles
 } from 'lucide-react';
 import { ToolDefinition } from '../../../types';
 import {
   csvToJson,
   jsonToCsv,
   markdownToHtml,
-  htmlToMarkdown,
   parseColorToAll,
   computeTextDiff,
-  DiffLine,
   ColorDetails
 } from '../../../services/dataConverterService';
-import { toast } from '../../common/ToastContainer';
+import { toast } from '../../common/toast';
 
 interface DataAndCodeToolsProps {
   tool: ToolDefinition;

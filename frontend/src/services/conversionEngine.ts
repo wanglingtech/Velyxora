@@ -76,7 +76,7 @@ export function loadImageElement(file: File | Blob): Promise<HTMLImageElement> {
       URL.revokeObjectURL(url);
       resolve(img);
     };
-    img.onerror = (err) => {
+    img.onerror = () => {
       URL.revokeObjectURL(url);
       reject(new Error('No se pudo decodificar el archivo de imagen.'));
     };

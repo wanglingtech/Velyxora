@@ -11,7 +11,7 @@ import {
   UserRound,
   Zap,
 } from "lucide-react";
-import { CurrentUser, useAuth } from "../../auth/AuthContext";
+import { CurrentUser, useAuth } from "../../auth/authContextValue";
 import { ACCOUNT_SERVICE_SUMMARY } from "../../config/freeService";
 import {
   SERVICE_OPERATIONAL_STATES,
