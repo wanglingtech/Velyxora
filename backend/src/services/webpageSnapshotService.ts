@@ -102,10 +102,14 @@ const escapeAttribute = (value: string): string =>
 export const sanitizeSnapshotHtml = (html: string, finalUrl: string): string => {
   let output = html
     .replace(/<meta[^>]+http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi, "")
+<<<<<<< HEAD
     .replace(/<base\b[^>]*>/gi, "")
     // Remove script tags to prevent console noise in sandboxed preview
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
     .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, "");
+=======
+    .replace(/<base\b[^>]*>/gi, "");
+>>>>>>> origin/main
   const baseTag = `<base href="${escapeAttribute(finalUrl)}">`;
   if (/<head[^>]*>/i.test(output)) {
     output = output.replace(/<head([^>]*)>/i, `<head$1>${baseTag}`);

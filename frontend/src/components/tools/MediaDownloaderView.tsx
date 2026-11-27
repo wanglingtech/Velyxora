@@ -6,6 +6,12 @@ import {
   Play,
   ExternalLink,
   Server,
+<<<<<<< HEAD
+=======
+  Layers,
+  Sparkles,
+  Info,
+>>>>>>> origin/main
   Images,
 } from "lucide-react";
 import {
@@ -29,7 +35,13 @@ import { apiClient, type ConversionJobResponse } from "../../services/apiClient"
 import { pathForView } from "../../services/appRouting";
 import { downloadService } from "../../services/downloadService";
 import { convertImage } from "../../services/conversionEngine";
+<<<<<<< HEAD
 import { useAuth } from "../../auth/authContextValue";
+
+const MEDIA_GROUP_LABELS = { video: "VIDEO", audio: "AUDIO", image: "IMAGEN" } as const;
+=======
+import { useAuth } from "../../auth/AuthContext";
+>>>>>>> origin/main
 
 const MEDIA_GROUP_LABELS = { video: "VIDEO", audio: "AUDIO", image: "IMAGEN" } as const;
 

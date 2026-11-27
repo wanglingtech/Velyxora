@@ -29,8 +29,13 @@ import { downloadService } from "../../services/downloadService";
 import { convertImage, generateBatchZip } from "../../services/conversionEngine";
 import { completedMediaOutput } from "../../services/mediaService";
 import { pathForView } from "../../services/appRouting";
+<<<<<<< HEAD
 import { useAuth } from "../../auth/authContextValue";
 import { toast } from "../common/toast";
+=======
+import { useAuth } from "../../auth/AuthContext";
+import { toast } from "../common/ToastContainer";
+>>>>>>> origin/main
 
 interface BulkImageDownloaderViewProps {
   onBack?: () => void;

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import React, { useEffect, useRef, useState } from "react";
+=======
+import React, { useRef, useState } from "react";
+>>>>>>> origin/main
 import {
   ArrowLeft,
   Globe,
@@ -12,6 +16,7 @@ import {
   CheckCircle2,
   EyeOff,
   Rows3,
+<<<<<<< HEAD
   Zap,
   Crop,
   X,
@@ -21,32 +26,52 @@ import { ApiError, apiClient, type WebpageSnapshot } from "../../services/apiCli
 import {
   CAPTURE_SEGMENT_HEIGHT,
   type CaptureCropRegion,
+=======
+} from "lucide-react";
+import { apiClient, type WebpageSnapshot } from "../../services/apiClient";
+import {
+  CAPTURE_SEGMENT_HEIGHT,
+>>>>>>> origin/main
   type CaptureImageFormat,
   type CapturedSegment,
   WebpageCaptureError,
   captureFilename,
+<<<<<<< HEAD
   captureFullPageWithBrowser,
   sliceCapturedImage,
+=======
+  captureWebpage,
+>>>>>>> origin/main
 } from "../../services/webpageCaptureService";
 import { generateBatchZip } from "../../services/conversionEngine";
 import { createPdfFromImages, type PdfOrientation, type PdfPageSize } from "../../services/pdfEngine";
 import { downloadService } from "../../services/downloadService";
 import { pathForView } from "../../services/appRouting";
+<<<<<<< HEAD
 import { useAuth } from "../../auth/authContextValue";
 import { toast } from "../common/toast";
+=======
+import { useAuth } from "../../auth/AuthContext";
+import { toast } from "../common/ToastContainer";
+>>>>>>> origin/main
 
 interface WebpageCaptureViewProps {
   onBack?: () => void;
   onRequireAuth: (returnTo?: string) => void;
 }
 
+<<<<<<< HEAD
 const CAPTURE_WIDTHS = [1024, 1280, 1440, 1600, 1920];
+=======
+const CAPTURE_WIDTHS = [1024, 1280, 1440, 1600];
+>>>>>>> origin/main
 const FORMAT_OPTIONS: Array<{ value: CaptureImageFormat; label: string }> = [
   { value: "image/png", label: "PNG" },
   { value: "image/jpeg", label: "JPG" },
   { value: "image/webp", label: "WebP" },
 ];
 
+<<<<<<< HEAD
 interface PreviewState {
   url: string;
   blob: Blob;
@@ -58,12 +83,16 @@ interface PreviewState {
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
+=======
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+>>>>>>> origin/main
 
 const errorMessage = (error: unknown): string =>
   error instanceof WebpageCaptureError || error instanceof Error
     ? error.message
     : "No se pudo completar la captura de la página.";
 
+<<<<<<< HEAD
 const isBrowserUnavailable = (error: unknown): boolean =>
   error instanceof ApiError &&
   (error.code === "BROWSER_UNAVAILABLE" ||
@@ -88,6 +117,15 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
   const draggingRef = useRef(false);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const draftCropRef = useRef<CaptureCropRegion | null>(null);
+=======
+export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, onRequireAuth }) => {
+  const { user } = useAuth();
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [url, setUrl] = useState("");
+  const [snapshot, setSnapshot] = useState<WebpageSnapshot | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
+>>>>>>> origin/main
 
   const [captureWidth, setCaptureWidth] = useState(1280);
   const [format, setFormat] = useState<CaptureImageFormat>("image/png");
@@ -106,6 +144,7 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
 
   const selectedSegments = segments.filter((segment) => !skipBlank || !segment.blank);
   const blankCount = segments.filter((segment) => segment.blank).length;
+<<<<<<< HEAD
   const previewMatches = Boolean(
     preview && preview.width === captureWidth && preview.scale === scale,
   );
@@ -135,6 +174,8 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
       active = false;
     };
   }, [user]);
+=======
+>>>>>>> origin/main
 
   const requireSession = (): boolean => {
     if (user) return true;
@@ -143,6 +184,7 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
     return false;
   };
 
+<<<<<<< HEAD
   const applyPreview = (page: Omit<PreviewState, "url">, resetCrop: boolean) => {
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     const objectUrl = URL.createObjectURL(page.blob);
@@ -174,6 +216,8 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
     }
   };
 
+=======
+>>>>>>> origin/main
   const handleLoad = async () => {
     if (isLoading || isCapturing || !requireSession()) return;
     const target = url.trim();
@@ -184,6 +228,7 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
     setIsLoading(true);
     setSnapshot(null);
     setSegments([]);
+<<<<<<< HEAD
     setPreview(null);
     setCrop(null);
     setPreviewError(null);
@@ -196,6 +241,13 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
       } else {
         setPreviewError("La captura completa no está disponible ahora.");
       }
+=======
+    try {
+      const result = await apiClient.fetchWebpageSnapshot(target);
+      setSnapshot(result);
+      setPreviewKey((value) => value + 1);
+      toast.success("Página cargada", result.title || result.finalUrl);
+>>>>>>> origin/main
     } catch (error: unknown) {
       toast.error("No se pudo cargar la página", errorMessage(error));
     } finally {
@@ -203,6 +255,7 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
     }
   };
 
+<<<<<<< HEAD
   const handleRefreshPreview = async () => {
     if (!snapshot || isPreviewing || isCapturing) return;
     await loadPreview(snapshot.finalUrl, captureWidth, scale);
@@ -215,11 +268,20 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
         "Captura no disponible",
         "Este servidor no tiene el navegador de captura. Prueba de nuevo más tarde.",
       );
+=======
+  const handleCapture = async () => {
+    if (isCapturing || isExporting || !snapshot || !requireSession()) return;
+    const iframe = iframeRef.current;
+    const doc = iframe?.contentDocument;
+    if (!doc?.body || !doc.body.children.length) {
+      toast.error("La vista previa aún no está lista", "Espera un momento e inténtalo de nuevo.");
+>>>>>>> origin/main
       return;
     }
     setIsCapturing(true);
     setCaptureProgress({ done: 0, total: 0 });
     try {
+<<<<<<< HEAD
       let source: { blob: Blob; pageWidth: number; pageHeight: number; width: number; scale: number };
       if (preview && previewMatches) {
         source = preview;
@@ -268,12 +330,35 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
       } else {
         toast.error("No se pudo capturar la página", errorMessage(error));
       }
+=======
+      // The iframe keeps its requested layout width so media queries match the
+      // capture width selected by the user.
+      if (iframe) iframe.style.width = `${captureWidth}px`;
+      await sleep(350);
+      const result = await captureWebpage({
+        document: doc,
+        baseUrl: snapshot.finalUrl,
+        format,
+        quality: quality / 100,
+        scale,
+        segmentHeight,
+        onProgress: (done, total) => setCaptureProgress({ done, total }),
+      });
+      setSegments(result);
+      toast.success(
+        `${result.length} pantalla(s) capturada(s)`,
+        result.some((segment) => segment.blank) ? "Algunas pantallas parecen estar en blanco." : "Revisa las miniaturas antes de descargar.",
+      );
+    } catch (error: unknown) {
+      toast.error("No se pudo capturar la página", errorMessage(error));
+>>>>>>> origin/main
     } finally {
       setIsCapturing(false);
       setCaptureProgress(null);
     }
   };
 
+<<<<<<< HEAD
   const pointToPage = (event: React.PointerEvent): { x: number; y: number } | null => {
     const image = imgRef.current;
     if (!image || !preview) return null;
@@ -337,6 +422,8 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
     dragStartRef.current = null;
   };
 
+=======
+>>>>>>> origin/main
   const removeSegment = (id: string) => {
     setSegments((previous) => previous.filter((segment) => segment.id !== id));
   };
@@ -390,9 +477,13 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
     }
   };
 
+<<<<<<< HEAD
   const controlsLocked = isCapturing || isExporting;
   const selectionPercent = (value: number, total: number): string =>
     `${clamp((value / total) * 100, 0, 100)}%`;
+=======
+  const controlsLocked = isCapturing || segments.length > 0;
+>>>>>>> origin/main
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">
@@ -414,7 +505,11 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
           Captura una página completa
         </h2>
         <p className="text-xs sm:text-sm text-slate-400 max-w-2xl mx-auto">
+<<<<<<< HEAD
           Pega la URL, revisa la página real y elige el área exacta que quieres capturar en PNG, JPG o WebP, o genera un PDF.
+=======
+          Pega la URL, revisa cómo se ve la página y genera capturas por pantallas en PNG, JPG o WebP, o un PDF con la orientación que elijas.
+>>>>>>> origin/main
         </p>
         <p className="text-xs text-amber-300">
           Usa solo páginas públicas o contenido que tengas permiso de capturar.
@@ -448,6 +543,7 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
       </div>
 
       {/* Preview + capture settings */}
+<<<<<<< HEAD
       {(snapshot || previewError) && (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
           <div className="rounded-2xl bg-[#101218] border border-white/[0.08] overflow-hidden">
@@ -537,11 +633,35 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
                 )}
               </div>
             )}
+=======
+      {snapshot && (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
+          <div className="rounded-2xl bg-[#101218] border border-white/[0.08] overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06] text-[11px] text-slate-400 gap-3">
+              <span className="truncate" title={snapshot.finalUrl}>{snapshot.title || snapshot.finalUrl}</span>
+              <span className="font-mono shrink-0">{captureWidth}px</span>
+            </div>
+            <div className="bg-white overflow-auto">
+              <iframe
+                key={previewKey}
+                ref={iframeRef}
+                title="Vista previa de la página"
+                srcDoc={snapshot.html}
+                sandbox="allow-same-origin"
+                className="block border-0"
+                style={{ width: captureWidth, height: 560, maxWidth: "100%" }}
+              />
+            </div>
+            <p className="px-3 py-2 text-[10px] text-slate-500 border-t border-white/[0.06]">
+              La vista previa desactiva scripts. Algunos elementos interactivos, videos o tipografías externas pueden verse distintos en la captura.
+            </p>
+>>>>>>> origin/main
           </div>
 
           <div className="rounded-2xl bg-[#101218] border border-white/[0.08] p-4 space-y-3 h-fit">
             <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
               <Wand2 className="w-3.5 h-3.5" /> Ajustes de captura
+<<<<<<< HEAD
               {browserCapture !== null && (
                 <span
                   className={`ml-auto px-2 py-0.5 rounded-full text-[9px] font-semibold normal-case tracking-normal border flex items-center gap-1 ${
@@ -554,6 +674,8 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
                   {browserCapture ? "Renderizado completo" : "No disponible"}
                 </span>
               )}
+=======
+>>>>>>> origin/main
             </h3>
 
             <label className="block text-[11px] text-slate-400">
@@ -570,6 +692,7 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
               </select>
             </label>
 
+<<<<<<< HEAD
             {preview && !previewMatches && (
               <button
                 onClick={handleRefreshPreview}
@@ -580,6 +703,8 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
               </button>
             )}
 
+=======
+>>>>>>> origin/main
             <div className="grid grid-cols-2 gap-2">
               <label className="block text-[11px] text-slate-400">
                 Formato
@@ -639,6 +764,7 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
 
             <button
               onClick={handleCapture}
+<<<<<<< HEAD
               disabled={isCapturing || isExporting || isPreviewing || !snapshot || browserCapture === false}
               className="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
             >
@@ -647,20 +773,34 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
               ) : (
                 <Rows3 className="w-4 h-4" />
               )}
+=======
+              disabled={isCapturing || isExporting}
+              className="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+            >
+              {isCapturing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rows3 className="w-4 h-4" />}
+>>>>>>> origin/main
               {isCapturing
                 ? captureProgress?.total
                   ? `Capturando ${captureProgress.done} de ${captureProgress.total}...`
                   : "Preparando captura..."
+<<<<<<< HEAD
                 : isPreviewing
                   ? "Preparando vista previa..."
                   : segments.length
                     ? "Volver a capturar"
                     : "Generar capturas"}
+=======
+                : segments.length ? "Volver a capturar" : "Generar capturas"}
+>>>>>>> origin/main
             </button>
 
             {segments.length > 0 && (
               <p className="text-[10px] text-slate-500 leading-snug">
+<<<<<<< HEAD
                 Cambiar formato, ancho, área o nitidez requiere volver a capturar.
+=======
+                Cambiar formato, ancho o nitidez requiere volver a capturar.
+>>>>>>> origin/main
               </p>
             )}
           </div>
@@ -801,18 +941,30 @@ export const WebpageCaptureView: React.FC<WebpageCaptureViewProps> = ({ onBack, 
         </div>
       )}
 
+<<<<<<< HEAD
       {!snapshot && !isLoading && !previewError && (
         <div className="py-14 text-center rounded-2xl bg-[#101218] border border-dashed border-white/[0.1]">
           <Globe className="w-10 h-10 mx-auto text-slate-600 mb-2" />
           <p className="text-sm text-slate-300">Carga una página para empezar.</p>
           <p className="text-xs text-slate-500 mt-1">Después podrás previsualizarla, recortar el área y descargar imágenes o un PDF.</p>
+=======
+      {!snapshot && (
+        <div className="py-14 text-center rounded-2xl bg-[#101218] border border-dashed border-white/[0.1]">
+          <Globe className="w-10 h-10 mx-auto text-slate-600 mb-2" />
+          <p className="text-sm text-slate-300">Carga una página para empezar.</p>
+          <p className="text-xs text-slate-500 mt-1">Después podrás capturarla por pantallas y descargar imágenes o un PDF.</p>
+>>>>>>> origin/main
         </div>
       )}
 
       <div className="rounded-xl bg-[#08090D] border border-white/[0.06] p-4 flex items-start gap-3">
         <Download className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
         <p className="text-[11px] text-slate-400 leading-relaxed">
+<<<<<<< HEAD
           La vista previa y las capturas se renderizan con un navegador real en el servidor, así que las páginas con JavaScript se ven como en tu navegador. Los archivos solo se guardan cuando los descargas.
+=======
+          Las capturas se generan en tu navegador. La página se carga una sola vez para la vista previa y solo se guardan las imágenes o el PDF que descargues.
+>>>>>>> origin/main
         </p>
       </div>
     </div>

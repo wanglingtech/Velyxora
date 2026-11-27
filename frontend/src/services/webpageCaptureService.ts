@@ -129,6 +129,7 @@ const STYLE_PROPERTIES = [
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+<<<<<<< HEAD
 const CAPTURE_RENDER_TIMEOUT_MS = 20_000;
 const CAPTURE_BLOB_TIMEOUT_MS = 25_000;
 
@@ -146,6 +147,8 @@ const withCaptureTimeout = async <T>(task: Promise<T>, ms: number, message: stri
   }
 };
 
+=======
+>>>>>>> origin/main
 const waitForResources = async (doc: Document): Promise<void> => {
   try {
     await Promise.race([doc.fonts?.ready ?? Promise.resolve(), sleep(2500)]);
@@ -265,6 +268,7 @@ const renderSvgToCanvas = async (
   try {
     const image = new Image();
     image.decoding = "async";
+<<<<<<< HEAD
     await withCaptureTimeout(
       new Promise<void>((resolve, reject) => {
         image.onload = () => resolve();
@@ -274,6 +278,13 @@ const renderSvgToCanvas = async (
       CAPTURE_RENDER_TIMEOUT_MS,
       "La captura tardó demasiado en prepararse. Prueba con una página más sencilla.",
     );
+=======
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new WebpageCaptureError("La página no se pudo convertir en imagen. Prueba con otra URL o con menos contenido."));
+      image.src = url;
+    });
+>>>>>>> origin/main
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(width * scale));
     canvas.height = Math.max(1, Math.round(height * scale));
@@ -429,6 +440,7 @@ export const captureWebpage = async (options: CaptureOptions): Promise<CapturedS
 
   return captured;
 };
+<<<<<<< HEAD
 
 /* -------------------------------------------------------------------------- */
 /* Server-rendered full-page capture                                           */
@@ -675,3 +687,5 @@ export const pageLooksScriptDriven = (doc: Document): boolean => {
   return text.length < 240 && media < 3 && elements < 120;
 };
 
+=======
+>>>>>>> origin/main

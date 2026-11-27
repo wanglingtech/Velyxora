@@ -1,4 +1,5 @@
 import { Router } from 'express';
+<<<<<<< HEAD
 import {
   captureWebpage,
   snapshotWebpage,
@@ -7,13 +8,22 @@ import {
 } from '../controllers/webpageController';
 import { requireProcessingAuth } from '../middleware/auth';
 import { webpageAssetLimit, webpageCaptureLimit, webpageSnapshotLimit } from '../security/routeLimits';
+=======
+import { snapshotWebpage, webpageAsset } from '../controllers/webpageController';
+import { requireProcessingAuth } from '../middleware/auth';
+import { webpageAssetLimit, webpageSnapshotLimit } from '../security/routeLimits';
+>>>>>>> origin/main
 
 const router = Router();
 router.use(requireProcessingAuth);
 
+<<<<<<< HEAD
 router.get('/capabilities', webpageSnapshotLimit, webpageCapabilities);
 router.post('/snapshot', webpageSnapshotLimit, snapshotWebpage);
 router.post('/capture', webpageCaptureLimit, captureWebpage);
+=======
+router.post('/snapshot', webpageSnapshotLimit, snapshotWebpage);
+>>>>>>> origin/main
 router.get('/asset', webpageAssetLimit, webpageAsset);
 
 export default router;

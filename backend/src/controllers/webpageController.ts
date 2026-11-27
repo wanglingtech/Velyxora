@@ -5,6 +5,7 @@ import {
   fetchWebpageAsset,
   fetchWebpageSnapshot,
 } from "../services/webpageSnapshotService";
+<<<<<<< HEAD
 import {
   captureWebpageScreenshot,
   isBrowserCaptureAvailable,
@@ -17,6 +18,12 @@ const errorResponse = (res: Response, error: unknown, fallback: string): void =>
       ? HTTP_STATUS.SERVICE_UNAVAILABLE
       : HTTP_STATUS.UNPROCESSABLE_ENTITY;
   res.status(status).json({
+=======
+
+const errorResponse = (res: Response, error: unknown, fallback: string): void => {
+  const webpageError = error instanceof WebpageFetchError ? error : null;
+  res.status(HTTP_STATUS.UNPROCESSABLE_ENTITY).json({
+>>>>>>> origin/main
     success: false,
     error: {
       code: webpageError?.code || "PAGE_FETCH_FAILED",
@@ -61,6 +68,7 @@ export async function snapshotWebpage(req: Request, res: Response): Promise<void
   }
 }
 
+<<<<<<< HEAD
 export async function webpageCapabilities(_req: Request, res: Response): Promise<void> {
   res.status(HTTP_STATUS.OK).json({
     success: true,
@@ -101,6 +109,8 @@ export async function captureWebpage(req: Request, res: Response): Promise<void>
   }
 }
 
+=======
+>>>>>>> origin/main
 export async function webpageAsset(req: Request, res: Response): Promise<void> {
   const url = readUrl(req.query.url);
   if (!url) {
