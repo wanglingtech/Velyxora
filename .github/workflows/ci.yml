@@ -8,10 +8,6 @@ on:
 
 env:
   NODE_VERSION: '22'
-<<<<<<< HEAD
-=======
-  PNPM_VERSION: '9'
->>>>>>> origin/main
 
 jobs:
   typecheck:
@@ -19,48 +15,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-<<<<<<< HEAD
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - run: npm run typecheck
-=======
-      - uses: pnpm/action-setup@v3
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run typecheck
->>>>>>> origin/main
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-<<<<<<< HEAD
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - run: npm run lint
-=======
-      - uses: pnpm/action-setup@v3
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run lint
->>>>>>> origin/main
 
   test:
     name: Tests
@@ -83,7 +55,6 @@ jobs:
       NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
-<<<<<<< HEAD
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -92,19 +63,6 @@ jobs:
       - run: npm run db:generate
       - run: npm run db:migrate
       - run: npm run test
-=======
-      - uses: pnpm/action-setup@v3
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run db:generate
-      - run: pnpm run db:migrate
-      - run: pnpm run test
->>>>>>> origin/main
 
   build:
     name: Build (Frontend + Backend)
@@ -112,24 +70,12 @@ jobs:
     needs: [typecheck, lint, test]
     steps:
       - uses: actions/checkout@v4
-<<<<<<< HEAD
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - run: npm run build
-=======
-      - uses: pnpm/action-setup@v3
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
->>>>>>> origin/main
       - uses: actions/upload-artifact@v4
         with:
           name: dist
@@ -142,24 +88,12 @@ jobs:
     needs: [typecheck, lint]
     steps:
       - uses: actions/checkout@v4
-<<<<<<< HEAD
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - run: npm run build:frontend
-=======
-      - uses: pnpm/action-setup@v3
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build:frontend
->>>>>>> origin/main
       - uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
